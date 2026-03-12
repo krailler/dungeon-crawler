@@ -68,12 +68,14 @@ export class WallOcclusionSystem {
     }
 
     wall.material = this.fadedMaterial;
+    wall.isPickable = false;
   }
 
   private restoreWall(wall: Mesh): void {
     const origMat = this.originalMaterials.get(wall);
     if (origMat && wall.material !== origMat) {
       wall.material = origMat;
+      wall.isPickable = true;
     }
   }
 }
