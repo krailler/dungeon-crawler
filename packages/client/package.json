@@ -13,8 +13,8 @@
     "@babylonjs/gui": "^8.55.0",
     "@babylonjs/loaders": "^8.55.0",
     "@babylonjs/materials": "^8.55.0",
+    "@colyseus/sdk": "^0.17.35",
     "@dungeon/shared": "*",
-    "colyseus.js": "^0.16.20",
     "recast-detour": "^1.6.4"
   },
   "devDependencies": {

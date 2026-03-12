@@ -9,8 +9,8 @@
     },
     {
       "name": "server",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "watch", "packages/server/src/main.ts"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace=@dungeon/server"],
       "port": 3000
     }
   ]

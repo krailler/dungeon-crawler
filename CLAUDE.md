@@ -3,7 +3,7 @@
 ## Tech Stack
 
 - **3D Engine**: Babylon.js 8.x (client)
-- **Multiplayer**: Colyseus 0.16.x (server) + colyseus.js 0.16.x (client)
+- **Multiplayer**: Colyseus 0.17.x (server) + @colyseus/sdk 0.17.x (client)
 - **Language**: TypeScript 5.9 (strict mode)
 - **Bundler**: Vite 8.x (client)
 - **Server runtime**: tsx (esbuild, watch mode)
@@ -62,10 +62,9 @@ packages/
 
 - Server owns all game logic: dungeon gen, pathfinding, AI, combat
 - Clients are dumb renderers: receive state, interpolate, render meshes
-- Colyseus Schema v3 for state sync (binary delta encoding)
-- `defineTypes()` API (not decorators) — tsx/esbuild only supports TC39 Stage 3 decorators
-- Synced Schema fields MUST use `declare` (no initializer) to avoid esbuild overwriting Schema's property descriptors
-- Server-only fields (path, speed, currentPathIndex) use normal initializers
+- Colyseus Schema v4 for state sync (binary delta encoding)
+- `@type()` decorators with `experimentalDecorators: true` + `useDefineForClassFields: false` in server tsconfig
+- Server-only fields (path, speed, currentPathIndex) use normal initializers (not in Schema)
 
 ### Entity pattern: Hybrid (not pure ECS)
 
@@ -130,9 +129,9 @@ packages/
 
 ### Colyseus Schema conventions
 
-- Use `defineTypes()` programmatic API (NOT `@type()` decorators)
-- Synced fields: `declare x: number;` — NEVER use initializers on synced fields
-- Server-only fields: normal `path: WorldPos[] = [];` — NOT in defineTypes
+- Use `@type()` decorators for synced fields (server tsconfig has `experimentalDecorators: true`)
+- Synced fields: `@type("float32") x: number = 0;` — with default values
+- Server-only fields: normal `path: WorldPos[] = [];` — no `@type()` decorator
 - Client callbacks: `$(room.state).listen(prop, cb)`, `$(room.state).players.onAdd(cb)`, `$(player).onChange(cb)`
 
 ## Vite Configuration

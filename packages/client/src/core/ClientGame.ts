@@ -7,7 +7,7 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
 
-import { Client, Room, getStateCallbacks } from "colyseus.js";
+import { Client, Room, getStateCallbacks } from "@colyseus/sdk";
 
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";

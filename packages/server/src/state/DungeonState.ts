@@ -1,20 +1,11 @@
-import { Schema, MapSchema, defineTypes } from "@colyseus/schema";
+import { Schema, MapSchema, type } from "@colyseus/schema";
 import { PlayerState } from "./PlayerState";
 import { EnemyState } from "./EnemyState";
 
 export class DungeonState extends Schema {
-  // Synced fields — use `declare` to avoid esbuild overwriting Schema descriptors
-  declare players: MapSchema<PlayerState>;
-  declare enemies: MapSchema<EnemyState>;
-  declare tileMapData: string;
-  declare mapWidth: number;
-  declare mapHeight: number;
+  @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
+  @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>();
+  @type("string") tileMapData: string = "";
+  @type("uint16") mapWidth: number = 0;
+  @type("uint16") mapHeight: number = 0;
 }
-
-defineTypes(DungeonState, {
-  players: { map: PlayerState },
-  enemies: { map: EnemyState },
-  tileMapData: "string",
-  mapWidth: "uint16",
-  mapHeight: "uint16",
-});

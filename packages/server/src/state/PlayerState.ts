@@ -1,26 +1,15 @@
-import { Schema, defineTypes } from "@colyseus/schema";
+import { Schema, type } from "@colyseus/schema";
 
 export class PlayerState extends Schema {
-  // Synced fields — use `declare` so esbuild/tsx won't emit
-  // Object.defineProperty that overwrites Schema's property descriptors.
-  declare x: number;
-  declare z: number;
-  declare rotY: number;
-  declare health: number;
-  declare maxHealth: number;
-  declare isMoving: boolean;
+  @type("float32") x: number = 0;
+  @type("float32") z: number = 0;
+  @type("float32") rotY: number = 0;
+  @type("int16") health: number = 0;
+  @type("int16") maxHealth: number = 0;
+  @type("boolean") isMoving: boolean = false;
 
-  // Server-only (not synced — not in defineTypes)
+  // Server-only (not synced)
   path: { x: number; z: number }[] = [];
   currentPathIndex: number = 0;
   speed: number = 0;
 }
-
-defineTypes(PlayerState, {
-  x: "float32",
-  z: "float32",
-  rotY: "float32",
-  health: "int16",
-  maxHealth: "int16",
-  isMoving: "boolean",
-});

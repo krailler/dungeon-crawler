@@ -1,7 +1,7 @@
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
 
 export class InputManager {

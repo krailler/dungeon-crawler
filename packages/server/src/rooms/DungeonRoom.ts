@@ -8,7 +8,6 @@ import type { Room as DungeonRoomDef } from "../dungeon/DungeonGenerator";
 import { Pathfinder } from "../navigation/Pathfinder";
 import { AISystem } from "../systems/AISystem";
 import { CombatSystem } from "../systems/CombatSystem";
-import { MapSchema } from "@colyseus/schema";
 import {
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
@@ -26,18 +25,14 @@ import type { MoveMessage } from "@dungeon/shared";
 
 const TICK_RATE = 50; // ms between simulation ticks (~20 ticks/sec)
 
-export class DungeonRoom extends Room<DungeonState> {
+export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
   private aiSystem!: AISystem;
   private combatSystem!: CombatSystem;
   private tileMap!: TileMap;
 
   onCreate(): void {
-    const state = new DungeonState();
-    // Initialize MapSchema fields (declare doesn't create them)
-    state.players = new MapSchema<PlayerState>();
-    state.enemies = new MapSchema<EnemyState>();
-    this.setState(state);
+    this.setState(new DungeonState());
 
     // Generate dungeon
     const generator = new DungeonGenerator();
@@ -128,7 +123,7 @@ export class DungeonRoom extends Room<DungeonState> {
 
     // AI system: enemies chase and attack players
     const playersMap = new Map<string, PlayerState>();
-    this.state.players.forEach((player, sessionId) => {
+    this.state.players.forEach((player: PlayerState, sessionId: string) => {
       playersMap.set(sessionId, player);
     });
 
@@ -141,7 +136,7 @@ export class DungeonRoom extends Room<DungeonState> {
 
     // Combat system: player auto-attack
     const enemiesMap = new Map<string, EnemyState>();
-    this.state.enemies.forEach((enemy, id) => {
+    this.state.enemies.forEach((enemy: EnemyState, id: string) => {
       enemiesMap.set(id, enemy);
     });
 
