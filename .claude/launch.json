@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dev",
+      "name": "client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--workspace=@dungeon/client"],
       "port": 5173
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "watch", "packages/server/src/main.ts"],
+      "port": 3000
     }
   ]
 }

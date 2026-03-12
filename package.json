@@ -2,23 +2,23 @@
   "name": "dungeon-crawler",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "npm run dev --workspace=@dungeon/client",
+    "build": "npm run build --workspace=@dungeon/client",
+    "server": "npm run start --workspace=@dungeon/server",
+    "server:dev": "npm run dev --workspace=@dungeon/server",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json,md,html,css}": "prettier --write"
   },
   "devDependencies": {
-    "@babylonjs/inspector": "^8.55.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3",
     "prettier": "^3.8.1",
-    "typescript": "~5.9.3",
-    "vite": "^8.0.0"
-  },
-  "dependencies": {
-    "@babylonjs/core": "^8.55.0",
-    "@babylonjs/gui": "^8.55.0",
-    "@babylonjs/loaders": "^8.55.0",
-    "@babylonjs/materials": "^8.55.0",
-    "recast-detour": "^1.6.4"
+    "typescript": "~5.9.3"
   }
 }

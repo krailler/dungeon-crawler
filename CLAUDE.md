@@ -2,79 +2,111 @@
 
 ## Tech Stack
 
-- **3D Engine**: Babylon.js 8.x
+- **3D Engine**: Babylon.js 8.x (client)
+- **Multiplayer**: Colyseus 0.16.x (server) + colyseus.js 0.16.x (client)
 - **Language**: TypeScript 5.9 (strict mode)
-- **Bundler**: Vite 8.x
-- **Pathfinding**: recast-detour (WASM, navmesh)
+- **Bundler**: Vite 8.x (client)
+- **Server runtime**: tsx (esbuild, watch mode)
+- **Pathfinding**: Grid-based A\* on TileMap (server-side)
 - **UI**: HTML/CSS overlay for HUD, Babylon.js GUI only for in-world UI (floating bars)
 
 ## Commands
 
 ```bash
-npm run dev      # Dev server with HMR
-npm run build    # Production build
-npm run preview  # Preview production build
+npm run dev          # Client dev server with HMR (Vite)
+npm run build        # Client production build
+npm run server       # Start game server
+npm run server:dev   # Start game server with watch (auto-restart)
 ```
 
-## Project Structure
+## Project Structure (monorepo with npm workspaces)
 
 ```
-src/
-  core/           # Game loop, input, asset loading
-  camera/         # Isometric camera
-  entities/       # Player, Enemy, Entity base
-  components/     # HealthComponent, CombatStats, Movement
-  systems/        # MovementSystem, CombatSystem, AISystem
-  dungeon/        # Procedural generator, TileMap, renderer
-  navigation/     # NavMesh wrapper (RecastJSPlugin)
-  ui/             # HUD HTML overlay
-  lighting/       # Dungeon lighting
-  utils/          # Constants, helpers
-  main.ts         # Entry point
-public/assets/    # Models, textures, sounds
+packages/
+  shared/           # Code shared between client and server
+    src/
+      Constants.ts    # All game balance constants (TILE_SIZE, PLAYER_*, ENEMY_*, etc.)
+      TileMap.ts      # 2D grid data + TileType + serialization
+      protocol.ts     # MessageType + MoveMessage interface
+      index.ts        # Barrel export
+  server/           # Authoritative game server (Colyseus)
+    src/
+      state/          # Schema state classes (PlayerState, EnemyState, DungeonState)
+      rooms/          # DungeonRoom (game loop, message handlers)
+      systems/        # AISystem, CombatSystem (server-side logic)
+      dungeon/        # DungeonGenerator (procedural, no Babylon deps)
+      navigation/     # Pathfinder (A* on TileMap, uses WorldPos)
+      main.ts         # Server entry point
+  client/           # Babylon.js renderer + Colyseus client
+    src/
+      core/           # ClientGame, InputManager
+      camera/         # IsometricCamera
+      entities/       # ClientPlayer, ClientEnemy (mesh + interpolation)
+      dungeon/        # DungeonRenderer (3D mesh generation)
+      systems/        # WallOcclusionSystem
+      ui/             # HUD HTML overlay
+      main.ts         # Client entry point
+    index.html
+    vite.config.ts
 ```
 
 ## Architectural Decisions
 
 ### Engine: Babylon.js (not Three.js)
+
 - Built-in physics, GUI, collisions, particles
 - Native TypeScript
 - Better suited for games vs Three.js which is more general-purpose
 
+### Architecture: Authoritative Server
+
+- Server owns all game logic: dungeon gen, pathfinding, AI, combat
+- Clients are dumb renderers: receive state, interpolate, render meshes
+- Colyseus Schema v3 for state sync (binary delta encoding)
+- `defineTypes()` API (not decorators) — tsx/esbuild only supports TC39 Stage 3 decorators
+- Synced Schema fields MUST use `declare` (no initializer) to avoid esbuild overwriting Schema's property descriptors
+- Server-only fields (path, speed, currentPathIndex) use normal initializers
+
 ### Entity pattern: Hybrid (not pure ECS)
-- Classes: Entity (base) -> Player, Enemy
-- Components as attached data: HealthComponent, CombatStatsComponent, MovementComponent
-- Systems process logic each frame: MovementSystem, CombatSystem, AISystem
+
+- Server: Schema state classes (PlayerState, EnemyState) + Systems (AISystem, CombatSystem)
+- Client: ClientPlayer, ClientEnemy (mesh + lerp interpolation toward server state)
 - Pure ECS is overkill for MVP with ~3 entity types
 
 ### Camera: ArcRotateCamera in perspective mode
+
 - alpha = -PI/4 (45° diagonal view)
 - beta = PI/3 (60° from zenith = 30° above horizon)
 - radius = 25, zoom range 20-30
 - Locked angles, no panning — follows player with lerp
 
 ### Physics: Custom (not Havok)
-- Distance-based collisions + navmesh clamping
+
+- Distance-based collisions on server + navmesh clamping via A\* pathfinding
 - Havok adds ~2MB WASM with no benefit for this genre
-- NavMesh prevents walking through walls
+- A\* pathfinding on TileMap prevents walking through walls
 
 ### Dungeons: Procedural tile-based generation
+
 - 2D grid with TileType (WALL, FLOOR, DOOR, SPAWN, EXIT)
 - Algorithm: random room placement + L-shaped corridors
 - DungeonRenderer converts tiles to 3D meshes (boxes)
 - TILE_SIZE = 2 world units
 
-### Pathfinding: Grid-based A* on TileMap
-- Custom A* implementation on the 2D tile grid (8-directional with diagonal wall check)
+### Pathfinding: Grid-based A\* on TileMap
+
+- Custom A\* implementation on the 2D tile grid (8-directional with diagonal wall check)
 - Octile distance heuristic, skips start node in returned path
 - recast-detour available for upgrade to NavMesh if needed later
 
 ### UI: HTML/CSS overlay
+
 - Better performance for frequent updates (health, damage)
 - Easier to style than Babylon.js GUI
 - Babylon.js GUI only for floating bars above enemies (linkWithMesh)
 
 ### Lighting
+
 - HemisphericLight ambient (intensity 0.7 debug, lower to 0.1 for gameplay)
 - SpotLight as player torch (with ShadowGenerator PCF)
 - PointLights for wall torches (no shadows, atmosphere only)
@@ -91,10 +123,17 @@ public/assets/    # Models, textures, sounds
   import { Engine } from "@babylonjs/core";
   ```
 - Classes in PascalCase, files in PascalCase.ts
-- Constants in UPPER_SNAKE_CASE in Constants.ts
+- Constants in UPPER_SNAKE_CASE in shared Constants.ts
 - One file per class/component
 - No `enum` keyword — use `as const` objects + type union (tsconfig `erasableSyntaxOnly`)
 - No constructor parameter properties (`private x: T`) — declare fields explicitly
+
+### Colyseus Schema conventions
+
+- Use `defineTypes()` programmatic API (NOT `@type()` decorators)
+- Synced fields: `declare x: number;` — NEVER use initializers on synced fields
+- Server-only fields: normal `path: WorldPos[] = [];` — NOT in defineTypes
+- Client callbacks: `$(room.state).listen(prop, cb)`, `$(room.state).players.onAdd(cb)`, `$(player).onChange(cb)`
 
 ## Vite Configuration
 
@@ -105,27 +144,43 @@ public/assets/    # Models, textures, sounds
 
 - [x] Phase 0: Project setup + documentation + base scene
 - [x] Phase 1: Dungeon generation (DungeonGenerator + DungeonRenderer)
-- [x] Phase 2: Player with click-to-move (Player + A* Pathfinder + Input)
+- [x] Phase 2: Player with click-to-move (Player + A\* Pathfinder + Input)
 - [x] Phase 3: Enemies with basic AI (Enemy + AISystem)
 - [x] Phase 4: Combat system + functional HUD (CombatSystem + damage)
+- [x] Phase 4.5: Client-server migration (Colyseus multiplayer)
 - [ ] Phase 5: Polish (dynamic lighting, particles, sound)
 
 ## Implemented Files
 
-- `src/main.ts` — Entry point, creates Game
-- `src/core/Game.ts` — Engine + Scene + render loop + game loop + dungeon + player
-- `src/camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles
-- `src/utils/Constants.ts` — Tuning constants (tile size, camera, player stats)
-- `src/dungeon/TileMap.ts` — 2D grid data structure + TileType const object
-- `src/dungeon/DungeonGenerator.ts` — Random room placement + L-shaped corridors
-- `src/dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes
-- `src/entities/Player.ts` — Player mesh (cylinder+sphere), path following, rotation
-- `src/core/InputManager.ts` — Click-on-floor raycasting via scene.pick()
-- `src/navigation/Pathfinder.ts` — A* pathfinding on TileMap grid (8-directional)
-- `src/systems/WallOcclusionSystem.ts` — Diablo-style wall transparency (fades walls between camera and player)
-- `src/entities/Enemy.ts` — Enemy mesh (red cylinder+sphere), path following, health, damage
-- `src/systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK states, A* repath, attack cooldown
-- `src/systems/CombatSystem.ts` — Player auto-attack: targets closest enemy in range, cooldown-based
-- `src/ui/HUD.ts` — HTML overlay: health bar with color changes (green/orange/red)
-- `index.html` — Fullscreen canvas + HUD overlay (health bar)
+### Shared (`packages/shared/src/`)
+
+- `Constants.ts` — All game balance constants (TILE*SIZE, PLAYER*\_, ENEMY\_\_, CAMERA*\*, DUNGEON*\*)
+- `TileMap.ts` — 2D grid data + TileType + `serializeGrid()` / `fromSerialized()` for network transfer
+- `protocol.ts` — MessageType const object + MoveMessage interface
+- `index.ts` — Barrel export
+
+### Server (`packages/server/src/`)
+
+- `main.ts` — Colyseus Server entry, defines "dungeon" room
+- `rooms/DungeonRoom.ts` — Game room: dungeon gen, message handlers, 20-tick game loop
+- `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies, tileMapData)
+- `state/PlayerState.ts` — Player Schema (position, health, synced) + server-only path data
+- `state/EnemyState.ts` — Enemy Schema (position, health, isDead) + server-only AI data
+- `systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK, multi-player targeting, A\* repath
+- `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, closest enemy targeting
+- `dungeon/DungeonGenerator.ts` — Procedural dungeon (no Babylon deps)
+- `navigation/Pathfinder.ts` — A\* on TileMap (uses WorldPos, no Babylon deps)
+
+### Client (`packages/client/src/`)
+
+- `main.ts` — Entry point, creates ClientGame
+- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, entity management
+- `core/InputManager.ts` — Click-on-floor raycasting, sends MOVE to server
+- `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles
+- `entities/ClientPlayer.ts` — Player mesh + lerp interpolation from server state
+- `entities/ClientEnemy.ts` — Enemy mesh + lerp + hit flash on damage
+- `dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes
+- `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency
+- `ui/HUD.ts` — HTML overlay: health bar with color changes (green/orange/red)
+- `index.html` — Fullscreen canvas + HUD overlay
 - `vite.config.ts` — WASM exclusion for recast-detour

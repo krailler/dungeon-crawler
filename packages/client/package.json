@@ -1,0 +1,24 @@
+{
+  "name": "@dungeon/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^8.55.0",
+    "@babylonjs/gui": "^8.55.0",
+    "@babylonjs/loaders": "^8.55.0",
+    "@babylonjs/materials": "^8.55.0",
+    "@dungeon/shared": "*",
+    "colyseus.js": "^0.16.20",
+    "recast-detour": "^1.6.4"
+  },
+  "devDependencies": {
+    "@babylonjs/inspector": "^8.55.0",
+    "vite": "^8.0.0"
+  }
+}
