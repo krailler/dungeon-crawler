@@ -106,8 +106,8 @@ public/assets/    # Models, textures, sounds
 - [x] Phase 0: Project setup + documentation + base scene
 - [x] Phase 1: Dungeon generation (DungeonGenerator + DungeonRenderer)
 - [x] Phase 2: Player with click-to-move (Player + A* Pathfinder + Input)
-- [ ] Phase 3: Enemies with basic AI (Enemy + AISystem)
-- [ ] Phase 4: Combat system + functional HUD (CombatSystem + damage)
+- [x] Phase 3: Enemies with basic AI (Enemy + AISystem)
+- [x] Phase 4: Combat system + functional HUD (CombatSystem + damage)
 - [ ] Phase 5: Polish (dynamic lighting, particles, sound)
 
 ## Implemented Files
@@ -123,5 +123,9 @@ public/assets/    # Models, textures, sounds
 - `src/core/InputManager.ts` — Click-on-floor raycasting via scene.pick()
 - `src/navigation/Pathfinder.ts` — A* pathfinding on TileMap grid (8-directional)
 - `src/systems/WallOcclusionSystem.ts` — Diablo-style wall transparency (fades walls between camera and player)
+- `src/entities/Enemy.ts` — Enemy mesh (red cylinder+sphere), path following, health, damage
+- `src/systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK states, A* repath, attack cooldown
+- `src/systems/CombatSystem.ts` — Player auto-attack: targets closest enemy in range, cooldown-based
+- `src/ui/HUD.ts` — HTML overlay: health bar with color changes (green/orange/red)
 - `index.html` — Fullscreen canvas + HUD overlay (health bar)
 - `vite.config.ts` — WASM exclusion for recast-detour

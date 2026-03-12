@@ -50,6 +50,17 @@
         transition: width 0.3s ease;
       }
 
+      #fps-counter {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        color: #aaa;
+        font-family: monospace;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 10;
+      }
+
       #health-text {
         position: absolute;
         top: 50%;
@@ -64,6 +75,7 @@
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
+    <div id="fps-counter">-- FPS</div>
     <div id="hud">
       <div id="health-bar">
         <div id="health-fill"></div>

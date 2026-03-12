@@ -10,9 +10,15 @@ import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonGenerator } from "../dungeon/DungeonGenerator";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { Player } from "../entities/Player";
+import { Enemy } from "../entities/Enemy";
 import { InputManager } from "./InputManager";
 import { Pathfinder } from "../navigation/Pathfinder";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
+import { AISystem } from "../systems/AISystem";
+import { CombatSystem } from "../systems/CombatSystem";
+import { HUD } from "../ui/HUD";
+import type { Room } from "../dungeon/DungeonGenerator";
+import { TILE_SIZE } from "../utils/Constants";
 const DUNGEON_WIDTH = 40;
 const DUNGEON_HEIGHT = 40;
 const DUNGEON_ROOMS = 7;
@@ -26,6 +32,10 @@ export class Game {
   private inputManager: InputManager | null = null;
   private pathfinder: Pathfinder | null = null;
   private wallOcclusion: WallOcclusionSystem | null = null;
+  private enemies: Enemy[] = [];
+  private aiSystem: AISystem | null = null;
+  private combatSystem: CombatSystem;
+  private hud: HUD;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -59,6 +69,15 @@ export class Game {
       this.isoCamera.camera,
       this.dungeonRenderer.getWallMeshes(),
     );
+
+    // Combat and HUD
+    this.combatSystem = new CombatSystem();
+    this.hud = new HUD();
+
+    // Spawn enemies in rooms (skip first room = spawn)
+    const rooms = generator.getRooms();
+    this.aiSystem = new AISystem(this.pathfinder);
+    this.spawnEnemies(rooms);
 
     // Game logic runs before each render
     this.scene.onBeforeRenderObservable.add(() => {
@@ -102,6 +121,22 @@ export class Game {
     // Update player movement
     this.player.update(dt);
 
+    // Update enemy AI
+    if (this.aiSystem) {
+      this.aiSystem.update(dt, this.player.getWorldPosition(), (damage) => {
+        if (!this.player) return;
+        this.player.health -= damage;
+        if (this.player.health < 0) this.player.health = 0;
+      });
+    }
+
+    // Player auto-attack
+    this.combatSystem.update(dt, this.player, this.enemies);
+
+    // Update HUD
+    this.hud.updateHealth(this.player.health, this.player.maxHealth);
+    this.hud.updateFPS(dt);
+
     // Wall occlusion
     const playerPos = this.player.getWorldPosition();
     if (this.wallOcclusion) {
@@ -110,6 +145,27 @@ export class Game {
 
     // Camera follows player
     this.isoCamera.followTarget(playerPos);
+  }
+
+  private spawnEnemies(rooms: Room[]): void {
+    let enemyId = 0;
+    // Skip first room (player spawn)
+    for (let i = 1; i < rooms.length; i++) {
+      const room = rooms[i];
+      const enemyCount = 1 + Math.floor(Math.random() * 2); // 1-2 per room
+
+      for (let j = 0; j < enemyCount; j++) {
+        const tileX = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
+        const tileY = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+        const worldPos = new Vector3(tileX * TILE_SIZE, 0, tileY * TILE_SIZE);
+
+        const enemy = new Enemy(this.scene, worldPos, enemyId++);
+        this.enemies.push(enemy);
+        if (this.aiSystem) {
+          this.aiSystem.register(enemy);
+        }
+      }
+    }
   }
 
   dispose(): void {
