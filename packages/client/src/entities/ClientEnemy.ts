@@ -3,6 +3,9 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
+import { Control } from "@babylonjs/gui/2D/controls/control";
+import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 
 const LERP_SPEED = 0.2;
 const HIT_FLASH_DURATION = 0.12;
@@ -22,7 +25,11 @@ export class ClientEnemy {
   private hitMaterial: StandardMaterial;
   private hitFlashTimer: number = 0;
 
-  constructor(scene: Scene, id: string, initialHealth: number) {
+  // Floating health bar
+  private healthBarBg: Rectangle;
+  private healthBarFill: Rectangle;
+
+  constructor(scene: Scene, id: string, initialHealth: number, guiTexture: AdvancedDynamicTexture) {
     this.previousHealth = initialHealth;
 
     this.mesh = MeshBuilder.CreateCylinder(
@@ -50,10 +57,39 @@ export class ClientEnemy {
     this.hitMaterial.specularColor = new Color3(0.5, 0.5, 0.5);
 
     this.mesh.position.y = 0.6;
+
+    // --- Floating health bar ---
+    this.healthBarBg = new Rectangle(`enemyHpBg_${id}`);
+    this.healthBarBg.widthInPixels = 60;
+    this.healthBarBg.heightInPixels = 8;
+    this.healthBarBg.cornerRadius = 2;
+    this.healthBarBg.thickness = 1;
+    this.healthBarBg.color = "#555";
+    this.healthBarBg.background = "#222";
+    this.healthBarBg.linkOffsetY = -70;
+    this.healthBarBg.isVisible = false; // hidden at full health
+
+    this.healthBarFill = new Rectangle(`enemyHpFill_${id}`);
+    this.healthBarFill.width = 1;
+    this.healthBarFill.height = 1;
+    this.healthBarFill.thickness = 0;
+    this.healthBarFill.background = "#4caf50";
+    this.healthBarFill.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+
+    this.healthBarBg.addControl(this.healthBarFill);
+    guiTexture.addControl(this.healthBarBg);
+    this.healthBarBg.linkWithMesh(this.mesh);
   }
 
   /** Called when server state changes */
-  setServerState(x: number, z: number, rotY: number, health: number, isDead: boolean): void {
+  setServerState(
+    x: number,
+    z: number,
+    rotY: number,
+    health: number,
+    maxHealth: number,
+    isDead: boolean,
+  ): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
@@ -64,8 +100,11 @@ export class ClientEnemy {
     }
     this.previousHealth = health;
 
+    this.updateHealthBar(health, maxHealth);
+
     if (isDead && !this.isDead) {
       this.isDead = true;
+      this.healthBarBg.dispose();
       this.mesh.dispose();
     }
   }
@@ -97,6 +136,27 @@ export class ClientEnemy {
     }
   }
 
+  private updateHealthBar(health: number, maxHealth: number): void {
+    if (maxHealth <= 0) return;
+
+    const ratio = health / maxHealth;
+
+    // Hide at full health, show when damaged
+    this.healthBarBg.isVisible = ratio < 1 && health > 0;
+
+    // Scale fill width
+    this.healthBarFill.width = Math.max(ratio, 0);
+
+    // Color by percentage: green > orange > red
+    if (ratio > 0.6) {
+      this.healthBarFill.background = "#4caf50";
+    } else if (ratio > 0.3) {
+      this.healthBarFill.background = "#ff9800";
+    } else {
+      this.healthBarFill.background = "#f44336";
+    }
+  }
+
   private triggerHitFlash(): void {
     this.mesh.material = this.hitMaterial;
     const head = this.mesh.getChildMeshes()[0];
@@ -105,6 +165,7 @@ export class ClientEnemy {
   }
 
   dispose(): void {
+    this.healthBarBg.dispose();
     if (!this.isDead) {
       this.mesh.dispose();
     }

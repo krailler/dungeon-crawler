@@ -16,6 +16,7 @@ import { ClientEnemy } from "../entities/ClientEnemy";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { HUD } from "../ui/HUD";
+import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { TileMap } from "@dungeon/shared";
 
 const SERVER_URL = "ws://localhost:3000";
@@ -27,6 +28,7 @@ export class ClientGame {
   private dungeonRenderer: DungeonRenderer;
   private wallOcclusion: WallOcclusionSystem | null = null;
   private hud: HUD;
+  private guiTexture: AdvancedDynamicTexture;
 
   // Colyseus
   private client: Client;
@@ -49,6 +51,7 @@ export class ClientGame {
     this.setupLighting();
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
+    this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     this.hud = new HUD();
     this.client = new Client(SERVER_URL);
 
@@ -141,14 +144,28 @@ export class ClientGame {
 
     // Enemies added
     state$.enemies.onAdd((enemy: any, id: string) => {
-      const clientEnemy = new ClientEnemy(this.scene, id, enemy.health);
+      const clientEnemy = new ClientEnemy(this.scene, id, enemy.health, this.guiTexture);
       clientEnemy.snapToPosition(enemy.x, enemy.z);
-      clientEnemy.setServerState(enemy.x, enemy.z, enemy.rotY, enemy.health, enemy.isDead);
+      clientEnemy.setServerState(
+        enemy.x,
+        enemy.z,
+        enemy.rotY,
+        enemy.health,
+        enemy.maxHealth,
+        enemy.isDead,
+      );
       this.enemies.set(id, clientEnemy);
 
       // Listen to changes on this enemy
       $(enemy).onChange(() => {
-        clientEnemy.setServerState(enemy.x, enemy.z, enemy.rotY, enemy.health, enemy.isDead);
+        clientEnemy.setServerState(
+          enemy.x,
+          enemy.z,
+          enemy.rotY,
+          enemy.health,
+          enemy.maxHealth,
+          enemy.isDead,
+        );
       });
     });
 
