@@ -122,14 +122,23 @@ export class ClientGame {
         this.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
       }
 
+      const name = isLocal ? "You" : `Player ${sessionId.slice(0, 4).toUpperCase()}`;
+      this.hud.setMember({
+        id: sessionId,
+        name,
+        health: player.health,
+        maxHealth: player.maxHealth,
+        isLocal,
+      });
+
       // Listen to changes on this player
       $(player).onChange(() => {
         clientPlayer.setServerState(player.x, player.z, player.rotY);
 
-        // Update HUD for local player
-        if (isLocal) {
-          this.hud.updateHealth(player.health, player.maxHealth);
-        }
+        this.hud.updateMember(sessionId, {
+          health: player.health,
+          maxHealth: player.maxHealth,
+        });
       });
     });
 
@@ -140,6 +149,7 @@ export class ClientGame {
         clientPlayer.dispose();
         this.players.delete(sessionId);
       }
+      this.hud.removeMember(sessionId);
     });
 
     // Enemies added
@@ -214,6 +224,7 @@ export class ClientGame {
 
   dispose(): void {
     this.room?.leave();
+    this.hud.dispose();
     this.dungeonRenderer.dispose();
     this.engine.dispose();
   }

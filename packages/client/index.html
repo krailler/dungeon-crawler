@@ -4,85 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dungeon Crawler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
       html,
       body {
         width: 100%;
         height: 100%;
+        margin: 0;
+        padding: 0;
         overflow: hidden;
-        background: #000;
+        background: #05070d;
       }
 
       #renderCanvas {
+        position: fixed;
+        inset: 0;
         width: 100%;
         height: 100%;
+        display: block;
         touch-action: none;
+        z-index: 0;
       }
 
-      #hud {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
+      #ui-root {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
         pointer-events: none;
-        z-index: 10;
-      }
-
-      #health-bar {
-        width: 200px;
-        height: 20px;
-        background: #333;
-        border: 2px solid #666;
-        border-radius: 4px;
-        overflow: hidden;
-        position: relative;
-      }
-
-      #health-fill {
-        width: 100%;
-        height: 100%;
-        background: #2ecc71;
-        transition: width 0.3s ease;
-      }
-
-      #fps-counter {
-        position: absolute;
-        top: 8px;
-        right: 10px;
-        color: #aaa;
-        font-family: monospace;
-        font-size: 12px;
-        pointer-events: none;
-        z-index: 10;
-      }
-
-      #health-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #fff;
-        font-family: monospace;
-        font-size: 12px;
-        text-shadow: 1px 1px 2px #000;
       }
     </style>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
-    <div id="fps-counter">-- FPS</div>
-    <div id="hud">
-      <div id="health-bar">
-        <div id="health-fill"></div>
-        <span id="health-text">100/100</span>
-      </div>
-    </div>
+    <div id="ui-root"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

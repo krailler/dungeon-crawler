@@ -15,10 +15,18 @@
     "@babylonjs/materials": "^8.55.0",
     "@colyseus/sdk": "^0.17.35",
     "@dungeon/shared": "*",
-    "recast-detour": "^1.6.4"
+    "recast-detour": "^1.6.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@babylonjs/inspector": "^8.55.0",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.0.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
     "vite": "^8.0.0"
   }
 }
