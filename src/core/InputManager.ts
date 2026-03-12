@@ -15,8 +15,10 @@ export class InputManager {
     this.floorMeshSet = new Set(floorMeshes);
 
     this.scene.onPointerObservable.add((pointerInfo) => {
-      if (pointerInfo.type === PointerEventTypes.POINTERTAP ||
-          pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+      if (
+        pointerInfo.type === PointerEventTypes.POINTERTAP ||
+        pointerInfo.type === PointerEventTypes.POINTERDOWN
+      ) {
         const pickInfo = pointerInfo.pickInfo;
         if (pickInfo && pickInfo.hit && pickInfo.pickedPoint && pickInfo.pickedMesh) {
           if (this.floorMeshSet.has(pickInfo.pickedMesh as Mesh)) {

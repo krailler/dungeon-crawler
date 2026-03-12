@@ -27,11 +27,7 @@ export class Player {
       scene,
     );
 
-    const head = MeshBuilder.CreateSphere(
-      "playerHead",
-      { diameter: 0.65, segments: 8 },
-      scene,
-    );
+    const head = MeshBuilder.CreateSphere("playerHead", { diameter: 0.65, segments: 8 }, scene);
     head.position.y = 0.9;
     head.parent = this.mesh;
 
@@ -60,11 +56,7 @@ export class Player {
 
     const target = this.path[this.currentPathIndex];
     const current = this.mesh.position;
-    const direction = new Vector3(
-      target.x - current.x,
-      0,
-      target.z - current.z,
-    );
+    const direction = new Vector3(target.x - current.x, 0, target.z - current.z);
     const distance = direction.length();
 
     if (distance < 0.15) {

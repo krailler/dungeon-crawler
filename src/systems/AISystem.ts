@@ -67,10 +67,7 @@ export class AISystem {
 
         if (entry.repathTimer <= 0) {
           entry.repathTimer = REPATH_INTERVAL;
-          const path = this.pathfinder.findPath(
-            entry.enemy.getWorldPosition(),
-            playerPos,
-          );
+          const path = this.pathfinder.findPath(entry.enemy.getWorldPosition(), playerPos);
           if (path.length > 0) {
             entry.enemy.setPath(path);
           }
@@ -86,8 +83,6 @@ export class AISystem {
   }
 
   getAliveEnemies(): Enemy[] {
-    return this.entries
-      .filter((e) => !e.enemy.isDead)
-      .map((e) => e.enemy);
+    return this.entries.filter((e) => !e.enemy.isDead).map((e) => e.enemy);
   }
 }

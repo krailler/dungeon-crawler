@@ -30,17 +30,10 @@ export class Pathfinder {
     if (tilePath.length === 0) return [];
 
     // Convert tile coords to world positions
-    return tilePath.map(
-      (node) => new Vector3(node.x * TILE_SIZE, 0, node.y * TILE_SIZE),
-    );
+    return tilePath.map((node) => new Vector3(node.x * TILE_SIZE, 0, node.y * TILE_SIZE));
   }
 
-  private astar(
-    sx: number,
-    sy: number,
-    ex: number,
-    ey: number,
-  ): { x: number; y: number }[] {
+  private astar(sx: number, sy: number, ex: number, ey: number): { x: number; y: number }[] {
     const open: Node[] = [];
     const closed = new Set<string>();
 
@@ -92,8 +85,10 @@ export class Pathfinder {
 
         // Prevent diagonal movement through walls
         if (dx !== 0 && dy !== 0) {
-          if (!this.map.isFloor(current.x + dx, current.y) ||
-              !this.map.isFloor(current.x, current.y + dy)) {
+          if (
+            !this.map.isFloor(current.x + dx, current.y) ||
+            !this.map.isFloor(current.x, current.y + dy)
+          ) {
             continue;
           }
         }

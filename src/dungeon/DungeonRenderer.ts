@@ -108,12 +108,7 @@ export class DungeonRenderer {
     this.floorMeshes.push(floor);
   }
 
-  private createWallBlock(
-    worldX: number,
-    worldZ: number,
-    tileX: number,
-    tileY: number,
-  ): void {
+  private createWallBlock(worldX: number, worldZ: number, tileX: number, tileY: number): void {
     const wall = MeshBuilder.CreateBox(
       `wall_${tileX}_${tileY}`,
       { width: TILE_SIZE, height: WALL_HEIGHT, depth: TILE_SIZE },

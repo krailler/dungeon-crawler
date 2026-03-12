@@ -85,11 +85,7 @@ export class Enemy {
 
     const target = this.path[this.currentPathIndex];
     const current = this.mesh.position;
-    const direction = new Vector3(
-      target.x - current.x,
-      0,
-      target.z - current.z,
-    );
+    const direction = new Vector3(target.x - current.x, 0, target.z - current.z);
     const distance = direction.length();
 
     if (distance < 0.15) {

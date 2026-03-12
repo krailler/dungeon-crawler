@@ -16,9 +16,7 @@ export class TileMap {
   constructor(width: number, height: number) {
     this.width = width;
     this.height = height;
-    this.grid = Array.from({ length: height }, () =>
-      Array<TileType>(width).fill(TileType.WALL),
-    );
+    this.grid = Array.from({ length: height }, () => Array<TileType>(width).fill(TileType.WALL));
   }
 
   get(x: number, y: number): TileType {
@@ -36,7 +34,12 @@ export class TileMap {
 
   isFloor(x: number, y: number): boolean {
     const tile = this.get(x, y);
-    return tile === TileType.FLOOR || tile === TileType.SPAWN || tile === TileType.EXIT || tile === TileType.DOOR;
+    return (
+      tile === TileType.FLOOR ||
+      tile === TileType.SPAWN ||
+      tile === TileType.EXIT ||
+      tile === TileType.DOOR
+    );
   }
 
   isAdjacentToFloor(x: number, y: number): boolean {

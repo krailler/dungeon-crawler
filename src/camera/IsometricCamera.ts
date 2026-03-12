@@ -41,10 +41,6 @@ export class IsometricCamera {
   }
 
   followTarget(position: Vector3): void {
-    this.camera.target = Vector3.Lerp(
-      this.camera.target,
-      position,
-      CAMERA_FOLLOW_SPEED,
-    );
+    this.camera.target = Vector3.Lerp(this.camera.target, position, CAMERA_FOLLOW_SPEED);
   }
 }

@@ -34,10 +34,7 @@ export class CombatSystem {
 
       // Face the enemy
       const ePos = closest.mesh.position;
-      const angle = Math.atan2(
-        ePos.x - player.mesh.position.x,
-        ePos.z - player.mesh.position.z,
-      );
+      const angle = Math.atan2(ePos.x - player.mesh.position.x, ePos.z - player.mesh.position.z);
       player.mesh.rotation.y = angle;
     }
   }

@@ -96,11 +96,7 @@ export class Game {
   }
 
   private setupLighting(): void {
-    const ambient = new HemisphericLight(
-      "ambient",
-      new Vector3(0, 1, 0),
-      this.scene,
-    );
+    const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), this.scene);
     ambient.intensity = 0.7;
     ambient.diffuse = new Color3(0.6, 0.6, 0.7);
     ambient.groundColor = new Color3(0.2, 0.2, 0.25);
