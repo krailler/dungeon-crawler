@@ -17,7 +17,7 @@ import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { HUD } from "../ui/HUD";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
-import { TileMap } from "@dungeon/shared";
+import { TileMap, unpackSetId, tileSetNameFromId } from "@dungeon/shared";
 
 const SERVER_URL = "ws://localhost:3000";
 
@@ -68,12 +68,13 @@ export class ClientGame {
       this.engine.resize();
     });
 
-    // Connect to server
-    this.connect();
+    // Load assets then connect to server
+    this.init();
   }
 
-  private async connect(): Promise<void> {
+  private async init(): Promise<void> {
     try {
+      // Connect first — floor assets are loaded lazily after we know which sets the dungeon uses
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
       this.localSessionId = room.sessionId;
@@ -97,17 +98,37 @@ export class ClientGame {
       const width = (room.state as any).mapWidth;
       const height = (room.state as any).mapHeight;
       const tileMap = TileMap.fromSerialized(width, height, flat);
-      this.dungeonRenderer.render(tileMap);
 
-      // Setup input after dungeon renders (sends move commands to server)
-      new InputManager(this.scene, this.dungeonRenderer.getFloorMeshes(), room);
+      // Parse packed floor variant data from server
+      const variantRaw = (room.state as any).floorVariantData;
+      const floorVariants: number[] = variantRaw ? JSON.parse(variantRaw) : [];
 
-      // Setup wall occlusion
-      this.wallOcclusion = new WallOcclusionSystem(
-        this.scene,
-        this.isoCamera.camera,
-        this.dungeonRenderer.getWallMeshes(),
-      );
+      // Scan packed values to find which tile sets are actually used
+      const usedSetNames = new Set<string>();
+      for (const packed of floorVariants) {
+        if (packed === 0) continue;
+        const setId = unpackSetId(packed);
+        const name = tileSetNameFromId(setId);
+        if (name) usedSetNames.add(name);
+      }
+
+      // Load only the sets this dungeon needs, then render
+      const setNames = Array.from(usedSetNames);
+      console.log("[Client] Loading floor tile sets:", setNames);
+      this.dungeonRenderer.loadAssets(setNames).then(() => {
+        console.log("[Client] Floor assets loaded, rendering dungeon");
+        this.dungeonRenderer.render(tileMap, floorVariants);
+
+        // Setup input after dungeon renders (sends move commands to server)
+        new InputManager(this.scene, this.dungeonRenderer.getFloorMeshes(), room);
+
+        // Setup wall occlusion
+        this.wallOcclusion = new WallOcclusionSystem(
+          this.scene,
+          this.isoCamera.camera,
+          this.dungeonRenderer.getWallMeshes(),
+        );
+      });
     });
 
     // Players added

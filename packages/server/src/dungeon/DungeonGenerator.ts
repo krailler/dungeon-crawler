@@ -9,24 +9,30 @@ export interface Room {
 
 export class DungeonGenerator {
   private rooms: Room[] = [];
+  /** Grid tracking which room (index) owns each tile. -1 = unowned. */
+  private roomOwnership: number[][] = [];
 
   generate(width: number, height: number, roomCount: number): TileMap {
     this.rooms = [];
     const map = new TileMap(width, height);
+
+    // Initialize ownership grid to -1 (unowned)
+    this.roomOwnership = Array.from({ length: height }, () => Array<number>(width).fill(-1));
 
     // Place random non-overlapping rooms
     const maxAttempts = roomCount * 10;
     for (let i = 0; i < maxAttempts && this.rooms.length < roomCount; i++) {
       const room = this.randomRoom(width, height);
       if (!this.overlapsAny(room)) {
+        const roomIndex = this.rooms.length;
         this.rooms.push(room);
-        this.carveRoom(map, room);
+        this.carveRoom(map, room, roomIndex);
       }
     }
 
     // Connect rooms with L-shaped corridors
     for (let i = 1; i < this.rooms.length; i++) {
-      this.carveCorridor(map, this.rooms[i - 1], this.rooms[i]);
+      this.carveCorridor(map, this.rooms[i - 1], this.rooms[i], i - 1);
     }
 
     // Mark spawn in first room center
@@ -50,6 +56,11 @@ export class DungeonGenerator {
 
   getRooms(): Room[] {
     return this.rooms;
+  }
+
+  /** Get the room ownership grid. Each cell is a room index or -1. */
+  getRoomOwnership(): number[][] {
+    return this.roomOwnership;
   }
 
   private randomRoom(mapWidth: number, mapHeight: number): Room {
@@ -77,45 +88,66 @@ export class DungeonGenerator {
     return false;
   }
 
-  private carveRoom(map: TileMap, room: Room): void {
+  private carveRoom(map: TileMap, room: Room, roomIndex: number): void {
     for (let y = room.y; y < room.y + room.h; y++) {
       for (let x = room.x; x < room.x + room.w; x++) {
         map.set(x, y, TileType.FLOOR);
+        this.roomOwnership[y][x] = roomIndex;
       }
     }
   }
 
-  private carveCorridor(map: TileMap, a: Room, b: Room): void {
+  private carveCorridor(map: TileMap, a: Room, b: Room, sourceRoomIndex: number): void {
     const ax = a.x + Math.floor(a.w / 2);
     const ay = a.y + Math.floor(a.h / 2);
     const bx = b.x + Math.floor(b.w / 2);
     const by = b.y + Math.floor(b.h / 2);
 
     if (Math.random() < 0.5) {
-      this.carveHorizontal(map, ax, bx, ay);
-      this.carveVertical(map, ay, by, bx);
+      this.carveHorizontal(map, ax, bx, ay, sourceRoomIndex);
+      this.carveVertical(map, ay, by, bx, sourceRoomIndex);
     } else {
-      this.carveVertical(map, ay, by, ax);
-      this.carveHorizontal(map, ax, bx, by);
+      this.carveVertical(map, ay, by, ax, sourceRoomIndex);
+      this.carveHorizontal(map, ax, bx, by, sourceRoomIndex);
     }
   }
 
-  private carveHorizontal(map: TileMap, x1: number, x2: number, y: number): void {
+  private carveHorizontal(
+    map: TileMap,
+    x1: number,
+    x2: number,
+    y: number,
+    sourceRoomIndex: number,
+  ): void {
     const start = Math.min(x1, x2);
     const end = Math.max(x1, x2);
     for (let x = start; x <= end; x++) {
       if (map.get(x, y) === TileType.WALL) {
         map.set(x, y, TileType.FLOOR);
       }
+      // Only assign ownership if tile is not already owned by a room
+      if (this.roomOwnership[y][x] === -1) {
+        this.roomOwnership[y][x] = sourceRoomIndex;
+      }
     }
   }
 
-  private carveVertical(map: TileMap, y1: number, y2: number, x: number): void {
+  private carveVertical(
+    map: TileMap,
+    y1: number,
+    y2: number,
+    x: number,
+    sourceRoomIndex: number,
+  ): void {
     const start = Math.min(y1, y2);
     const end = Math.max(y1, y2);
     for (let y = start; y <= end; y++) {
       if (map.get(x, y) === TileType.WALL) {
         map.set(x, y, TileType.FLOOR);
+      }
+      // Only assign ownership if tile is not already owned by a room
+      if (this.roomOwnership[y][x] === -1) {
+        this.roomOwnership[y][x] = sourceRoomIndex;
       }
     }
   }

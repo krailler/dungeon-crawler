@@ -4,40 +4,56 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { TileMap, TileType, TILE_SIZE } from "@dungeon/shared";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import {
+  TileMap,
+  TileType,
+  TILE_SIZE,
+  unpackSetId,
+  unpackVariant,
+  tileSetNameFromId,
+} from "@dungeon/shared";
+import { FloorAssetLoader } from "./FloorAssetLoader";
 
 const WALL_HEIGHT = 3;
 
 export class DungeonRenderer {
-  private floorMeshes: Mesh[] = [];
+  /** Floor meshes (GLB children) — used for InputManager raycasting */
+  private floorMeshes: AbstractMesh[] = [];
+  /** GLB instance root nodes — for disposal */
+  private floorRoots: TransformNode[] = [];
   private wallMeshes: Mesh[] = [];
-  private floorMaterial: StandardMaterial;
+
   private wallMaterial: StandardMaterial;
-  private spawnMaterial: StandardMaterial;
-  private exitMaterial: StandardMaterial;
 
   private scene: Scene;
+  private floorAssetLoader: FloorAssetLoader;
 
   constructor(scene: Scene) {
     this.scene = scene;
-    this.floorMaterial = new StandardMaterial("floorMat", scene);
-    this.floorMaterial.diffuseColor = new Color3(0.25, 0.22, 0.2);
-    this.floorMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
 
     this.wallMaterial = new StandardMaterial("wallMat", scene);
     this.wallMaterial.diffuseColor = new Color3(0.35, 0.3, 0.28);
     this.wallMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
 
-    this.spawnMaterial = new StandardMaterial("spawnMat", scene);
-    this.spawnMaterial.diffuseColor = new Color3(0.2, 0.4, 0.6);
-    this.spawnMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
-
-    this.exitMaterial = new StandardMaterial("exitMat", scene);
-    this.exitMaterial.diffuseColor = new Color3(0.6, 0.4, 0.2);
-    this.exitMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
+    this.floorAssetLoader = new FloorAssetLoader(scene);
   }
 
-  render(map: TileMap): void {
+  /**
+   * Pre-load floor tile GLBs for the given sets. Must be called before render().
+   * @param setNames Array of set folder names, e.g. ["set1", "set2"]
+   */
+  async loadAssets(setNames: string[]): Promise<void> {
+    await this.floorAssetLoader.loadTileSets(setNames);
+  }
+
+  /**
+   * Render the dungeon using GLB floor tiles and primitive wall boxes.
+   * @param map            The tile map
+   * @param floorVariants  Flat row-major array of packed values: (setId << 8) | variant, 0 = non-floor
+   */
+  render(map: TileMap, floorVariants: number[]): void {
     this.dispose();
 
     for (let y = 0; y < map.height; y++) {
@@ -46,12 +62,16 @@ export class DungeonRenderer {
         const worldX = x * TILE_SIZE;
         const worldZ = y * TILE_SIZE;
 
-        if (tile === TileType.FLOOR || tile === TileType.DOOR) {
-          this.createFloorTile(worldX, worldZ, x, y, this.floorMaterial);
-        } else if (tile === TileType.SPAWN) {
-          this.createFloorTile(worldX, worldZ, x, y, this.spawnMaterial);
-        } else if (tile === TileType.EXIT) {
-          this.createFloorTile(worldX, worldZ, x, y, this.exitMaterial);
+        if (map.isFloor(x, y)) {
+          const packed = floorVariants[y * map.width + x];
+          if (packed > 0) {
+            const setId = unpackSetId(packed);
+            const variant = unpackVariant(packed);
+            const setName = tileSetNameFromId(setId);
+            if (setName) {
+              this.createFloorTileGLB(worldX, worldZ, x, y, setName, variant);
+            }
+          }
         } else if (tile === TileType.WALL && map.isAdjacentToFloor(x, y)) {
           this.createWallBlock(worldX, worldZ, x, y);
         }
@@ -59,7 +79,7 @@ export class DungeonRenderer {
     }
   }
 
-  getFloorMeshes(): Mesh[] {
+  getFloorMeshes(): AbstractMesh[] {
     return this.floorMeshes;
   }
 
@@ -79,32 +99,38 @@ export class DungeonRenderer {
   }
 
   dispose(): void {
-    for (const mesh of this.floorMeshes) {
-      mesh.dispose();
+    // Dispose GLB floor instances
+    for (const root of this.floorRoots) {
+      root.dispose(false, true);
     }
+    this.floorRoots = [];
+    this.floorMeshes = [];
+
+    // Dispose wall meshes
     for (const mesh of this.wallMeshes) {
       mesh.dispose();
     }
-    this.floorMeshes = [];
     this.wallMeshes = [];
   }
 
-  private createFloorTile(
+  private createFloorTileGLB(
     worldX: number,
     worldZ: number,
     tileX: number,
     tileY: number,
-    material: StandardMaterial,
+    setName: string,
+    variant: number,
   ): void {
-    const floor = MeshBuilder.CreateBox(
-      `floor_${tileX}_${tileY}`,
-      { width: TILE_SIZE, height: 0.1, depth: TILE_SIZE },
-      this.scene,
+    const name = `floor_${tileX}_${tileY}`;
+    const { root, meshes } = this.floorAssetLoader.instantiate(
+      setName,
+      variant,
+      worldX,
+      worldZ,
+      name,
     );
-    floor.position.set(worldX, 0, worldZ);
-    floor.material = material;
-    floor.receiveShadows = true;
-    this.floorMeshes.push(floor);
+    this.floorRoots.push(root);
+    this.floorMeshes.push(...meshes);
   }
 
   private createWallBlock(worldX: number, worldZ: number, tileX: number, tileY: number): void {

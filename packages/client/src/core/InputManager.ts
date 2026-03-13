@@ -1,15 +1,15 @@
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import type { Scene } from "@babylonjs/core/scene";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
 
 export class InputManager {
   private scene: Scene;
-  private floorMeshSet: Set<Mesh>;
+  private floorMeshSet: Set<AbstractMesh>;
   private room: Room;
 
-  constructor(scene: Scene, floorMeshes: Mesh[], room: Room) {
+  constructor(scene: Scene, floorMeshes: AbstractMesh[], room: Room) {
     this.scene = scene;
     this.floorMeshSet = new Set(floorMeshes);
     this.room = room;
@@ -21,7 +21,7 @@ export class InputManager {
       ) {
         const pickInfo = pointerInfo.pickInfo;
         if (pickInfo && pickInfo.hit && pickInfo.pickedPoint && pickInfo.pickedMesh) {
-          if (this.floorMeshSet.has(pickInfo.pickedMesh as Mesh)) {
+          if (this.floorMeshSet.has(pickInfo.pickedMesh)) {
             // Send move command to server
             this.room.send(MessageType.MOVE, {
               x: pickInfo.pickedPoint.x,

@@ -20,6 +20,8 @@ import {
   TileType,
   type TileMap,
   MessageType,
+  generateFloorVariants,
+  assignRoomSets,
 } from "@dungeon/shared";
 import type { MoveMessage } from "@dungeon/shared";
 
@@ -32,7 +34,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tileMap!: TileMap;
 
   onCreate(): void {
-    this.setState(new DungeonState());
+    this.state = new DungeonState();
 
     // Generate dungeon
     const generator = new DungeonGenerator();
@@ -43,24 +45,27 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.mapWidth = this.tileMap.width;
     this.state.mapHeight = this.tileMap.height;
 
+    // Generate deterministic floor tile variants with per-room tile sets
+    const rooms = generator.getRooms();
+    const roomOwnership = generator.getRoomOwnership();
+    const seed = Date.now();
+    const roomSets = assignRoomSets(rooms.length, seed);
+    const floorVariants = generateFloorVariants(this.tileMap, seed, roomOwnership, roomSets);
+    this.state.floorVariantData = JSON.stringify(floorVariants);
+
     // Setup pathfinding
     this.pathfinder = new Pathfinder(this.tileMap);
 
     // Setup systems
     this.aiSystem = new AISystem(this.pathfinder);
     this.combatSystem = new CombatSystem();
-
-    // Spawn enemies
-    const rooms = generator.getRooms();
     this.spawnEnemies(rooms);
 
     // Register message handlers
-    this.onMessage(MessageType.MOVE, (client: Client, data: MoveMessage) => {
-      this.handleMove(client, data);
-    });
+    this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
 
     // Game loop
-    this.setSimulationInterval((dt) => this.update(dt), TICK_RATE);
+    this.setSimulationInterval(this.update.bind(this), TICK_RATE);
 
     console.log("[DungeonRoom] Created with", rooms.length, "rooms");
   }

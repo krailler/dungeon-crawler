@@ -28,3 +28,16 @@ export {
 
 export { MessageType } from "./protocol.js";
 export type { MoveMessage } from "./protocol.js";
+
+export {
+  generateFloorVariants,
+  assignRoomSets,
+  packFloorTile,
+  unpackSetId,
+  unpackVariant,
+  FLOOR_VARIANT_COUNT,
+} from "./FloorVariants.js";
+export type { RoomSetAssignment } from "./FloorVariants.js";
+
+export { TILE_SETS, TILE_SET_NAMES, tileSetNameFromId } from "./TileSets.js";
+export type { TileSetName } from "./TileSets.js";
