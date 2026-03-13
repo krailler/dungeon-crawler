@@ -1,5 +1,5 @@
 """
-Blender script: convert Kenney Animated Characters FBX → GLB.
+Blender 5.0 script: convert Kenney Animated Characters FBX → GLB.
 
 Usage:
   /Applications/Blender.app/Contents/MacOS/Blender --background --python scripts/convert_kenney_fbx.py -- <src_dir> <dst_dir> <skin_name>
@@ -8,8 +8,12 @@ Example:
   /Applications/Blender.app/Contents/MacOS/Blender --background --python scripts/convert_kenney_fbx.py \
     -- assets/kenney-characters packages/client/public/models/character survivorMaleB
 
-Each animation FBX produces one GLB with mesh + skeleton + animation + skin texture.
-The real animation action is selected (skips the "Targeting Pose" rest action).
+Each animation FBX is imported directly (contains mesh + skeleton + animation)
+and exported as one GLB per animation. The real animation action is kept
+(skips the "Targeting Pose" rest action).
+
+Note: Blender 5.0 uses layered actions — moving actions between armatures
+doesn't work reliably. Instead, we import each animation FBX directly.
 """
 import bpy
 import os
@@ -30,7 +34,6 @@ DST = args[1]
 SKIN_NAME = args[2]
 SKIN = os.path.join(SRC, "Skins", f"{SKIN_NAME}.png")
 
-MODEL_FBX = os.path.join(SRC, "Model", "characterMedium.fbx")
 ANIM_DIR = os.path.join(SRC, "Animations")
 
 os.makedirs(DST, exist_ok=True)
@@ -72,20 +75,12 @@ def apply_skin(skin_path):
         links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
 
 
-def find_real_animation():
-    """Find the actual animation action (skip 'Targeting Pose')."""
-    for act in bpy.data.actions:
-        if "Targeting Pose" not in act.name:
-            return act
-    return None
-
-
 def export_glb(anim_name, fbx_path):
-    """Import animation FBX, set correct action, apply skin, export GLB."""
+    """Import animation FBX directly, apply skin, export GLB."""
     clear_scene()
 
-    # Import model (mesh + skeleton)
-    bpy.ops.import_scene.fbx(filepath=MODEL_FBX, use_anim=False)
+    # Import animation FBX directly (contains mesh + skeleton + animation)
+    bpy.ops.import_scene.fbx(filepath=fbx_path, use_anim=True)
 
     # Find armature
     armature = None
@@ -97,31 +92,29 @@ def export_glb(anim_name, fbx_path):
         print(f"ERROR: No armature found")
         return
 
-    # Import animation FBX (skeleton + keyframes)
-    bpy.ops.import_scene.fbx(filepath=fbx_path, use_anim=True)
+    # Find the real animation action (skip "Targeting Pose")
+    real_action = None
+    for act in bpy.data.actions:
+        if "Targeting Pose" not in act.name:
+            real_action = act
+            break
 
-    # Find the real animation action
-    real_action = find_real_animation()
     if not real_action:
         print(f"WARNING: No animation found in {fbx_path}")
         return
 
-    # Rename action to match animation name
+    # Set as active action and rename
+    if not armature.animation_data:
+        armature.animation_data_create()
+    armature.animation_data.action = real_action
     real_action.name = anim_name
     fr = real_action.frame_range
     print(f"  Animation: {anim_name} frames={fr[0]:.0f}-{fr[1]:.0f}")
 
-    # Assign to the original armature
-    if not armature.animation_data:
-        armature.animation_data_create()
-    armature.animation_data.action = real_action
-
-    # Remove the duplicate armature imported with the animation
-    for obj in list(bpy.context.scene.objects):
-        if obj.type == "ARMATURE" and obj != armature:
-            for child in list(obj.children):
-                bpy.data.objects.remove(child, do_unlink=True)
-            bpy.data.objects.remove(obj, do_unlink=True)
+    # Remove unwanted actions (Targeting Pose etc.)
+    for act in list(bpy.data.actions):
+        if act != real_action:
+            bpy.data.actions.remove(act)
 
     # Apply skin
     apply_skin(SKIN)

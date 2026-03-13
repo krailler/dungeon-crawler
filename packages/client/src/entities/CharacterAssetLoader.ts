@@ -29,15 +29,18 @@ export class CharacterAssetLoader {
   private containers: Map<AnimName, AssetContainer> = new Map();
   private loaded: boolean = false;
 
-  constructor(scene: Scene) {
+  private basePath: string;
+
+  constructor(scene: Scene, basePath: string = "/models/characters/player") {
     this.scene = scene;
+    this.basePath = basePath;
   }
 
   async load(): Promise<void> {
     if (this.loaded) return;
 
     const promises = ANIM_NAMES.map(async (name) => {
-      const container = await LoadAssetContainerAsync(`/models/character/${name}.glb`, this.scene);
+      const container = await LoadAssetContainerAsync(`${this.basePath}/${name}.glb`, this.scene);
       this.containers.set(name, container);
     });
 
@@ -69,6 +72,8 @@ export class CharacterAssetLoader {
     const animations = new Map<AnimName, AnimationGroup>();
     if (result.animationGroups.length > 0) {
       const idleAnim = result.animationGroups[0];
+      // Stop auto-started animation — let ClientPlayer control playback
+      idleAnim.stop();
       idleAnim.name = `${name}_idle`;
       animations.set("idle", idleAnim);
     }
@@ -83,13 +88,29 @@ export class CharacterAssetLoader {
         (sourceName) => `${name}_${animName}_${sourceName}`,
       );
 
-      // Find the real animation group (skip "Targeting Pose" extras)
-      let animGroup = animResult.animationGroups.find((ag) => !ag.name.includes("Targeting Pose"));
+      // Find the animation group matching this animation name.
+      // GLBs may contain multiple groups (Targeting Pose, other anims) — pick the right one.
+      // Strip the instantiation prefix before matching since all groups share it.
+      const prefix = `${name}_${animName}_`;
+      let animGroup = animResult.animationGroups.find((ag) => {
+        const original = ag.name.startsWith(prefix) ? ag.name.slice(prefix.length) : ag.name;
+        return (
+          original.toLowerCase().includes(animName.toLowerCase()) &&
+          !original.includes("Targeting Pose")
+        );
+      });
+      if (!animGroup) {
+        // Fallback: first group that isn't a Targeting Pose
+        animGroup = animResult.animationGroups.find((ag) => !ag.name.includes("Targeting Pose"));
+      }
       if (!animGroup && animResult.animationGroups.length > 0) {
         animGroup = animResult.animationGroups[0];
       }
 
       if (animGroup) {
+        // Stop the animation group — instantiateModelsToScene may auto-start it,
+        // leaving _isStarted=true which would prevent later start() calls.
+        animGroup.stop();
         animGroup.name = `${name}_${animName}`;
 
         // Retarget the animation to our skeleton by matching bone names

@@ -39,7 +39,8 @@ export class ClientGame {
   private client: Client;
   private room: Room | null = null;
 
-  private characterLoader: CharacterAssetLoader;
+  private playerLoader: CharacterAssetLoader;
+  private enemyLoader: CharacterAssetLoader;
 
   // Entities synced from server
   private players: Map<string, ClientPlayer> = new Map();
@@ -60,7 +61,8 @@ export class ClientGame {
     this.fogOfWar = new FogOfWarSystem(this.scene, this.isoCamera.camera);
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
-    this.characterLoader = new CharacterAssetLoader(this.scene);
+    this.playerLoader = new CharacterAssetLoader(this.scene, "/models/characters/player");
+    this.enemyLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     mountHud();
     this.client = new Client(SERVER_URL);
@@ -86,7 +88,7 @@ export class ClientGame {
     hudStore.setConnection("connecting", "");
     try {
       // Pre-load character model while connecting
-      await this.characterLoader.load();
+      await Promise.all([this.playerLoader.load(), this.enemyLoader.load()]);
 
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
@@ -194,7 +196,7 @@ export class ClientGame {
       }
 
       // Attach GLB character model
-      const charInstance = this.characterLoader.instantiate(`char_${sessionId}`);
+      const charInstance = this.playerLoader.instantiate(`char_${sessionId}`);
       clientPlayer.attachModel(charInstance);
 
       // Add model meshes as shadow casters for local player's torch
@@ -246,8 +248,14 @@ export class ClientGame {
         enemy.maxHealth,
         enemy.isDead,
       );
+      // Attach zombie GLB model
+      const enemyInstance = this.enemyLoader.instantiate(`enemy_${id}`);
+      clientEnemy.attachModel(enemyInstance);
+
       this.enemies.set(id, clientEnemy);
-      this.addShadowCaster(clientEnemy.mesh);
+      for (const m of clientEnemy.modelMeshes) {
+        this.addShadowCaster(m);
+      }
 
       // Listen to changes on this enemy
       $(enemy).onChange(() => {

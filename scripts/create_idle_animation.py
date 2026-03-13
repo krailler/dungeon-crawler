@@ -4,20 +4,30 @@ Arms resting at sides + subtle breathing motion.
 Computes bone-local rotation axes from the armature rest pose for accuracy.
 
 Usage:
-    blender --background --python scripts/create_idle_animation.py
+    blender --background --python scripts/create_idle_animation.py -- <skin_name> <output_dir>
 
-Requires Kenney Animated Characters pack at SRC path below.
-Outputs idle.glb to packages/client/public/models/character/idle.glb
+Examples:
+    blender --background --python scripts/create_idle_animation.py -- survivorMaleB packages/client/public/models/characters/player
+    blender --background --python scripts/create_idle_animation.py -- zombieA packages/client/public/models/characters/zombie
 """
 import bpy
 import os
+import sys
 import math
 from mathutils import Quaternion, Vector
 
+# Parse CLI args after "--"
+argv = sys.argv
+args = argv[argv.index("--") + 1:] if "--" in argv else []
+SKIN_NAME = args[0] if len(args) > 0 else "survivorMaleB"
+OUT_DIR = args[1] if len(args) > 1 else "packages/client/public/models/characters/player"
+
 SRC = os.path.join(os.getcwd(), "assets", "kenney-characters")
 MODEL_FBX = os.path.join(SRC, "Model", "characterMedium.fbx")
-SKIN = os.path.join(SRC, "Skins", "survivorMaleB.png")
-DST = os.path.join(os.getcwd(), "packages/client/public/models/character/idle.glb")
+SKIN = os.path.join(SRC, "Skins", f"{SKIN_NAME}.png")
+DST = os.path.join(os.getcwd(), OUT_DIR, "idle.glb")
+os.makedirs(os.path.dirname(DST), exist_ok=True)
+print(f"Skin: {SKIN_NAME}, Output: {DST}")
 
 # --- Clean scene ---
 bpy.ops.object.select_all(action="SELECT")

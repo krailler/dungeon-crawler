@@ -50,14 +50,25 @@ packages/
     src/
       core/           # ClientGame, InputManager (click-and-hold Diablo-style)
       camera/         # IsometricCamera
-      entities/       # ClientPlayer (mesh + torch + shadows), ClientEnemy (mesh + hit flash)
+      entities/       # ClientPlayer, ClientEnemy (GLB models + animations), CharacterAssetLoader
       dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
       systems/        # WallOcclusionSystem, FogOfWarSystem
       i18n/           # i18next config + locales (en.json)
       ui/             # HUD: hudStore (pub-sub state) + HudRoot (React + Tailwind)
       main.ts         # Client entry point
+    public/
+      models/
+        characters/
+          player/       # survivorMaleB skin: idle.glb, run.glb
+          zombie/       # zombieA skin: idle.glb, run.glb
     index.html
     vite.config.ts
+scripts/                # Blender Python scripts for asset generation
+  convert_kenney_fbx.py   # FBX→GLB converter (parameterized: skin + output)
+  create_idle_animation.py # Procedural idle animation (arms down + breathing)
+  create_run_animation.py  # Procedural walk animation (sagittal leg/arm swing)
+assets/
+  kenney-characters/      # Source Kenney Animated Characters (FBX + skins)
 ```
 
 ## Architectural Decisions
@@ -121,6 +132,16 @@ packages/
 - GlowLayer for emissive effects
 - Fog of war: PostProcess depth-based shader with radial darkness
 
+### Character Models: Multi-skin GLB pipeline
+
+- Base mesh: Kenney Animated Characters FBX, converted to GLB via Blender scripts
+- Skins stored in `public/models/characters/{skinName}/` with `idle.glb` + `run.glb`
+- `CharacterAssetLoader(scene, basePath)` loads GLBs per skin, instantiates with retargeted animations
+- Idle GLB = base mesh; other GLBs provide animations via `instantiateModelsToScene` retargeting
+- Blender scripts parameterized: `-- <skin_name> <output_dir>` (default: survivorMaleB → player/)
+- Animations are procedural (Python in Blender), not from FBX source
+- To add a new character/enemy: run scripts with new skin name, create loader with new basePath
+
 ### Internationalization (i18n)
 
 - i18next with `initReactI18next` plugin (no Provider needed)
@@ -163,7 +184,7 @@ packages/
 
 ### Shared (`packages/shared/src/`)
 
-- `Constants.ts` — All game constants: TILE*SIZE, PLAYER*_, ENEMY\__, CAMERA*\*, DUNGEON*_, WALL\__, lighting (AMBIENT/TORCH/WALL_TORCH), fog of war
+- `Constants.ts` — All game constants: TILE*SIZE, PLAYER*\_, ENEMY\__, CAMERA*\*, DUNGEON*_, WALL\_\_, lighting (AMBIENT/TORCH/WALL_TORCH), fog of war
 - `TileMap.ts` — 2D grid data + TileType + `serializeGrid()` / `fromSerialized()` for network transfer
 - `protocol.ts` — MessageType const object + MoveMessage interface
 - `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
@@ -187,11 +208,12 @@ packages/
 ### Client (`packages/client/src/`)
 
 - `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame
-- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, entity management, shadow casters
+- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, two CharacterAssetLoaders (player + enemy), shadow casters
 - `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms)
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15
-- `entities/ClientPlayer.ts` — Player mesh + SpotLight torch + ShadowGenerator PCF + lerp interpolation
-- `entities/ClientEnemy.ts` — Enemy mesh + lerp + hit flash on damage
+- `entities/CharacterAssetLoader.ts` — Loads GLB character models per skin (basePath), instantiates with retargeted animations
+- `entities/ClientPlayer.ts` — GLB character model + SpotLight torch + ShadowGenerator PCF + lerp interpolation + idle/run animations
+- `entities/ClientEnemy.ts` — GLB zombie model + lerp + hit flash (baseMaterials swap) + idle/run animations + floating health bar
 - `dungeon/DungeonRenderer.ts` — GLB floor tiles, thin wall segments, GLB wall decorations, wall torch PointLights + fire ParticleSystems
 - `dungeon/FloorAssetLoader.ts` — Loads floor tile GLBs per set, GPU-efficient instancing via AssetContainer
 - `dungeon/WallAssetLoader.ts` — Loads wall decoration GLBs per set, places on wall faces (N/S/W/E), auto-scales to TILE_SIZE × WALL_HEIGHT
