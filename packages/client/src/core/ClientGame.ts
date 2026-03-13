@@ -14,6 +14,7 @@ import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { ClientPlayer } from "../entities/ClientPlayer";
 import { ClientEnemy } from "../entities/ClientEnemy";
+import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
@@ -38,6 +39,8 @@ export class ClientGame {
   private client: Client;
   private room: Room | null = null;
 
+  private characterLoader: CharacterAssetLoader;
+
   // Entities synced from server
   private players: Map<string, ClientPlayer> = new Map();
   private enemies: Map<string, ClientEnemy> = new Map();
@@ -57,6 +60,7 @@ export class ClientGame {
     this.fogOfWar = new FogOfWarSystem(this.scene, this.isoCamera.camera);
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
+    this.characterLoader = new CharacterAssetLoader(this.scene);
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     mountHud();
     this.client = new Client(SERVER_URL);
@@ -81,7 +85,9 @@ export class ClientGame {
   private async init(): Promise<void> {
     hudStore.setConnection("connecting", "");
     try {
-      // Connect first — floor assets are loaded lazily after we know which sets the dungeon uses
+      // Pre-load character model while connecting
+      await this.characterLoader.load();
+
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
       this.localSessionId = room.sessionId;
@@ -187,8 +193,14 @@ export class ClientGame {
         this.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
       }
 
-      // Add as shadow caster for local player's torch
-      this.addShadowCaster(clientPlayer.mesh);
+      // Attach GLB character model
+      const charInstance = this.characterLoader.instantiate(`char_${sessionId}`);
+      clientPlayer.attachModel(charInstance);
+
+      // Add model meshes as shadow casters for local player's torch
+      for (const m of clientPlayer.modelMeshes) {
+        this.addShadowCaster(m);
+      }
 
       const name = isLocal
         ? t("player.you")

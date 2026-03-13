@@ -1,24 +1,42 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
 
 // Side-effect: shadow map support
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 
-/** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
-const LERP_FACTOR = 12;
+/** Position smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
+const LERP_FACTOR = 6;
+
+/** Rotation smoothing factor — lower = smoother turn */
+const ROT_LERP_FACTOR = 10;
+
+/** Distance threshold to consider the player "moving" */
+const MOVE_THRESHOLD = 0.05;
 
 export class ClientPlayer {
+  /** Invisible anchor mesh used for positioning and torch parenting */
   public mesh: Mesh;
+  /** GLB model root — child of mesh */
+  public modelRoot: TransformNode | null = null;
+  /** All GLB child meshes — for shadow casting */
+  public modelMeshes: AbstractMesh[] = [];
   public isLocal: boolean;
   public torchLight: SpotLight | null = null;
   public shadowGenerator: ShadowGenerator | null = null;
+
+  private animations: Map<AnimName, AnimationGroup> = new Map();
+  private currentAnim: AnimName | null = null;
 
   // Target state from server
   private targetX: number = 0;
@@ -28,31 +46,11 @@ export class ClientPlayer {
   constructor(scene: Scene, isLocal: boolean, id: string) {
     this.isLocal = isLocal;
 
-    this.mesh = MeshBuilder.CreateCylinder(
-      `player_${id}`,
-      { height: 1.4, diameterTop: 0.6, diameterBottom: 0.7, tessellation: 12 },
-      scene,
-    );
-
-    const head = MeshBuilder.CreateSphere(
-      `playerHead_${id}`,
-      { diameter: 0.65, segments: 8 },
-      scene,
-    );
-    head.position.y = 0.9;
-    head.parent = this.mesh;
-
-    const material = new StandardMaterial(`playerMat_${id}`, scene);
-    if (isLocal) {
-      material.diffuseColor = new Color3(0.2, 0.6, 0.9);
-    } else {
-      material.diffuseColor = new Color3(0.2, 0.9, 0.4);
-    }
-    material.specularColor = new Color3(0.3, 0.3, 0.3);
-    this.mesh.material = material;
-    head.material = material;
-
-    this.mesh.position.y = 0.7;
+    // Invisible anchor for position/rotation
+    this.mesh = MeshBuilder.CreateGround(`player_${id}`, { width: 0.1, height: 0.1 }, scene);
+    this.mesh.visibility = 0;
+    this.mesh.isPickable = false;
+    this.mesh.position.y = 0;
 
     // Only local player gets a torch light
     if (isLocal) {
@@ -77,6 +75,53 @@ export class ClientPlayer {
     }
   }
 
+  /** Attach the loaded GLB character instance. */
+  attachModel(instance: CharacterInstance): void {
+    this.modelRoot = instance.root;
+    this.modelMeshes = instance.meshes;
+    this.animations = instance.animations;
+
+    // Parent to our invisible anchor and scale to fit dungeon proportions
+    this.modelRoot.parent = this.mesh;
+    this.modelRoot.scaling.setAll(0.5);
+
+    // Fix GLB material: exported with alpha=0 (transparent) — force opaque
+    for (const m of this.modelMeshes) {
+      const mat = m.material;
+      if (mat instanceof PBRMaterial) {
+        mat.alpha = 1;
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+        mat.backFaceCulling = true;
+      }
+    }
+
+    // Add model meshes as shadow casters
+    if (this.shadowGenerator) {
+      for (const m of this.modelMeshes) {
+        this.shadowGenerator.addShadowCaster(m);
+      }
+    }
+
+    // Start idle animation
+    this.playAnimation("idle");
+  }
+
+  private playAnimation(name: AnimName): void {
+    if (this.currentAnim === name) return;
+
+    // Stop current
+    if (this.currentAnim) {
+      const current = this.animations.get(this.currentAnim);
+      current?.stop();
+    }
+
+    const anim = this.animations.get(name);
+    if (anim) {
+      anim.start(true); // loop
+      this.currentAnim = name;
+    }
+  }
+
   /** Called when server state changes */
   setServerState(x: number, z: number, rotY: number): void {
     this.targetX = x;
@@ -95,9 +140,26 @@ export class ClientPlayer {
   /** Interpolate toward server state each frame */
   update(dt: number): void {
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
-    this.mesh.position.x += (this.targetX - this.mesh.position.x) * t;
-    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * t;
-    this.mesh.rotation.y = this.targetRotY;
+
+    const dx = this.targetX - this.mesh.position.x;
+    const dz = this.targetZ - this.mesh.position.z;
+    this.mesh.position.x += dx * t;
+    this.mesh.position.z += dz * t;
+    // Smooth rotation — lerp via shortest arc
+    const targetRot = this.targetRotY + Math.PI;
+    let delta = targetRot - this.mesh.rotation.y;
+    // Wrap to [-PI, PI] for shortest-path interpolation
+    delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (delta < -Math.PI) delta += 2 * Math.PI;
+    this.mesh.rotation.y += delta * (1 - Math.exp(-ROT_LERP_FACTOR * dt));
+
+    // Switch animation based on movement
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist > MOVE_THRESHOLD) {
+      this.playAnimation("run");
+    } else {
+      this.playAnimation("idle");
+    }
   }
 
   getWorldPosition(): Vector3 {
@@ -105,6 +167,10 @@ export class ClientPlayer {
   }
 
   dispose(): void {
+    for (const [, anim] of this.animations) {
+      anim.dispose();
+    }
+    this.modelRoot?.dispose(false, true);
     this.shadowGenerator?.dispose();
     this.torchLight?.dispose();
     this.mesh.dispose();
