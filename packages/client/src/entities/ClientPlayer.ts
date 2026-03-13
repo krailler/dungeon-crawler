@@ -170,7 +170,7 @@ export class ClientPlayer {
     for (const [, anim] of this.animations) {
       anim.dispose();
     }
-    this.modelRoot?.dispose(false, true);
+    this.modelRoot?.dispose(false, false);
     this.shadowGenerator?.dispose();
     this.torchLight?.dispose();
     this.mesh.dispose();

@@ -70,7 +70,7 @@ export class ClientEnemy {
     this.healthBarBg.thickness = 1;
     this.healthBarBg.color = "#555";
     this.healthBarBg.background = "#222";
-    this.healthBarBg.linkOffsetY = -70;
+    this.healthBarBg.linkOffsetY = -140;
     this.healthBarBg.isVisible = false;
 
     this.healthBarFill = new Rectangle(`enemyHpFill_${id}`);
@@ -152,7 +152,7 @@ export class ClientEnemy {
       for (const [, anim] of this.animations) {
         anim.dispose();
       }
-      this.modelRoot?.dispose(false, true);
+      this.modelRoot?.dispose(false, false);
       this.mesh.dispose();
     }
   }
@@ -233,7 +233,7 @@ export class ClientEnemy {
       for (const [, anim] of this.animations) {
         anim.dispose();
       }
-      this.modelRoot?.dispose(false, true);
+      this.modelRoot?.dispose(false, false);
       this.mesh.dispose();
     }
     this.hitMaterial.dispose();
