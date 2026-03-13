@@ -242,7 +242,7 @@ export class ClientGame {
   private update(dt: number): void {
     // Interpolate all entities toward server state
     for (const [, player] of this.players) {
-      player.update();
+      player.update(dt);
     }
 
     for (const [, enemy] of this.enemies) {

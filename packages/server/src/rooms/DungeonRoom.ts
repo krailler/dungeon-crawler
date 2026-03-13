@@ -163,27 +163,40 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       return;
     }
 
-    const target = entity.path[entity.currentPathIndex];
-    const dx = target.x - entity.x;
-    const dz = target.z - entity.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    let remaining = entity.speed * dt;
 
-    if (dist < 0.15) {
-      entity.currentPathIndex++;
-      if (entity.currentPathIndex >= entity.path.length) {
-        entity.isMoving = false;
+    while (remaining > 0 && entity.currentPathIndex < entity.path.length) {
+      const target = entity.path[entity.currentPathIndex];
+      const dx = target.x - entity.x;
+      const dz = target.z - entity.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist < 0.01) {
+        entity.currentPathIndex++;
+        continue;
       }
-      return;
+
+      const ndx = dx / dist;
+      const ndz = dz / dist;
+      entity.rotY = Math.atan2(ndx, ndz);
+
+      if (remaining >= dist) {
+        // Snap to waypoint and consume distance, continue to next
+        entity.x = target.x;
+        entity.z = target.z;
+        remaining -= dist;
+        entity.currentPathIndex++;
+      } else {
+        // Partial move toward waypoint
+        entity.x += ndx * remaining;
+        entity.z += ndz * remaining;
+        remaining = 0;
+      }
     }
 
-    const ndx = dx / dist;
-    const ndz = dz / dist;
-    const step = Math.min(entity.speed * dt, dist);
-
-    entity.x += ndx * step;
-    entity.z += ndz * step;
-
-    entity.rotY = Math.atan2(ndx, ndz);
+    if (entity.currentPathIndex >= entity.path.length) {
+      entity.isMoving = false;
+    }
   }
 
   private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number): void {

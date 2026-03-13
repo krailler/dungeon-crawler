@@ -7,7 +7,8 @@ import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 
-const LERP_SPEED = 0.2;
+/** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
+const LERP_FACTOR = 12;
 const HIT_FLASH_DURATION = 0.12;
 
 export class ClientEnemy {
@@ -121,8 +122,9 @@ export class ClientEnemy {
   update(dt: number): void {
     if (this.isDead) return;
 
-    this.mesh.position.x += (this.targetX - this.mesh.position.x) * LERP_SPEED;
-    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * LERP_SPEED;
+    const t = 1 - Math.exp(-LERP_FACTOR * dt);
+    this.mesh.position.x += (this.targetX - this.mesh.position.x) * t;
+    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * t;
     this.mesh.rotation.y = this.targetRotY;
 
     // Hit flash timer

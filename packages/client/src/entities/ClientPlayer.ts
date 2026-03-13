@@ -5,7 +5,8 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 
-const LERP_SPEED = 0.2;
+/** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
+const LERP_FACTOR = 12;
 
 export class ClientPlayer {
   public mesh: Mesh;
@@ -62,9 +63,10 @@ export class ClientPlayer {
   }
 
   /** Interpolate toward server state each frame */
-  update(): void {
-    this.mesh.position.x += (this.targetX - this.mesh.position.x) * LERP_SPEED;
-    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * LERP_SPEED;
+  update(dt: number): void {
+    const t = 1 - Math.exp(-LERP_FACTOR * dt);
+    this.mesh.position.x += (this.targetX - this.mesh.position.x) * t;
+    this.mesh.position.z += (this.targetZ - this.mesh.position.z) * t;
     this.mesh.rotation.y = this.targetRotY;
   }
 
