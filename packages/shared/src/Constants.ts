@@ -22,6 +22,10 @@ export const ENEMY_ATTACK_COOLDOWN = 1.5;
 export const ENEMY_ATTACK_DAMAGE = 8;
 export const ENEMY_REPATH_INTERVAL = 0.5;
 
+// Wall
+export const WALL_HEIGHT = 3;
+export const WALL_DEPTH = 0.3;
+
 // Camera (client-only but shared for consistency)
 export const CAMERA_ALPHA = -Math.PI / 4;
 export const CAMERA_BETA = Math.PI / 3;

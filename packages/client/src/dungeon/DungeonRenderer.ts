@@ -3,6 +3,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
+import type { Material } from "@babylonjs/core/Materials/material";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -10,13 +11,14 @@ import {
   TileMap,
   TileType,
   TILE_SIZE,
+  WALL_HEIGHT,
+  WALL_DEPTH,
   unpackSetId,
   unpackVariant,
   tileSetNameFromId,
 } from "@dungeon/shared";
 import { FloorAssetLoader } from "./FloorAssetLoader";
-
-const WALL_HEIGHT = 3;
+import { WallAssetLoader, WallFace, FACE_DIRECTION, OPPOSITE_FACE } from "./WallAssetLoader";
 
 export class DungeonRenderer {
   /** Floor meshes (GLB children) — used for InputManager raycasting */
@@ -25,35 +27,55 @@ export class DungeonRenderer {
   private floorRoots: TransformNode[] = [];
   private wallMeshes: Mesh[] = [];
 
-  private wallMaterial: StandardMaterial;
+  /** Wall decoration instance roots — for disposal */
+  private wallDecoRoots: TransformNode[] = [];
+  /** Map from wall cube mesh → its decoration root nodes (for occlusion toggling) */
+  private wallDecoMap: Map<Mesh, TransformNode[]> = new Map();
+
+  private wallMaterial!: Material;
 
   private scene: Scene;
   private floorAssetLoader: FloorAssetLoader;
+  private wallAssetLoader: WallAssetLoader;
 
   constructor(scene: Scene) {
     this.scene = scene;
 
-    this.wallMaterial = new StandardMaterial("wallMat", scene);
-    this.wallMaterial.diffuseColor = new Color3(0.35, 0.3, 0.28);
-    this.wallMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
+    // Fallback wall material — replaced by PBR from GLBs after loadAssets()
+    const fallback = new StandardMaterial("wallMat_fallback", scene);
+    fallback.diffuseColor = Color3.FromHexString("#7a6a60");
+    fallback.specularColor = new Color3(0.05, 0.05, 0.05);
+    this.wallMaterial = fallback;
 
     this.floorAssetLoader = new FloorAssetLoader(scene);
+    this.wallAssetLoader = new WallAssetLoader(scene);
   }
 
   /**
-   * Pre-load floor tile GLBs for the given sets. Must be called before render().
-   * @param setNames Array of set folder names, e.g. ["set1", "set2"]
+   * Pre-load floor and wall tile GLBs for the given sets. Must be called before render().
+   * @param floorSetNames Array of set folder names for floors, e.g. ["set1", "set2"]
+   * @param wallSetNames  Array of set folder names for walls, e.g. ["set1"]
    */
-  async loadAssets(setNames: string[]): Promise<void> {
-    await this.floorAssetLoader.loadTileSets(setNames);
+  async loadAssets(floorSetNames: string[], wallSetNames: string[]): Promise<void> {
+    await Promise.all([
+      this.floorAssetLoader.loadTileSets(floorSetNames),
+      this.wallAssetLoader.loadTileSets(wallSetNames),
+    ]);
+
+    // Sample edge color from wall GLB textures → PBR material for wall cubes
+    const pbrMat = await this.wallAssetLoader.getWallCubeMaterial();
+    if (pbrMat) {
+      this.wallMaterial = pbrMat;
+    }
   }
 
   /**
-   * Render the dungeon using GLB floor tiles and primitive wall boxes.
+   * Render the dungeon using GLB floor tiles, primitive wall boxes, and wall decorations.
    * @param map            The tile map
    * @param floorVariants  Flat row-major array of packed values: (setId << 8) | variant, 0 = non-floor
+   * @param wallVariants   Flat row-major array of packed values for wall tiles, 0 = no decoration
    */
-  render(map: TileMap, floorVariants: number[]): void {
+  render(map: TileMap, floorVariants: number[], wallVariants: number[]): void {
     this.dispose();
 
     for (let y = 0; y < map.height; y++) {
@@ -73,7 +95,8 @@ export class DungeonRenderer {
             }
           }
         } else if (tile === TileType.WALL && map.isAdjacentToFloor(x, y)) {
-          this.createWallBlock(worldX, worldZ, x, y);
+          const wallPacked = wallVariants[y * map.width + x];
+          this.createWallBlock(map, worldX, worldZ, x, y, wallPacked);
         }
       }
     }
@@ -85,6 +108,10 @@ export class DungeonRenderer {
 
   getWallMeshes(): Mesh[] {
     return this.wallMeshes;
+  }
+
+  getWallDecoMap(): Map<Mesh, TransformNode[]> {
+    return this.wallDecoMap;
   }
 
   getSpawnWorldPosition(map: TileMap): Vector3 | null {
@@ -99,6 +126,13 @@ export class DungeonRenderer {
   }
 
   dispose(): void {
+    // Dispose wall decoration instances
+    for (const root of this.wallDecoRoots) {
+      root.dispose(false, true);
+    }
+    this.wallDecoRoots = [];
+    this.wallDecoMap.clear();
+
     // Dispose GLB floor instances
     for (const root of this.floorRoots) {
       root.dispose(false, true);
@@ -133,15 +167,123 @@ export class DungeonRenderer {
     this.floorMeshes.push(...meshes);
   }
 
-  private createWallBlock(worldX: number, worldZ: number, tileX: number, tileY: number): void {
+  private createWallBlock(
+    map: TileMap,
+    worldX: number,
+    worldZ: number,
+    tileX: number,
+    tileY: number,
+    wallPacked: number,
+  ): void {
+    // Detect which sides have floor neighbors
+    const floorN = map.isFloor(tileX, tileY - 1);
+    const floorS = map.isFloor(tileX, tileY + 1);
+    const floorW = map.isFloor(tileX - 1, tileY);
+    const floorE = map.isFloor(tileX + 1, tileY);
+    const hasNS = floorN || floorS;
+    const hasEW = floorW || floorE;
+
+    // Thin wall dimensions — full TILE_SIZE along the wall, WALL_DEPTH perpendicular
+    let boxW = TILE_SIZE;
+    let boxD = TILE_SIZE;
+    let shiftX = 0;
+    let shiftZ = 0;
+    const edgeShift = (TILE_SIZE - WALL_DEPTH) / 2;
+
+    if (hasNS && hasEW) {
+      // Corner: small post — thin walls from adjacent tiles provide visual coverage
+      boxW = WALL_DEPTH;
+      boxD = WALL_DEPTH;
+      // Shift toward the corner where the two floor edges meet
+      if (floorS) shiftZ = edgeShift;
+      else if (floorN) shiftZ = -edgeShift;
+      if (floorE) shiftX = edgeShift;
+      else if (floorW) shiftX = -edgeShift;
+    } else if (hasNS && !hasEW) {
+      boxD = WALL_DEPTH;
+      if (floorS && !floorN) shiftZ = edgeShift;
+      else if (floorN && !floorS) shiftZ = -edgeShift;
+    } else if (hasEW && !hasNS) {
+      boxW = WALL_DEPTH;
+      if (floorE && !floorW) shiftX = edgeShift;
+      else if (floorW && !floorE) shiftX = -edgeShift;
+    }
+
     const wall = MeshBuilder.CreateBox(
       `wall_${tileX}_${tileY}`,
-      { width: TILE_SIZE, height: WALL_HEIGHT, depth: TILE_SIZE },
+      { width: boxW, height: WALL_HEIGHT, depth: boxD },
       this.scene,
     );
-    wall.position.set(worldX, WALL_HEIGHT / 2, worldZ);
+    wall.position.set(worldX + shiftX, WALL_HEIGHT / 2, worldZ + shiftZ);
     wall.material = this.wallMaterial;
     wall.receiveShadows = true;
     this.wallMeshes.push(wall);
+
+    // Place GLB decorations on exposed faces + back faces
+    if (wallPacked <= 0) return;
+
+    const setId = unpackSetId(wallPacked);
+    const variant = unpackVariant(wallPacked);
+    const setName = tileSetNameFromId(setId);
+    if (!setName) return;
+
+    const decos: TransformNode[] = [];
+
+    const exposedFaces: Array<{ dx: number; dy: number; face: WallFace }> = [
+      { dx: 0, dy: -1, face: WallFace.NORTH },
+      { dx: 0, dy: 1, face: WallFace.SOUTH },
+      { dx: -1, dy: 0, face: WallFace.WEST },
+      { dx: 1, dy: 0, face: WallFace.EAST },
+    ];
+
+    for (const { dx, dy, face } of exposedFaces) {
+      const nx = tileX + dx;
+      const ny = tileY + dy;
+      if (!map.isFloor(nx, ny)) continue;
+
+      const dir = FACE_DIRECTION[face];
+      const frontDist = TILE_SIZE / 2;
+
+      // Front decoration: at tile boundary (same as before)
+      const frontX = worldX + dir.x * frontDist;
+      const frontZ = worldZ + dir.z * frontDist;
+      const frontName = `wallDeco_${tileX}_${tileY}_f${face}`;
+      const { root: frontRoot } = this.wallAssetLoader.instantiate(
+        setName,
+        variant,
+        frontX,
+        frontZ,
+        face,
+        frontName,
+      );
+      decos.push(frontRoot);
+      this.wallDecoRoots.push(frontRoot);
+
+      // Back decoration: opposite face of the thin wall
+      const backFace = OPPOSITE_FACE[face];
+      // Skip if the opposite side already has its own decoration (floor on both sides)
+      const ox = tileX - dx;
+      const oy = tileY - dy;
+      if (map.isFloor(ox, oy)) continue;
+
+      const backDist = frontDist - WALL_DEPTH;
+      const backX = worldX + dir.x * backDist;
+      const backZ = worldZ + dir.z * backDist;
+      const backName = `wallDeco_${tileX}_${tileY}_b${face}`;
+      const { root: backRoot } = this.wallAssetLoader.instantiate(
+        setName,
+        variant,
+        backX,
+        backZ,
+        backFace,
+        backName,
+      );
+      decos.push(backRoot);
+      this.wallDecoRoots.push(backRoot);
+    }
+
+    if (decos.length > 0) {
+      this.wallDecoMap.set(wall, decos);
+    }
   }
 }

@@ -109,30 +109,46 @@ export class ClientGame {
       const variantRaw = (room.state as any).floorVariantData;
       const floorVariants: number[] = variantRaw ? JSON.parse(variantRaw) : [];
 
-      // Scan packed values to find which tile sets are actually used
-      const usedSetNames = new Set<string>();
+      // Parse packed wall variant data from server
+      const wallVariantRaw = (room.state as any).wallVariantData;
+      const wallVariants: number[] = wallVariantRaw ? JSON.parse(wallVariantRaw) : [];
+
+      // Scan packed values to find which tile sets are actually used (floors)
+      const usedFloorSets = new Set<string>();
       for (const packed of floorVariants) {
         if (packed === 0) continue;
         const setId = unpackSetId(packed);
         const name = tileSetNameFromId(setId);
-        if (name) usedSetNames.add(name);
+        if (name) usedFloorSets.add(name);
+      }
+
+      // Scan packed values to find which wall tile sets are used
+      const usedWallSets = new Set<string>();
+      for (const packed of wallVariants) {
+        if (packed === 0) continue;
+        const setId = unpackSetId(packed);
+        const name = tileSetNameFromId(setId);
+        if (name) usedWallSets.add(name);
       }
 
       // Load only the sets this dungeon needs, then render
-      const setNames = Array.from(usedSetNames);
-      console.log("[Client] Loading floor tile sets:", setNames);
-      this.dungeonRenderer.loadAssets(setNames).then(() => {
-        console.log("[Client] Floor assets loaded, rendering dungeon");
-        this.dungeonRenderer.render(tileMap, floorVariants);
+      const floorSetNames = Array.from(usedFloorSets);
+      const wallSetNames = Array.from(usedWallSets);
+      console.log("[Client] Loading floor tile sets:", floorSetNames);
+      console.log("[Client] Loading wall tile sets:", wallSetNames);
+      this.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
+        console.log("[Client] Assets loaded, rendering dungeon");
+        this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
 
         // Setup input after dungeon renders (sends move commands to server)
         new InputManager(this.scene, this.dungeonRenderer.getFloorMeshes(), room);
 
-        // Setup wall occlusion
+        // Setup wall occlusion (with wall decoration map for toggling)
         this.wallOcclusion = new WallOcclusionSystem(
           this.scene,
           this.isoCamera.camera,
           this.dungeonRenderer.getWallMeshes(),
+          this.dungeonRenderer.getWallDecoMap(),
         );
       });
     });

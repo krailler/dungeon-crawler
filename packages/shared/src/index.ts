@@ -24,6 +24,8 @@ export {
   CAMERA_RADIUS_MIN,
   CAMERA_RADIUS_MAX,
   CAMERA_FOLLOW_SPEED,
+  WALL_HEIGHT,
+  WALL_DEPTH,
 } from "./Constants.js";
 
 export { MessageType } from "./protocol.js";
@@ -41,3 +43,7 @@ export type { RoomSetAssignment } from "./FloorVariants.js";
 
 export { TILE_SETS, TILE_SET_NAMES, tileSetNameFromId } from "./TileSets.js";
 export type { TileSetName } from "./TileSets.js";
+
+export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
+
+export { mulberry32 } from "./random.js";

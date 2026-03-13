@@ -7,6 +7,7 @@ export class DungeonState extends Schema {
   @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>();
   @type("string") tileMapData: string = "";
   @type("string") floorVariantData: string = "";
+  @type("string") wallVariantData: string = "";
   @type("uint16") mapWidth: number = 0;
   @type("uint16") mapHeight: number = 0;
 }

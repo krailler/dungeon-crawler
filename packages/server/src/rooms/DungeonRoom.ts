@@ -21,11 +21,16 @@ import {
   type TileMap,
   MessageType,
   generateFloorVariants,
+  generateWallVariants,
   assignRoomSets,
 } from "@dungeon/shared";
 import type { MoveMessage } from "@dungeon/shared";
+import { mulberry32 } from "@dungeon/shared";
 
-const TICK_RATE = 50; // ms between simulation ticks (~20 ticks/sec)
+const TICK_RATE = 64; // ms between simulation ticks
+
+/** Fixed seed for deterministic dungeon generation (set to null for random). */
+const DUNGEON_SEED: number | null = 42;
 
 export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
@@ -37,8 +42,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state = new DungeonState();
 
     // Generate dungeon
+    const seed = DUNGEON_SEED ?? Date.now();
     const generator = new DungeonGenerator();
-    this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS);
+    this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
 
     // Serialize map for clients
     this.state.tileMapData = JSON.stringify(this.tileMap.serializeGrid());
@@ -48,10 +54,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Generate deterministic floor tile variants with per-room tile sets
     const rooms = generator.getRooms();
     const roomOwnership = generator.getRoomOwnership();
-    const seed = Date.now();
     const roomSets = assignRoomSets(rooms.length, seed);
     const floorVariants = generateFloorVariants(this.tileMap, seed, roomOwnership, roomSets);
     this.state.floorVariantData = JSON.stringify(floorVariants);
+
+    const wallVariants = generateWallVariants(this.tileMap, seed, roomOwnership, roomSets);
+    this.state.wallVariantData = JSON.stringify(wallVariants);
 
     // Setup pathfinding
     this.pathfinder = new Pathfinder(this.tileMap);
@@ -59,7 +67,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Setup systems
     this.aiSystem = new AISystem(this.pathfinder);
     this.combatSystem = new CombatSystem();
-    this.spawnEnemies(rooms);
+    const spawnRng = mulberry32(seed ^ 0x454e454d); // separate sequence for enemy spawns
+    this.spawnEnemies(rooms, spawnRng);
 
     // Register message handlers
     this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
@@ -177,16 +186,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     entity.rotY = Math.atan2(ndx, ndz);
   }
 
-  private spawnEnemies(rooms: DungeonRoomDef[]): void {
+  private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number): void {
     let enemyId = 0;
     // Skip first room (player spawn)
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      const enemyCount = 1 + Math.floor(Math.random() * 2);
+      const enemyCount = 1 + Math.floor(rng() * 2);
 
       for (let j = 0; j < enemyCount; j++) {
-        const tileX = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-        const tileY = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+        const tileX = room.x + 1 + Math.floor(rng() * (room.w - 2));
+        const tileY = room.y + 1 + Math.floor(rng() * (room.h - 2));
 
         const enemy = new EnemyState();
         enemy.x = tileX * TILE_SIZE;

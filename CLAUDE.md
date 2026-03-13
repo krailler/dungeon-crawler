@@ -153,9 +153,13 @@ packages/
 
 ### Shared (`packages/shared/src/`)
 
-- `Constants.ts` — All game balance constants (TILE*SIZE, PLAYER*\_, ENEMY\_\_, CAMERA*\*, DUNGEON*\*)
+- `Constants.ts` — All game balance constants (TILE*SIZE, PLAYER*\_, ENEMY\_\_, CAMERA*\*, DUNGEON*\*, WALL_HEIGHT)
 - `TileMap.ts` — 2D grid data + TileType + `serializeGrid()` / `fromSerialized()` for network transfer
 - `protocol.ts` — MessageType const object + MoveMessage interface
+- `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
+- `WallVariants.ts` — Deterministic wall decoration variant generation (3 variants, weighted: 40/45/15%), per-room sets inherited from adjacent floor
+- `TileSets.ts` — Tile set definitions + name↔id mapping
+- `random.ts` — Shared seeded PRNG (mulberry32)
 - `index.ts` — Barrel export
 
 ### Server (`packages/server/src/`)
@@ -178,8 +182,10 @@ packages/
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles
 - `entities/ClientPlayer.ts` — Player mesh + lerp interpolation from server state
 - `entities/ClientEnemy.ts` — Enemy mesh + lerp + hit flash on damage
-- `dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes
-- `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency
+- `dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes + GLB wall decorations on exposed faces
+- `dungeon/FloorAssetLoader.ts` — Loads floor tile GLBs per set, GPU-efficient instancing via AssetContainer
+- `dungeon/WallAssetLoader.ts` — Loads wall decoration GLBs per set, places on wall faces (N/S/W/E), auto-scales to TILE_SIZE × WALL_HEIGHT
+- `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency + wall decoration toggling
 - `ui/hudStore.ts` — HUD pub-sub store: party members, FPS, ping; React root lifecycle (mountHud/disposeHud)
 - `ui/HudRoot.tsx` — React component: party health bars, FPS counter, ping display
 - `index.html` — Fullscreen canvas + HUD overlay

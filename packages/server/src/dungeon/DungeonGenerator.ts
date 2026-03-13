@@ -1,4 +1,4 @@
-import { TileMap, TileType } from "@dungeon/shared";
+import { TileMap, TileType, mulberry32 } from "@dungeon/shared";
 
 export interface Room {
   x: number;
@@ -11,8 +11,10 @@ export class DungeonGenerator {
   private rooms: Room[] = [];
   /** Grid tracking which room (index) owns each tile. -1 = unowned. */
   private roomOwnership: number[][] = [];
+  private rng: () => number = Math.random;
 
-  generate(width: number, height: number, roomCount: number): TileMap {
+  generate(width: number, height: number, roomCount: number, seed?: number): TileMap {
+    this.rng = seed != null ? mulberry32(seed) : Math.random;
     this.rooms = [];
     const map = new TileMap(width, height);
 
@@ -66,10 +68,10 @@ export class DungeonGenerator {
   private randomRoom(mapWidth: number, mapHeight: number): Room {
     const minSize = 4;
     const maxSize = 8;
-    const w = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
-    const h = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
-    const x = 1 + Math.floor(Math.random() * (mapWidth - w - 2));
-    const y = 1 + Math.floor(Math.random() * (mapHeight - h - 2));
+    const w = minSize + Math.floor(this.rng() * (maxSize - minSize + 1));
+    const h = minSize + Math.floor(this.rng() * (maxSize - minSize + 1));
+    const x = 1 + Math.floor(this.rng() * (mapWidth - w - 2));
+    const y = 1 + Math.floor(this.rng() * (mapHeight - h - 2));
     return { x, y, w, h };
   }
 
@@ -103,7 +105,7 @@ export class DungeonGenerator {
     const bx = b.x + Math.floor(b.w / 2);
     const by = b.y + Math.floor(b.h / 2);
 
-    if (Math.random() < 0.5) {
+    if (this.rng() < 0.5) {
       this.carveHorizontal(map, ax, bx, ay, sourceRoomIndex);
       this.carveVertical(map, ay, by, bx, sourceRoomIndex);
     } else {

@@ -2,6 +2,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 
 const OCCLUDE_RADIUS = 10;
@@ -12,10 +13,18 @@ export class WallOcclusionSystem {
   private originalMaterials: Map<Mesh, StandardMaterial> = new Map();
   private fadedMaterial: StandardMaterial;
   private camera: ArcRotateCamera;
+  /** Map from wall cube → decoration root nodes (toggled with wall fade) */
+  private wallDecoMap: Map<Mesh, TransformNode[]>;
 
-  constructor(scene: Scene, camera: ArcRotateCamera, wallMeshes: Mesh[]) {
+  constructor(
+    scene: Scene,
+    camera: ArcRotateCamera,
+    wallMeshes: Mesh[],
+    wallDecoMap: Map<Mesh, TransformNode[]>,
+  ) {
     this.camera = camera;
     this.wallMeshes = wallMeshes;
+    this.wallDecoMap = wallDecoMap;
 
     // Single shared material for all faded walls
     this.fadedMaterial = new StandardMaterial("wallFaded", scene);
@@ -69,6 +78,14 @@ export class WallOcclusionSystem {
 
     wall.material = this.fadedMaterial;
     wall.isPickable = false;
+
+    // Hide wall decorations
+    const decos = this.wallDecoMap.get(wall);
+    if (decos) {
+      for (const deco of decos) {
+        deco.setEnabled(false);
+      }
+    }
   }
 
   private restoreWall(wall: Mesh): void {
@@ -76,6 +93,14 @@ export class WallOcclusionSystem {
     if (origMat && wall.material !== origMat) {
       wall.material = origMat;
       wall.isPickable = true;
+
+      // Show wall decorations
+      const decos = this.wallDecoMap.get(wall);
+      if (decos) {
+        for (const deco of decos) {
+          deco.setEnabled(true);
+        }
+      }
     }
   }
 }
