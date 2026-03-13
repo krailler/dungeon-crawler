@@ -265,14 +265,15 @@ export class DungeonRenderer {
       floorE: face === WallFace.EAST,
     };
 
-    const wall = MeshBuilder.CreateBox(
+    // Invisible anchor — only used by WallOcclusionSystem for position tracking
+    const wall = MeshBuilder.CreateGround(
       `wall_${tileX}_${tileY}${nameSuffix}`,
-      { width: boxW, height: WALL_HEIGHT, depth: boxD },
+      { width: boxW, height: boxD },
       this.scene,
     );
-    wall.position.set(worldX + shiftX, WALL_HEIGHT / 2, worldZ + shiftZ);
-    wall.material = this.wallMaterial;
-    wall.receiveShadows = true;
+    wall.position.set(worldX + shiftX, WALL_HEIGHT, worldZ + shiftZ);
+    wall.visibility = 0;
+    wall.isPickable = false;
     wall.metadata = meta;
     this.wallMeshes.push(wall);
 

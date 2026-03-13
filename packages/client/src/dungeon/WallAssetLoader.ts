@@ -187,16 +187,6 @@ export class WallAssetLoader {
     for (const mesh of meshes) {
       mesh.receiveShadows = true;
       mesh.isPickable = false;
-
-      // Negative zOffset pushes the decoration forward in the depth buffer,
-      // preventing z-fighting with the wall cube face it sits on (decal trick).
-      if (mesh.material) {
-        const cloned = mesh.material.clone(mesh.material.name + "_deco");
-        if (cloned) {
-          cloned.zOffset = -2;
-          mesh.material = cloned;
-        }
-      }
     }
 
     return { root, meshes };

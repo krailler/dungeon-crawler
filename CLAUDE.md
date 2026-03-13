@@ -1,5 +1,9 @@
 # Dungeon Crawler - Project Guide
 
+## Git
+
+- Always use `--no-gpg-sign` when committing (GPG agent not available)
+
 ## Tech Stack
 
 - **3D Engine**: Babylon.js 8.x (client)

@@ -1,8 +1,8 @@
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Material } from "@babylonjs/core/Materials/material";
 import type { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 
 const OCCLUDE_RADIUS = 10;
@@ -10,14 +10,16 @@ const FADED_ALPHA = 0.12;
 
 export class WallOcclusionSystem {
   private wallMeshes: Mesh[];
-  private originalMaterials: Map<Mesh, StandardMaterial> = new Map();
-  private fadedMaterial: StandardMaterial;
+  /** Original shared material + per-mesh faded clone */
+  private decoMaterialCache: Map<AbstractMesh, { original: Material; faded: Material }> = new Map();
+  /** Track which walls are currently faded */
+  private fadedWalls: Set<Mesh> = new Set();
   private camera: ArcRotateCamera;
-  /** Map from wall cube → decoration root nodes (toggled with wall fade) */
+  /** Map from wall cap → decoration root nodes (faded with wall) */
   private wallDecoMap: Map<Mesh, TransformNode[]>;
 
   constructor(
-    scene: Scene,
+    _scene: Scene,
     camera: ArcRotateCamera,
     wallMeshes: Mesh[],
     wallDecoMap: Map<Mesh, TransformNode[]>,
@@ -25,14 +27,6 @@ export class WallOcclusionSystem {
     this.camera = camera;
     this.wallMeshes = wallMeshes;
     this.wallDecoMap = wallDecoMap;
-
-    // Single shared material for all faded walls
-    this.fadedMaterial = new StandardMaterial("wallFaded", scene);
-    this.fadedMaterial.diffuseColor = new Color3(0.35, 0.3, 0.28);
-    this.fadedMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
-    this.fadedMaterial.alpha = FADED_ALPHA;
-    this.fadedMaterial.transparencyMode = 2; // ALPHABLEND
-    this.fadedMaterial.backFaceCulling = false;
   }
 
   update(playerX: number, playerZ: number): void {
@@ -59,8 +53,6 @@ export class WallOcclusionSystem {
       const dot = wx * normX + wz * normZ;
 
       // Only fade walls whose exposed face points TOWARD the camera.
-      // E.g. camera at +Z → south-facing walls (floorS) block the view.
-      // North/West walls face away from the camera and never occlude.
       const meta = wall.metadata as {
         floorN: boolean;
         floorS: boolean;
@@ -86,38 +78,44 @@ export class WallOcclusionSystem {
   }
 
   private fadeWall(wall: Mesh): void {
-    if (wall.material === this.fadedMaterial) return;
+    if (this.fadedWalls.has(wall)) return;
+    this.fadedWalls.add(wall);
 
-    const currentMat = wall.material as StandardMaterial;
-    if (!currentMat) return;
-
-    if (!this.originalMaterials.has(wall)) {
-      this.originalMaterials.set(wall, currentMat);
-    }
-
-    wall.material = this.fadedMaterial;
-    wall.isPickable = false;
-
-    // Hide wall decorations
+    // Swap decoration meshes to pre-built faded material clones
     const decos = this.wallDecoMap.get(wall);
     if (decos) {
-      for (const deco of decos) {
-        deco.setEnabled(false);
+      for (const root of decos) {
+        for (const child of root.getChildMeshes(false)) {
+          if (!child.material) continue;
+          let cached = this.decoMaterialCache.get(child);
+          if (!cached) {
+            const original = child.material;
+            const faded = original.clone(`${original.name}_faded`);
+            if (!faded) continue;
+            faded.alpha = FADED_ALPHA;
+            faded.transparencyMode = 2; // ALPHABLEND
+            faded.backFaceCulling = false;
+            cached = { original, faded };
+            this.decoMaterialCache.set(child, cached);
+          }
+          child.material = cached.faded;
+        }
       }
     }
   }
 
   private restoreWall(wall: Mesh): void {
-    const origMat = this.originalMaterials.get(wall);
-    if (origMat && wall.material !== origMat) {
-      wall.material = origMat;
-      wall.isPickable = true;
+    if (!this.fadedWalls.has(wall)) return;
+    this.fadedWalls.delete(wall);
 
-      // Show wall decorations
-      const decos = this.wallDecoMap.get(wall);
-      if (decos) {
-        for (const deco of decos) {
-          deco.setEnabled(true);
+    const decos = this.wallDecoMap.get(wall);
+    if (decos) {
+      for (const root of decos) {
+        for (const child of root.getChildMeshes(false)) {
+          const cached = this.decoMaterialCache.get(child);
+          if (cached) {
+            child.material = cached.original;
+          }
         }
       }
     }

@@ -24,12 +24,12 @@ export const ENEMY_REPATH_INTERVAL = 0.5;
 
 // Wall
 export const WALL_HEIGHT = 3;
-export const WALL_DEPTH = 0.3;
+export const WALL_DEPTH = 0.2;
 
 // Camera (client-only but shared for consistency)
 export const CAMERA_ALPHA = -Math.PI / 4;
 export const CAMERA_BETA = Math.PI / 3;
-export const CAMERA_RADIUS = 25;
-export const CAMERA_RADIUS_MIN = 20;
-export const CAMERA_RADIUS_MAX = 30;
+export const CAMERA_RADIUS = 15;
+export const CAMERA_RADIUS_MIN = 15;
+export const CAMERA_RADIUS_MAX = 15;
 export const CAMERA_FOLLOW_SPEED = 0.1;
