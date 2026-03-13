@@ -1,4 +1,4 @@
-import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -47,11 +47,9 @@ export class FloorAssetLoader {
 
     for (let i = 1; i <= FLOOR_VARIANT_COUNT; i++) {
       const fileName = `floor_${i}.glb`;
-      const p = SceneLoader.LoadAssetContainerAsync(basePath, fileName, this.scene).then(
-        (container) => {
-          setContainers.set(i, container);
-        },
-      );
+      const p = LoadAssetContainerAsync(`${basePath}${fileName}`, this.scene).then((container) => {
+        setContainers.set(i, container);
+      });
       promises.push(p);
     }
 

@@ -217,6 +217,8 @@ export class DungeonRenderer {
     wall.position.set(worldX + shiftX, WALL_HEIGHT / 2, worldZ + shiftZ);
     wall.material = this.wallMaterial;
     wall.receiveShadows = true;
+    // Store exposed face directions for WallOcclusionSystem
+    wall.metadata = { floorN, floorS, floorW, floorE };
     this.wallMeshes.push(wall);
 
     // Place GLB decorations on exposed faces + back faces

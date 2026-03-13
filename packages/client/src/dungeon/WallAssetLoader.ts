@@ -1,4 +1,4 @@
-import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Material } from "@babylonjs/core/Materials/material";
@@ -11,7 +11,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 // Side-effect: register the glTF/GLB loader plugin (may already be loaded by FloorAssetLoader)
 import "@babylonjs/loaders/glTF";
 
-import { WALL_VARIANT_COUNT, TILE_SIZE, WALL_HEIGHT, WALL_DEPTH } from "@dungeon/shared";
+import { WALL_VARIANT_COUNT, TILE_SIZE, WALL_HEIGHT } from "@dungeon/shared";
 
 // ─── Wall face directions ───────────────────────────────────────────
 
@@ -91,11 +91,9 @@ export class WallAssetLoader {
 
     for (let i = 1; i <= WALL_VARIANT_COUNT; i++) {
       const fileName = `wall_${i}.glb`;
-      const p = SceneLoader.LoadAssetContainerAsync(basePath, fileName, this.scene).then(
-        (container) => {
-          setContainers.set(i, container);
-        },
-      );
+      const p = LoadAssetContainerAsync(`${basePath}${fileName}`, this.scene).then((container) => {
+        setContainers.set(i, container);
+      });
       promises.push(p);
     }
 
@@ -221,7 +219,7 @@ export class WallAssetLoader {
         for (const mesh of container.meshes) {
           const pbrMat = mesh.material as PBRMaterial | null;
           if (!pbrMat || !pbrMat.albedoTexture) continue;
-          roughness = pbrMat.roughness;
+          roughness = pbrMat.roughness ?? 0.6;
           const key = pbrMat.albedoTexture.uid ?? pbrMat.albedoTexture.name;
           if (seen.has(key)) continue;
           seen.add(key);

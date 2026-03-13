@@ -58,7 +58,26 @@ export class WallOcclusionSystem {
       // Negative dot = wall is between camera and player
       const dot = wx * normX + wz * normZ;
 
-      if (dot < 0) {
+      // Only fade walls whose exposed face points TOWARD the camera.
+      // E.g. camera at +Z → south-facing walls (floorS) block the view.
+      // North/West walls face away from the camera and never occlude.
+      const meta = wall.metadata as {
+        floorN: boolean;
+        floorS: boolean;
+        floorW: boolean;
+        floorE: boolean;
+      } | null;
+
+      let facesCamera = true; // fallback: fade if no metadata
+      if (meta) {
+        facesCamera =
+          (meta.floorS && normZ > 0) || // south face blocks camera from -Z
+          (meta.floorN && normZ < 0) || // north face blocks camera from +Z
+          (meta.floorE && normX > 0) || // east face blocks camera from -X
+          (meta.floorW && normX < 0); // west face blocks camera from +X
+      }
+
+      if (dot < 0 && facesCamera) {
         this.fadeWall(wall);
       } else {
         this.restoreWall(wall);
