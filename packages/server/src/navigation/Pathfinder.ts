@@ -32,11 +32,13 @@ export class Pathfinder {
     const tilePath = this.astar(sx, sy, ex, ey);
     if (tilePath.length === 0) return [];
 
-    // Convert tile coords to world positions
-    return tilePath.map((node) => ({
+    // Convert tile coords to world positions, use exact click target as final waypoint
+    const path = tilePath.map((node) => ({
       x: node.x * TILE_SIZE,
       z: node.y * TILE_SIZE,
     }));
+    path[path.length - 1] = { x: end.x, z: end.z };
+    return path;
   }
 
   private astar(sx: number, sy: number, ex: number, ey: number): { x: number; y: number }[] {
