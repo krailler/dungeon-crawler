@@ -18,6 +18,7 @@ import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
+import { SoundManager } from "../audio/SoundManager";
 import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
@@ -41,6 +42,7 @@ export class ClientGame {
 
   private playerLoader: CharacterAssetLoader;
   private enemyLoader: CharacterAssetLoader;
+  private soundManager: SoundManager;
 
   // Entities synced from server
   private players: Map<string, ClientPlayer> = new Map();
@@ -52,6 +54,7 @@ export class ClientGame {
     this.engine = new Engine(canvas, true, {
       preserveDrawingBuffer: true,
       stencil: true,
+      audioEngine: true,
     });
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.02, 0.02, 0.05, 1);
@@ -63,6 +66,7 @@ export class ClientGame {
     this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.playerLoader = new CharacterAssetLoader(this.scene, "/models/characters/player");
     this.enemyLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
+    this.soundManager = new SoundManager(this.scene);
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     mountHud();
     this.client = new Client(SERVER_URL);
@@ -87,8 +91,18 @@ export class ClientGame {
   private async init(): Promise<void> {
     hudStore.setConnection("connecting", "");
     try {
-      // Pre-load character model while connecting
-      await Promise.all([this.playerLoader.load(), this.enemyLoader.load()]);
+      // Pre-load character models + audio while connecting
+      await Promise.all([
+        this.playerLoader.load(),
+        this.enemyLoader.load(),
+        this.soundManager.load(),
+      ]);
+
+      // Suppress Babylon.js default "click to unmute" button — our game
+      // naturally unlocks audio on the first player click (move command)
+      if (Engine.audioEngine) {
+        Engine.audioEngine.useCustomUnlockedButton = true;
+      }
 
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
@@ -186,7 +200,12 @@ export class ClientGame {
     // Players added
     state$.players.onAdd((player: any, sessionId: string) => {
       const isLocal = sessionId === this.localSessionId;
-      const clientPlayer = new ClientPlayer(this.scene, isLocal, sessionId);
+      const clientPlayer = new ClientPlayer(
+        this.scene,
+        isLocal,
+        sessionId,
+        isLocal ? this.soundManager : undefined,
+      );
       clientPlayer.snapToPosition(player.x, player.z);
       clientPlayer.setServerState(player.x, player.z, player.rotY);
       this.players.set(sessionId, clientPlayer);
@@ -332,6 +351,7 @@ export class ClientGame {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     disposeHud();
+    this.soundManager.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();
     this.engine.dispose();

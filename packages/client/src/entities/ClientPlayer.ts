@@ -11,6 +11,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
+import type { SoundManager } from "../audio/SoundManager";
 
 // Side-effect: shadow map support
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
@@ -23,6 +24,9 @@ const ROT_LERP_FACTOR = 10;
 
 /** Distance threshold to consider the player "moving" */
 const MOVE_THRESHOLD = 0.05;
+
+/** Interval between footstep sounds while running (seconds) */
+const FOOTSTEP_INTERVAL = 0.32;
 
 export class ClientPlayer {
   /** Invisible anchor mesh used for positioning and torch parenting */
@@ -39,12 +43,16 @@ export class ClientPlayer {
   private currentAnim: AnimName | null = null;
   private isPlayingOneShot: boolean = false;
 
+  // Audio
+  private soundManager: SoundManager | null = null;
+  private footstepTimer: number = 0;
+
   // Target state from server
   private targetX: number = 0;
   private targetZ: number = 0;
   private targetRotY: number = 0;
 
-  constructor(scene: Scene, isLocal: boolean, id: string) {
+  constructor(scene: Scene, isLocal: boolean, id: string, soundManager?: SoundManager) {
     this.isLocal = isLocal;
 
     // Invisible anchor for position/rotation
@@ -73,6 +81,11 @@ export class ClientPlayer {
       this.shadowGenerator = new ShadowGenerator(1024, this.torchLight);
       this.shadowGenerator.usePercentageCloserFiltering = true;
       this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+    }
+
+    // Only local player gets footstep sounds
+    if (isLocal && soundManager) {
+      this.soundManager = soundManager;
     }
   }
 
@@ -184,8 +197,18 @@ export class ClientPlayer {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
         this.playAnimation("run");
+
+        // Footstep sound at regular intervals (local player only)
+        if (this.soundManager) {
+          this.footstepTimer += dt;
+          if (this.footstepTimer >= FOOTSTEP_INTERVAL) {
+            this.soundManager.playRandomFootstep();
+            this.footstepTimer = 0;
+          }
+        }
       } else {
         this.playAnimation("idle");
+        this.footstepTimer = 0;
       }
     }
   }
