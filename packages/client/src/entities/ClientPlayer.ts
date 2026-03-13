@@ -2,8 +2,14 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { SpotLight } from "@babylonjs/core/Lights/spotLight";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
+
+// Side-effect: shadow map support
+import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 
 /** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
 const LERP_FACTOR = 12;
@@ -11,6 +17,8 @@ const LERP_FACTOR = 12;
 export class ClientPlayer {
   public mesh: Mesh;
   public isLocal: boolean;
+  public torchLight: SpotLight | null = null;
+  public shadowGenerator: ShadowGenerator | null = null;
 
   // Target state from server
   private targetX: number = 0;
@@ -45,6 +53,28 @@ export class ClientPlayer {
     head.material = material;
 
     this.mesh.position.y = 0.7;
+
+    // Only local player gets a torch light
+    if (isLocal) {
+      this.torchLight = new SpotLight(
+        `playerTorch_${id}`,
+        new Vector3(0, 3, 0),
+        new Vector3(0, -0.8, 0.2).normalize(),
+        TORCH_ANGLE,
+        1,
+        scene,
+      );
+      this.torchLight.intensity = TORCH_INTENSITY;
+      this.torchLight.range = TORCH_RANGE;
+      this.torchLight.diffuse = new Color3(1.0, 0.85, 0.6);
+      this.torchLight.specular = new Color3(0.5, 0.4, 0.3);
+      this.torchLight.parent = this.mesh;
+
+      // PCF shadow generator
+      this.shadowGenerator = new ShadowGenerator(1024, this.torchLight);
+      this.shadowGenerator.usePercentageCloserFiltering = true;
+      this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+    }
   }
 
   /** Called when server state changes */
@@ -75,6 +105,8 @@ export class ClientPlayer {
   }
 
   dispose(): void {
+    this.shadowGenerator?.dispose();
+    this.torchLight?.dispose();
     this.mesh.dispose();
   }
 }

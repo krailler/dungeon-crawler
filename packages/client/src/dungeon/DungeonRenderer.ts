@@ -7,12 +7,19 @@ import type { Material } from "@babylonjs/core/Materials/material";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { Color4 as BColor4 } from "@babylonjs/core/Maths/math.color";
 import {
   TileMap,
   TileType,
   TILE_SIZE,
   WALL_HEIGHT,
   WALL_DEPTH,
+  WALL_TORCH_INTENSITY,
+  WALL_TORCH_RANGE,
+  WALL_TORCH_CHANCE,
   unpackSetId,
   unpackVariant,
   tileSetNameFromId,
@@ -31,6 +38,10 @@ export class DungeonRenderer {
   private wallDecoRoots: TransformNode[] = [];
   /** Map from wall cube mesh → its decoration root nodes (for occlusion toggling) */
   private wallDecoMap: Map<Mesh, TransformNode[]> = new Map();
+
+  /** Wall torch lights and particles */
+  private torchLights: PointLight[] = [];
+  private torchParticles: ParticleSystem[] = [];
 
   private wallMaterial!: Material;
 
@@ -139,6 +150,16 @@ export class DungeonRenderer {
     }
     this.floorRoots = [];
     this.floorMeshes = [];
+
+    // Dispose torch lights & particles
+    for (const ps of this.torchParticles) {
+      ps.dispose();
+    }
+    this.torchParticles = [];
+    for (const light of this.torchLights) {
+      light.dispose();
+    }
+    this.torchLights = [];
 
     // Dispose wall meshes
     for (const mesh of this.wallMeshes) {
@@ -321,5 +342,60 @@ export class DungeonRenderer {
     this.wallDecoRoots.push(backRoot);
 
     this.wallDecoMap.set(wall, decos);
+
+    // Deterministic torch placement on front face only
+    const hash = ((tileX * 73856093) ^ (tileY * 19349663) ^ (face * 83492791)) >>> 0;
+    if ((hash % 1000) / 1000 < WALL_TORCH_CHANCE) {
+      this.createWallTorch(frontX, frontZ, dir);
+    }
+  }
+
+  private createWallTorch(x: number, z: number, dir: { x: number; z: number }): void {
+    const torchY = WALL_HEIGHT * 0.6;
+    // Offset slightly inward from wall face
+    const offsetDist = 0.3;
+    const px = x - dir.x * offsetDist;
+    const pz = z - dir.z * offsetDist;
+
+    const name = `wallTorch_${this.torchLights.length}`;
+
+    // PointLight
+    const light = new PointLight(name, new Vector3(px, torchY, pz), this.scene);
+    light.intensity = WALL_TORCH_INTENSITY;
+    light.range = WALL_TORCH_RANGE;
+    light.diffuse = new Color3(1.0, 0.7, 0.3);
+    light.specular = new Color3(0.4, 0.2, 0.1);
+    this.torchLights.push(light);
+
+    // Fire particle system
+    const ps = new ParticleSystem(`${name}_fire`, 30, this.scene);
+    ps.createPointEmitter(new Vector3(-0.05, 0, -0.05), new Vector3(0.05, 0.3, 0.05));
+    ps.emitter = new Vector3(px, torchY, pz);
+
+    // Use default particle texture (built-in)
+    ps.particleTexture = new Texture(
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAKNJREFUWEft1DEKwDAMA1D5/0enQ4eQIZClxKR0syT+NjapzN1i5v4tAD8HZG4ROU7MfBb4x8gRwMzswF0AhxVPAPpMAO4GACIAMA3knIDtACIA0ACsAmDrAEIA0ADMAqDLAGIA0ABMAaDrAOIA0ABMA6DrABIA0ABsA6DLAFIAnwB+f4qPfwB3d/3+q/nqrxDy/0KyD2j/HNj+M2S7A/0OAN8JbtwgkzFIRwAAAABJRU5ErkJggg==",
+      this.scene,
+    );
+
+    ps.minSize = 0.1;
+    ps.maxSize = 0.25;
+    ps.minLifeTime = 0.2;
+    ps.maxLifeTime = 0.5;
+    ps.emitRate = 20;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+
+    ps.color1 = new BColor4(1.0, 0.6, 0.1, 1.0);
+    ps.color2 = new BColor4(1.0, 0.3, 0.0, 0.8);
+    ps.colorDead = new BColor4(0.3, 0.1, 0.0, 0.0);
+
+    ps.minEmitPower = 0.3;
+    ps.maxEmitPower = 0.6;
+    ps.updateSpeed = 0.02;
+
+    ps.gravity = new Vector3(0, 1.5, 0);
+
+    ps.start();
+    this.torchParticles.push(ps);
   }
 }

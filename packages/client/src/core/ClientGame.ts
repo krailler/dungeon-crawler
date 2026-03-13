@@ -3,6 +3,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
@@ -18,7 +19,8 @@ import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
-import { TileMap, unpackSetId, tileSetNameFromId } from "@dungeon/shared";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
+import { TileMap, unpackSetId, tileSetNameFromId, AMBIENT_INTENSITY } from "@dungeon/shared";
 
 const SERVER_URL = "ws://localhost:3000";
 
@@ -161,6 +163,11 @@ export class ClientGame {
           this.dungeonRenderer.getWallMeshes(),
           this.dungeonRenderer.getWallDecoMap(),
         );
+
+        // Enable shadow receiving on floor meshes
+        for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
+          mesh.receiveShadows = true;
+        }
       });
     });
 
@@ -175,6 +182,9 @@ export class ClientGame {
       if (isLocal) {
         this.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
       }
+
+      // Add as shadow caster for local player's torch
+      this.addShadowCaster(clientPlayer.mesh);
 
       const name = isLocal ? "You" : `Player ${sessionId.slice(0, 4).toUpperCase()}`;
       hudStore.setMember({
@@ -219,6 +229,7 @@ export class ClientGame {
         enemy.isDead,
       );
       this.enemies.set(id, clientEnemy);
+      this.addShadowCaster(clientEnemy.mesh);
 
       // Listen to changes on this enemy
       $(enemy).onChange(() => {
@@ -245,9 +256,12 @@ export class ClientGame {
 
   private setupLighting(): void {
     const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), this.scene);
-    ambient.intensity = 0.7;
-    ambient.diffuse = new Color3(0.6, 0.6, 0.7);
-    ambient.groundColor = new Color3(0.2, 0.2, 0.25);
+    ambient.intensity = AMBIENT_INTENSITY;
+    ambient.diffuse = new Color3(0.4, 0.4, 0.55);
+    ambient.groundColor = new Color3(0.1, 0.1, 0.15);
+
+    const glow = new GlowLayer("glow", this.scene);
+    glow.intensity = 0.4;
   }
 
   private update(dt: number): void {
@@ -277,6 +291,13 @@ export class ClientGame {
 
     // FPS
     hudStore.updateFPS(dt);
+  }
+
+  private addShadowCaster(mesh: AbstractMesh): void {
+    const local = this.players.get(this.localSessionId);
+    if (local?.shadowGenerator) {
+      local.shadowGenerator.addShadowCaster(mesh);
+    }
   }
 
   dispose(): void {
