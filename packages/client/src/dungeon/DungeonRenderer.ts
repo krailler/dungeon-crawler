@@ -167,6 +167,10 @@ export class DungeonRenderer {
     this.floorMeshes.push(...meshes);
   }
 
+  /**
+   * One independent thin wall per exposed face.
+   * Corners → two walls in L. Room junctions → two separate walls, one per room.
+   */
   private createWallBlock(
     map: TileMap,
     worldX: number,
@@ -175,53 +179,103 @@ export class DungeonRenderer {
     tileY: number,
     wallPacked: number,
   ): void {
-    // Detect which sides have floor neighbors
-    const floorN = map.isFloor(tileX, tileY - 1);
-    const floorS = map.isFloor(tileX, tileY + 1);
-    const floorW = map.isFloor(tileX - 1, tileY);
-    const floorE = map.isFloor(tileX + 1, tileY);
-    const hasNS = floorN || floorS;
-    const hasEW = floorW || floorE;
-
-    // Thin wall dimensions — full TILE_SIZE along the wall, WALL_DEPTH perpendicular
-    let boxW = TILE_SIZE;
-    let boxD = TILE_SIZE;
-    let shiftX = 0;
-    let shiftZ = 0;
     const edgeShift = (TILE_SIZE - WALL_DEPTH) / 2;
 
-    if (hasNS && hasEW) {
-      // Corner: small post — thin walls from adjacent tiles provide visual coverage
-      boxW = WALL_DEPTH;
-      boxD = WALL_DEPTH;
-      // Shift toward the corner where the two floor edges meet
-      if (floorS) shiftZ = edgeShift;
-      else if (floorN) shiftZ = -edgeShift;
-      if (floorE) shiftX = edgeShift;
-      else if (floorW) shiftX = -edgeShift;
-    } else if (hasNS && !hasEW) {
-      boxD = WALL_DEPTH;
-      if (floorS && !floorN) shiftZ = edgeShift;
-      else if (floorN && !floorS) shiftZ = -edgeShift;
-    } else if (hasEW && !hasNS) {
-      boxW = WALL_DEPTH;
-      if (floorE && !floorW) shiftX = edgeShift;
-      else if (floorW && !floorE) shiftX = -edgeShift;
+    // One thin wall per floor-adjacent face
+    if (map.isFloor(tileX, tileY - 1)) {
+      this.createWallSegment(
+        worldX,
+        worldZ,
+        tileX,
+        tileY,
+        TILE_SIZE,
+        WALL_DEPTH,
+        0,
+        -edgeShift,
+        WallFace.NORTH,
+        wallPacked,
+        "_n",
+      );
     }
+    if (map.isFloor(tileX, tileY + 1)) {
+      this.createWallSegment(
+        worldX,
+        worldZ,
+        tileX,
+        tileY,
+        TILE_SIZE,
+        WALL_DEPTH,
+        0,
+        edgeShift,
+        WallFace.SOUTH,
+        wallPacked,
+        "_s",
+      );
+    }
+    if (map.isFloor(tileX - 1, tileY)) {
+      this.createWallSegment(
+        worldX,
+        worldZ,
+        tileX,
+        tileY,
+        WALL_DEPTH,
+        TILE_SIZE,
+        -edgeShift,
+        0,
+        WallFace.WEST,
+        wallPacked,
+        "_w",
+      );
+    }
+    if (map.isFloor(tileX + 1, tileY)) {
+      this.createWallSegment(
+        worldX,
+        worldZ,
+        tileX,
+        tileY,
+        WALL_DEPTH,
+        TILE_SIZE,
+        edgeShift,
+        0,
+        WallFace.EAST,
+        wallPacked,
+        "_e",
+      );
+    }
+  }
+
+  /** Create a single thin wall + its decoration for one face. */
+  private createWallSegment(
+    worldX: number,
+    worldZ: number,
+    tileX: number,
+    tileY: number,
+    boxW: number,
+    boxD: number,
+    shiftX: number,
+    shiftZ: number,
+    face: WallFace,
+    wallPacked: number,
+    nameSuffix: string,
+  ): void {
+    const meta = {
+      floorN: face === WallFace.NORTH,
+      floorS: face === WallFace.SOUTH,
+      floorW: face === WallFace.WEST,
+      floorE: face === WallFace.EAST,
+    };
 
     const wall = MeshBuilder.CreateBox(
-      `wall_${tileX}_${tileY}`,
+      `wall_${tileX}_${tileY}${nameSuffix}`,
       { width: boxW, height: WALL_HEIGHT, depth: boxD },
       this.scene,
     );
     wall.position.set(worldX + shiftX, WALL_HEIGHT / 2, worldZ + shiftZ);
     wall.material = this.wallMaterial;
     wall.receiveShadows = true;
-    // Store exposed face directions for WallOcclusionSystem
-    wall.metadata = { floorN, floorS, floorW, floorE };
+    wall.metadata = meta;
     this.wallMeshes.push(wall);
 
-    // Place GLB decorations on exposed faces + back faces
     if (wallPacked <= 0) return;
 
     const setId = unpackSetId(wallPacked);
@@ -230,62 +284,41 @@ export class DungeonRenderer {
     if (!setName) return;
 
     const decos: TransformNode[] = [];
+    const dir = FACE_DIRECTION[face];
+    const frontDist = TILE_SIZE / 2;
 
-    const exposedFaces: Array<{ dx: number; dy: number; face: WallFace }> = [
-      { dx: 0, dy: -1, face: WallFace.NORTH },
-      { dx: 0, dy: 1, face: WallFace.SOUTH },
-      { dx: -1, dy: 0, face: WallFace.WEST },
-      { dx: 1, dy: 0, face: WallFace.EAST },
-    ];
+    // Front decoration at tile boundary
+    const frontX = worldX + dir.x * frontDist;
+    const frontZ = worldZ + dir.z * frontDist;
+    const frontName = `wallDeco_${tileX}_${tileY}_f${face}${nameSuffix}`;
+    const { root: frontRoot } = this.wallAssetLoader.instantiate(
+      setName,
+      variant,
+      frontX,
+      frontZ,
+      face,
+      frontName,
+    );
+    decos.push(frontRoot);
+    this.wallDecoRoots.push(frontRoot);
 
-    for (const { dx, dy, face } of exposedFaces) {
-      const nx = tileX + dx;
-      const ny = tileY + dy;
-      if (!map.isFloor(nx, ny)) continue;
+    // Back decoration on the inside of the thin wall
+    const backDist = frontDist - WALL_DEPTH;
+    const backX = worldX + dir.x * backDist;
+    const backZ = worldZ + dir.z * backDist;
+    const backFace = OPPOSITE_FACE[face];
+    const backName = `wallDeco_${tileX}_${tileY}_b${face}${nameSuffix}`;
+    const { root: backRoot } = this.wallAssetLoader.instantiate(
+      setName,
+      variant,
+      backX,
+      backZ,
+      backFace,
+      backName,
+    );
+    decos.push(backRoot);
+    this.wallDecoRoots.push(backRoot);
 
-      const dir = FACE_DIRECTION[face];
-      const frontDist = TILE_SIZE / 2;
-
-      // Front decoration: at tile boundary (same as before)
-      const frontX = worldX + dir.x * frontDist;
-      const frontZ = worldZ + dir.z * frontDist;
-      const frontName = `wallDeco_${tileX}_${tileY}_f${face}`;
-      const { root: frontRoot } = this.wallAssetLoader.instantiate(
-        setName,
-        variant,
-        frontX,
-        frontZ,
-        face,
-        frontName,
-      );
-      decos.push(frontRoot);
-      this.wallDecoRoots.push(frontRoot);
-
-      // Back decoration: opposite face of the thin wall
-      const backFace = OPPOSITE_FACE[face];
-      // Skip if the opposite side already has its own decoration (floor on both sides)
-      const ox = tileX - dx;
-      const oy = tileY - dy;
-      if (map.isFloor(ox, oy)) continue;
-
-      const backDist = frontDist - WALL_DEPTH;
-      const backX = worldX + dir.x * backDist;
-      const backZ = worldZ + dir.z * backDist;
-      const backName = `wallDeco_${tileX}_${tileY}_b${face}`;
-      const { root: backRoot } = this.wallAssetLoader.instantiate(
-        setName,
-        variant,
-        backX,
-        backZ,
-        backFace,
-        backName,
-      );
-      decos.push(backRoot);
-      this.wallDecoRoots.push(backRoot);
-    }
-
-    if (decos.length > 0) {
-      this.wallDecoMap.set(wall, decos);
-    }
+    this.wallDecoMap.set(wall, decos);
   }
 }
