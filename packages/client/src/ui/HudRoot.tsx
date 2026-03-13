@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import type { PartyMember } from "./hudStore";
 import { hudStore } from "./hudStore";
 
@@ -15,6 +16,7 @@ const formatHealth = (member: PartyMember): string => {
 };
 
 const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
+  const { t } = useTranslation();
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
   const barClass = healthColor(pct);
@@ -32,7 +34,7 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold text-slate-100">{member.name}</span>
           <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-            {member.isLocal ? "Leader" : "Member"}
+            {member.isLocal ? t("party.roleLeader") : t("party.roleMember")}
           </span>
         </div>
         <span className="font-mono text-[11px] text-slate-300">{formatHealth(member)}</span>
@@ -48,6 +50,7 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
 };
 
 export const HudRoot = (): JSX.Element => {
+  const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const members = useMemo(() => snapshot.members, [snapshot.members]);
 
@@ -59,24 +62,26 @@ export const HudRoot = (): JSX.Element => {
             <div className="h-full w-full animate-glow-pulse rounded-full bg-sky-400/40" />
           </div>
           <div>
-            <div className="text-xs uppercase tracking-[0.4em] text-slate-400">Party</div>
-            <div className="text-sm font-semibold text-slate-100">Expedition</div>
+            <div className="text-xs uppercase tracking-[0.4em] text-slate-400">
+              {t("party.title")}
+            </div>
+            <div className="text-sm font-semibold text-slate-100">{t("party.subtitle")}</div>
           </div>
         </div>
         <div className="flex flex-col gap-3">
           {snapshot.connectionStatus === "connecting" && (
             <div className="rounded-2xl border border-dashed border-sky-400/30 bg-slate-900/30 px-3 py-3 text-xs text-sky-300">
-              <span className="animate-pulse">Connecting...</span>
+              <span className="animate-pulse">{t("connection.connecting")}</span>
             </div>
           )}
           {snapshot.connectionStatus === "error" && (
             <div className="rounded-2xl border border-dashed border-red-400/40 bg-red-950/30 px-3 py-3 text-xs text-red-300">
-              {snapshot.connectionInfo || "Connection failed"}
+              {snapshot.connectionInfo || t("connection.failed")}
             </div>
           )}
           {snapshot.connectionStatus === "connected" && members.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-500/40 bg-slate-900/30 px-3 py-3 text-xs text-slate-400">
-              Waiting for adventurers...
+              {t("party.waiting")}
             </div>
           )}
           {snapshot.connectionStatus === "connected" && snapshot.connectionInfo && (
@@ -91,10 +96,10 @@ export const HudRoot = (): JSX.Element => {
       </div>
       <div className="absolute right-5 top-4 flex items-center gap-2">
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
-          {snapshot.ping > 0 ? `${snapshot.ping} ms` : "-- ms"}
+          {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}
         </div>
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
-          {snapshot.fps > 0 ? `${snapshot.fps} FPS` : "-- FPS"}
+          {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
         </div>
       </div>
     </div>

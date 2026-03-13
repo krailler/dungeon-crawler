@@ -1,0 +1,24 @@
+{
+  "party": {
+    "title": "Party",
+    "subtitle": "Expedition",
+    "roleLeader": "Leader",
+    "roleMember": "Member",
+    "waiting": "Waiting for adventurers..."
+  },
+  "connection": {
+    "connecting": "Connecting...",
+    "failed": "Connection failed",
+    "info": "Room {{roomId}} · {{sessionId}}"
+  },
+  "player": {
+    "you": "You",
+    "other": "Player {{id}}"
+  },
+  "hud": {
+    "ping": "{{value}} ms",
+    "pingEmpty": "-- ms",
+    "fps": "{{value}} FPS",
+    "fpsEmpty": "-- FPS"
+  }
+}

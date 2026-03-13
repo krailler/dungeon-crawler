@@ -21,6 +21,7 @@ import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { TileMap, unpackSetId, tileSetNameFromId, AMBIENT_INTENSITY } from "@dungeon/shared";
+import { t } from "../i18n/i18n";
 
 const SERVER_URL = "ws://localhost:3000";
 
@@ -88,7 +89,10 @@ export class ClientGame {
 
       hudStore.setConnection(
         "connected",
-        `Room ${room.roomId} · ${room.sessionId.slice(0, 6).toUpperCase()}`,
+        t("connection.info", {
+          roomId: room.roomId,
+          sessionId: room.sessionId.slice(0, 6).toUpperCase(),
+        }),
       );
 
       this.setupStateListeners(room);
@@ -186,7 +190,9 @@ export class ClientGame {
       // Add as shadow caster for local player's torch
       this.addShadowCaster(clientPlayer.mesh);
 
-      const name = isLocal ? "You" : `Player ${sessionId.slice(0, 4).toUpperCase()}`;
+      const name = isLocal
+        ? t("player.you")
+        : t("player.other", { id: sessionId.slice(0, 4).toUpperCase() });
       hudStore.setMember({
         id: sessionId,
         name,

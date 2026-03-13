@@ -1,4 +1,5 @@
 import "./ui/index.css";
+import "./i18n/i18n";
 import { ClientGame } from "./core/ClientGame";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
