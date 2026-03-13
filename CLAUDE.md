@@ -44,7 +44,7 @@ packages/
       entities/       # ClientPlayer, ClientEnemy (mesh + interpolation)
       dungeon/        # DungeonRenderer (3D mesh generation)
       systems/        # WallOcclusionSystem
-      ui/             # HUD HTML overlay
+      ui/             # HUD: hudStore (pub-sub state) + HudRoot (React)
       main.ts         # Client entry point
     index.html
     vite.config.ts
@@ -180,6 +180,7 @@ packages/
 - `entities/ClientEnemy.ts` — Enemy mesh + lerp + hit flash on damage
 - `dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes
 - `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency
-- `ui/HUD.ts` — HTML overlay: health bar with color changes (green/orange/red)
+- `ui/hudStore.ts` — HUD pub-sub store: party members, FPS, ping; React root lifecycle (mountHud/disposeHud)
+- `ui/HudRoot.tsx` — React component: party health bars, FPS counter, ping display
 - `index.html` — Fullscreen canvas + HUD overlay
 - `vite.config.ts` — WASM exclusion for recast-detour

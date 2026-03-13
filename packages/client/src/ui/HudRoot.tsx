@@ -74,8 +74,13 @@ export const HudRoot = (): JSX.Element => {
           ))}
         </div>
       </div>
-      <div className="absolute right-5 top-4 rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
-        {snapshot.fps > 0 ? `${snapshot.fps} FPS` : "-- FPS"}
+      <div className="absolute right-5 top-4 flex items-center gap-2">
+        <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
+          {snapshot.ping > 0 ? `${snapshot.ping} ms` : "-- ms"}
+        </div>
+        <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
+          {snapshot.fps > 0 ? `${snapshot.fps} FPS` : "-- FPS"}
+        </div>
       </div>
     </div>
   );

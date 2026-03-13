@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { HudRoot } from "./HudRoot";
+
 export type PartyMember = {
   id: string;
   name: string;
@@ -9,6 +13,7 @@ export type PartyMember = {
 export type HudSnapshot = {
   members: PartyMember[];
   fps: number;
+  ping: number;
 };
 
 type Listener = () => void;
@@ -20,15 +25,21 @@ const members: MemberMap = new Map();
 const order: string[] = [];
 
 let fps = 0;
+let ping = 0;
+let fpsAccum = 0;
+let fpsFrames = 0;
+
 let cachedSnapshot: HudSnapshot = {
   members: [],
   fps: 0,
+  ping: 0,
 };
 
 const rebuildSnapshot = (): void => {
   cachedSnapshot = {
     members: sortedMembers(),
     fps,
+    ping,
   };
 };
 
@@ -82,9 +93,22 @@ export const hudStore = {
     rebuildSnapshot();
     emit();
   },
-  setFPS(value: number): void {
-    if (fps === value) return;
-    fps = value;
+  updateFPS(dt: number): void {
+    fpsAccum += dt;
+    fpsFrames++;
+    if (fpsAccum >= 0.5) {
+      const value = Math.round(fpsFrames / fpsAccum);
+      fpsAccum = 0;
+      fpsFrames = 0;
+      if (fps === value) return;
+      fps = value;
+      rebuildSnapshot();
+      emit();
+    }
+  },
+  setPing(value: number): void {
+    if (ping === value) return;
+    ping = value;
     rebuildSnapshot();
     emit();
   },
@@ -92,7 +116,29 @@ export const hudStore = {
     members.clear();
     order.length = 0;
     fps = 0;
+    ping = 0;
+    fpsAccum = 0;
+    fpsFrames = 0;
     rebuildSnapshot();
     emit();
   },
 };
+
+/* ------------------------------------------------------------------ */
+/*  React lifecycle — mount / dispose                                  */
+/* ------------------------------------------------------------------ */
+
+let root: Root | null = null;
+
+export function mountHud(): void {
+  const el = document.getElementById("ui-root");
+  if (!el) throw new Error("UI root #ui-root not found");
+  root = createRoot(el);
+  root.render(createElement(HudRoot));
+}
+
+export function disposeHud(): void {
+  root?.unmount();
+  root = null;
+  hudStore.reset();
+}

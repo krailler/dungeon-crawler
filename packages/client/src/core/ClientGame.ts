@@ -15,7 +15,7 @@ import { ClientPlayer } from "../entities/ClientPlayer";
 import { ClientEnemy } from "../entities/ClientEnemy";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
-import { HUD } from "../ui/HUD";
+import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { TileMap, unpackSetId, tileSetNameFromId } from "@dungeon/shared";
 
@@ -27,7 +27,6 @@ export class ClientGame {
   public isoCamera: IsometricCamera;
   private dungeonRenderer: DungeonRenderer;
   private wallOcclusion: WallOcclusionSystem | null = null;
-  private hud: HUD;
   private guiTexture: AdvancedDynamicTexture;
 
   // Colyseus
@@ -38,6 +37,7 @@ export class ClientGame {
   private players: Map<string, ClientPlayer> = new Map();
   private enemies: Map<string, ClientEnemy> = new Map();
   private localSessionId: string = "";
+  private pingInterval: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -52,7 +52,7 @@ export class ClientGame {
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
-    this.hud = new HUD();
+    mountHud();
     this.client = new Client(SERVER_URL);
 
     // Game loop — render + interpolation
@@ -81,6 +81,12 @@ export class ClientGame {
       console.log("[Client] Joined room:", room.sessionId);
 
       this.setupStateListeners(room);
+
+      // Ping polling — every 2 seconds
+      room.ping((ms: number) => hudStore.setPing(ms));
+      this.pingInterval = window.setInterval(() => {
+        room.ping((ms: number) => hudStore.setPing(ms));
+      }, 2000);
     } catch (err) {
       console.error("[Client] Failed to connect:", err);
     }
@@ -144,7 +150,7 @@ export class ClientGame {
       }
 
       const name = isLocal ? "You" : `Player ${sessionId.slice(0, 4).toUpperCase()}`;
-      this.hud.setMember({
+      hudStore.setMember({
         id: sessionId,
         name,
         health: player.health,
@@ -156,7 +162,7 @@ export class ClientGame {
       $(player).onChange(() => {
         clientPlayer.setServerState(player.x, player.z, player.rotY);
 
-        this.hud.updateMember(sessionId, {
+        hudStore.updateMember(sessionId, {
           health: player.health,
           maxHealth: player.maxHealth,
         });
@@ -170,7 +176,7 @@ export class ClientGame {
         clientPlayer.dispose();
         this.players.delete(sessionId);
       }
-      this.hud.removeMember(sessionId);
+      hudStore.removeMember(sessionId);
     });
 
     // Enemies added
@@ -240,12 +246,13 @@ export class ClientGame {
     }
 
     // FPS
-    this.hud.updateFPS(dt);
+    hudStore.updateFPS(dt);
   }
 
   dispose(): void {
     this.room?.leave();
-    this.hud.dispose();
+    window.clearInterval(this.pingInterval);
+    disposeHud();
     this.dungeonRenderer.dispose();
     this.engine.dispose();
   }
