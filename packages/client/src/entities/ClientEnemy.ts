@@ -12,6 +12,8 @@ import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
+import type { SoundManager } from "../audio/SoundManager";
+import { ATTACK_ANIM_DURATION } from "@dungeon/shared";
 
 /** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
 const LERP_FACTOR = 12;
@@ -19,6 +21,9 @@ const HIT_FLASH_DURATION = 0.12;
 
 /** Distance threshold to consider the enemy "moving" */
 const MOVE_THRESHOLD = 0.05;
+
+/** Delay before playing attack sound (at punch peak) */
+const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
 
 export class ClientEnemy {
   /** Invisible anchor mesh used for positioning */
@@ -32,6 +37,9 @@ export class ClientEnemy {
   private animations: Map<AnimName, AnimationGroup> = new Map();
   private currentAnim: AnimName | null = null;
   private isPlayingOneShot: boolean = false;
+  private soundManager: SoundManager | null = null;
+  private pendingSoundName: string | null = null;
+  private pendingSoundTimer: number = 0;
 
   // Target state from server
   private targetX: number = 0;
@@ -48,7 +56,16 @@ export class ClientEnemy {
   private healthBarBg: Rectangle;
   private healthBarFill: Rectangle;
 
-  constructor(scene: Scene, id: string, initialHealth: number, guiTexture: AdvancedDynamicTexture) {
+  constructor(
+    scene: Scene,
+    id: string,
+    initialHealth: number,
+    guiTexture: AdvancedDynamicTexture,
+    soundManager?: SoundManager,
+  ) {
+    if (soundManager) {
+      this.soundManager = soundManager;
+    }
     this.previousHealth = initialHealth;
 
     // Invisible anchor for position/rotation
@@ -139,6 +156,9 @@ export class ClientEnemy {
     if (anim) {
       this.isPlayingOneShot = true;
       anim.start(false);
+      // Schedule sound at animation peak (midpoint)
+      this.pendingSoundName = name;
+      this.pendingSoundTimer = ATTACK_SOUND_DELAY;
       anim.onAnimationGroupEndObservable.addOnce(() => {
         this.isPlayingOneShot = false;
         this.currentAnim = null;
@@ -194,6 +214,15 @@ export class ClientEnemy {
   /** Interpolate toward server state each frame */
   update(dt: number): void {
     if (this.isDead) return;
+
+    // Tick pending attack sound timer
+    if (this.pendingSoundTimer > 0) {
+      this.pendingSoundTimer -= dt;
+      if (this.pendingSoundTimer <= 0 && this.pendingSoundName) {
+        this.soundManager?.playAnimSound(this.pendingSoundName);
+        this.pendingSoundName = null;
+      }
+    }
 
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
     const dx = this.targetX - this.mesh.position.x;

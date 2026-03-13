@@ -13,10 +13,20 @@ const FOOTSTEP_VOLUME = 0.35;
 /** Base path for footstep audio files */
 const FOOTSTEP_BASE_PATH = "/audio/footsteps/footstep";
 
+/** Volume for attack/animation sounds */
+const ATTACK_VOLUME = 0.5;
+
+/** Tracks a set of sound variants for a single animation */
+interface AnimSoundEntry {
+  sounds: Sound[];
+  lastIndex: number;
+}
+
 export class SoundManager {
   private scene: Scene;
   private footsteps: Sound[] = [];
   private lastFootstepIndex: number = -1;
+  private animSounds: Map<string, AnimSoundEntry> = new Map();
   private loaded: boolean = false;
 
   constructor(scene: Scene) {
@@ -43,8 +53,50 @@ export class SoundManager {
       this.footsteps.push(sound);
     }
 
+    // Register animation sounds
+    this.registerAnimSound("punch", ["/audio/sfx/chop.ogg"], ATTACK_VOLUME);
+
     this.loaded = true;
     console.log("[SoundManager] Loaded", this.footsteps.length, "footstep sounds");
+  }
+
+  /**
+   * Register sound variants for an animation name.
+   * Future animations just add another call here.
+   */
+  private registerAnimSound(animName: string, urls: string[], volume: number): void {
+    const sounds: Sound[] = [];
+    for (const url of urls) {
+      const name = `${animName}_${url.split("/").pop()}`;
+      const sound = new Sound(name, url, this.scene, null, {
+        volume,
+        autoplay: false,
+        loop: false,
+      });
+      sounds.push(sound);
+    }
+    this.animSounds.set(animName, { sounds, lastIndex: -1 });
+  }
+
+  /**
+   * Play the sound associated with an animation name.
+   * If no sound is registered for that animation, does nothing.
+   */
+  playAnimSound(animName: string): void {
+    const entry = this.animSounds.get(animName);
+    if (!entry || entry.sounds.length === 0) return;
+
+    let index: number;
+    if (entry.sounds.length === 1) {
+      index = 0;
+    } else {
+      do {
+        index = Math.floor(Math.random() * entry.sounds.length);
+      } while (index === entry.lastIndex);
+    }
+
+    entry.lastIndex = index;
+    entry.sounds[index].play();
   }
 
   /**
@@ -72,6 +124,12 @@ export class SoundManager {
       sound.dispose();
     }
     this.footsteps = [];
+    for (const [, entry] of this.animSounds) {
+      for (const sound of entry.sounds) {
+        sound.dispose();
+      }
+    }
+    this.animSounds.clear();
     this.loaded = false;
   }
 }

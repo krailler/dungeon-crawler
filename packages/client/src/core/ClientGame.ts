@@ -200,12 +200,7 @@ export class ClientGame {
     // Players added
     state$.players.onAdd((player: any, sessionId: string) => {
       const isLocal = sessionId === this.localSessionId;
-      const clientPlayer = new ClientPlayer(
-        this.scene,
-        isLocal,
-        sessionId,
-        isLocal ? this.soundManager : undefined,
-      );
+      const clientPlayer = new ClientPlayer(this.scene, isLocal, sessionId, this.soundManager);
       clientPlayer.snapToPosition(player.x, player.z);
       clientPlayer.setServerState(player.x, player.z, player.rotY);
       this.players.set(sessionId, clientPlayer);
@@ -257,7 +252,13 @@ export class ClientGame {
 
     // Enemies added
     state$.enemies.onAdd((enemy: any, id: string) => {
-      const clientEnemy = new ClientEnemy(this.scene, id, enemy.health, this.guiTexture);
+      const clientEnemy = new ClientEnemy(
+        this.scene,
+        id,
+        enemy.health,
+        this.guiTexture,
+        this.soundManager,
+      );
       clientEnemy.snapToPosition(enemy.x, enemy.z);
       clientEnemy.setServerState(
         enemy.x,

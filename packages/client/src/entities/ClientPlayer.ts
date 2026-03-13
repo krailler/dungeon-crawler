@@ -8,7 +8,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
+import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE, ATTACK_ANIM_DURATION } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
 import type { SoundManager } from "../audio/SoundManager";
@@ -28,6 +28,9 @@ const MOVE_THRESHOLD = 0.05;
 /** Interval between footstep sounds while running (seconds) */
 const FOOTSTEP_INTERVAL = 0.32;
 
+/** Delay before playing attack sound (at punch peak) */
+const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
+
 export class ClientPlayer {
   /** Invisible anchor mesh used for positioning and torch parenting */
   public mesh: Mesh;
@@ -46,6 +49,8 @@ export class ClientPlayer {
   // Audio
   private soundManager: SoundManager | null = null;
   private footstepTimer: number = 0;
+  private pendingSoundName: string | null = null;
+  private pendingSoundTimer: number = 0;
 
   // Target state from server
   private targetX: number = 0;
@@ -83,8 +88,7 @@ export class ClientPlayer {
       this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     }
 
-    // Only local player gets footstep sounds
-    if (isLocal && soundManager) {
+    if (soundManager) {
       this.soundManager = soundManager;
     }
   }
@@ -149,7 +153,10 @@ export class ClientPlayer {
     if (anim) {
       this.isPlayingOneShot = true;
       anim.start(false); // no loop
-      const obs = anim.onAnimationGroupEndObservable.addOnce(() => {
+      // Schedule sound at animation peak (midpoint)
+      this.pendingSoundName = name;
+      this.pendingSoundTimer = ATTACK_SOUND_DELAY;
+      anim.onAnimationGroupEndObservable.addOnce(() => {
         this.isPlayingOneShot = false;
         this.currentAnim = null; // force re-evaluation in update()
       });
@@ -178,6 +185,15 @@ export class ClientPlayer {
 
   /** Interpolate toward server state each frame */
   update(dt: number): void {
+    // Tick pending attack sound timer
+    if (this.pendingSoundTimer > 0) {
+      this.pendingSoundTimer -= dt;
+      if (this.pendingSoundTimer <= 0 && this.pendingSoundName) {
+        this.soundManager?.playAnimSound(this.pendingSoundName);
+        this.pendingSoundName = null;
+      }
+    }
+
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
 
     const dx = this.targetX - this.mesh.position.x;
