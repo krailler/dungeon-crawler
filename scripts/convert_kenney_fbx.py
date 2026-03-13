@@ -6,7 +6,7 @@ Usage:
 
 Example:
   /Applications/Blender.app/Contents/MacOS/Blender --background --python scripts/convert_kenney_fbx.py \
-    -- /path/to/kenney_animated-characters-1 packages/client/public/models/character survivorMaleB
+    -- assets/kenney-characters packages/client/public/models/character survivorMaleB
 
 Each animation FBX produces one GLB with mesh + skeleton + animation + skin texture.
 The real animation action is selected (skips the "Targeting Pose" rest action).
