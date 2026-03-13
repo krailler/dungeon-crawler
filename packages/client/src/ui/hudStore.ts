@@ -10,10 +10,14 @@ export type PartyMember = {
   isLocal: boolean;
 };
 
+export type ConnectionStatus = "connecting" | "connected" | "error";
+
 export type HudSnapshot = {
   members: PartyMember[];
   fps: number;
   ping: number;
+  connectionStatus: ConnectionStatus;
+  connectionInfo: string;
 };
 
 type Listener = () => void;
@@ -28,11 +32,15 @@ let fps = 0;
 let ping = 0;
 let fpsAccum = 0;
 let fpsFrames = 0;
+let connectionStatus: ConnectionStatus = "connecting";
+let connectionInfo: string = "";
 
 let cachedSnapshot: HudSnapshot = {
   members: [],
   fps: 0,
   ping: 0,
+  connectionStatus: "connecting",
+  connectionInfo: "",
 };
 
 const rebuildSnapshot = (): void => {
@@ -40,6 +48,8 @@ const rebuildSnapshot = (): void => {
     members: sortedMembers(),
     fps,
     ping,
+    connectionStatus,
+    connectionInfo,
   };
 };
 
@@ -112,6 +122,12 @@ export const hudStore = {
     rebuildSnapshot();
     emit();
   },
+  setConnection(status: ConnectionStatus, info: string): void {
+    connectionStatus = status;
+    connectionInfo = info;
+    rebuildSnapshot();
+    emit();
+  },
   reset(): void {
     members.clear();
     order.length = 0;
@@ -119,6 +135,8 @@ export const hudStore = {
     ping = 0;
     fpsAccum = 0;
     fpsFrames = 0;
+    connectionStatus = "connecting";
+    connectionInfo = "";
     rebuildSnapshot();
     emit();
   },

@@ -64,9 +64,24 @@ export const HudRoot = (): JSX.Element => {
           </div>
         </div>
         <div className="flex flex-col gap-3">
-          {members.length === 0 && (
+          {snapshot.connectionStatus === "connecting" && (
+            <div className="rounded-2xl border border-dashed border-sky-400/30 bg-slate-900/30 px-3 py-3 text-xs text-sky-300">
+              <span className="animate-pulse">Connecting...</span>
+            </div>
+          )}
+          {snapshot.connectionStatus === "error" && (
+            <div className="rounded-2xl border border-dashed border-red-400/40 bg-red-950/30 px-3 py-3 text-xs text-red-300">
+              {snapshot.connectionInfo || "Connection failed"}
+            </div>
+          )}
+          {snapshot.connectionStatus === "connected" && members.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-500/40 bg-slate-900/30 px-3 py-3 text-xs text-slate-400">
               Waiting for adventurers...
+            </div>
+          )}
+          {snapshot.connectionStatus === "connected" && snapshot.connectionInfo && (
+            <div className="rounded-2xl border border-slate-500/20 bg-slate-900/20 px-3 py-1.5 text-[10px] text-slate-500">
+              {snapshot.connectionInfo}
             </div>
           )}
           {members.map((member) => (

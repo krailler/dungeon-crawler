@@ -15,6 +15,7 @@ import { ClientPlayer } from "../entities/ClientPlayer";
 import { ClientEnemy } from "../entities/ClientEnemy";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
+import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { TileMap, unpackSetId, tileSetNameFromId } from "@dungeon/shared";
@@ -27,6 +28,7 @@ export class ClientGame {
   public isoCamera: IsometricCamera;
   private dungeonRenderer: DungeonRenderer;
   private wallOcclusion: WallOcclusionSystem | null = null;
+  private fogOfWar: FogOfWarSystem;
   private guiTexture: AdvancedDynamicTexture;
 
   // Colyseus
@@ -49,6 +51,7 @@ export class ClientGame {
 
     this.isoCamera = new IsometricCamera(this.scene, canvas);
     this.setupLighting();
+    this.fogOfWar = new FogOfWarSystem(this.scene, this.isoCamera.camera);
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
@@ -73,12 +76,18 @@ export class ClientGame {
   }
 
   private async init(): Promise<void> {
+    hudStore.setConnection("connecting", "");
     try {
       // Connect first — floor assets are loaded lazily after we know which sets the dungeon uses
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
       this.localSessionId = room.sessionId;
       console.log("[Client] Joined room:", room.sessionId);
+
+      hudStore.setConnection(
+        "connected",
+        `Room ${room.roomId} · ${room.sessionId.slice(0, 6).toUpperCase()}`,
+      );
 
       this.setupStateListeners(room);
 
@@ -88,7 +97,9 @@ export class ClientGame {
         room.ping((ms: number) => hudStore.setPing(ms));
       }, 2000);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.error("[Client] Failed to connect:", err);
+      hudStore.setConnection("error", msg);
     }
   }
 
@@ -259,6 +270,9 @@ export class ClientGame {
       if (this.wallOcclusion) {
         this.wallOcclusion.update(pos.x, pos.z);
       }
+
+      // Fog of war
+      this.fogOfWar.update(pos.x, pos.z);
     }
 
     // FPS
@@ -269,6 +283,7 @@ export class ClientGame {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     disposeHud();
+    this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();
     this.engine.dispose();
   }

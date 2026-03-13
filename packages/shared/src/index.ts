@@ -26,6 +26,8 @@ export {
   CAMERA_FOLLOW_SPEED,
   WALL_HEIGHT,
   WALL_DEPTH,
+  FOG_INNER_RADIUS,
+  FOG_OUTER_RADIUS,
 } from "./Constants.js";
 
 export { MessageType } from "./protocol.js";
