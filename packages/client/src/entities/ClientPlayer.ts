@@ -37,6 +37,7 @@ export class ClientPlayer {
 
   private animations: Map<AnimName, AnimationGroup> = new Map();
   private currentAnim: AnimName | null = null;
+  private isPlayingOneShot: boolean = false;
 
   // Target state from server
   private targetX: number = 0;
@@ -122,11 +123,36 @@ export class ClientPlayer {
     }
   }
 
+  private playOneShot(name: AnimName): void {
+    if (this.isPlayingOneShot) return;
+
+    // Stop current looping animation
+    if (this.currentAnim) {
+      const current = this.animations.get(this.currentAnim);
+      current?.stop();
+    }
+
+    const anim = this.animations.get(name);
+    if (anim) {
+      this.isPlayingOneShot = true;
+      anim.start(false); // no loop
+      const obs = anim.onAnimationGroupEndObservable.addOnce(() => {
+        this.isPlayingOneShot = false;
+        this.currentAnim = null; // force re-evaluation in update()
+      });
+    }
+  }
+
   /** Called when server state changes */
-  setServerState(x: number, z: number, rotY: number): void {
+  setServerState(x: number, z: number, rotY: number, animState: string = ""): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
+
+    // Trigger one-shot animation if server says so
+    if (animState && !this.isPlayingOneShot) {
+      this.playOneShot(animState as AnimName);
+    }
   }
 
   /** Snap position immediately (used on first spawn) */
@@ -153,12 +179,14 @@ export class ClientPlayer {
     if (delta < -Math.PI) delta += 2 * Math.PI;
     this.mesh.rotation.y += delta * (1 - Math.exp(-ROT_LERP_FACTOR * dt));
 
-    // Switch animation based on movement
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist > MOVE_THRESHOLD) {
-      this.playAnimation("run");
-    } else {
-      this.playAnimation("idle");
+    // Switch animation based on movement (only if not playing one-shot)
+    if (!this.isPlayingOneShot) {
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > MOVE_THRESHOLD) {
+        this.playAnimation("run");
+      } else {
+        this.playAnimation("idle");
+      }
     }
   }
 

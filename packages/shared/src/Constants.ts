@@ -12,6 +12,7 @@ export const PLAYER_HEALTH = 100;
 export const PLAYER_ATTACK_DAMAGE = 10;
 export const PLAYER_ATTACK_RANGE = 2.5;
 export const PLAYER_ATTACK_COOLDOWN = 1.0;
+export const ATTACK_ANIM_DURATION = 0.67;
 
 // Enemy
 export const ENEMY_SPEED = 3;

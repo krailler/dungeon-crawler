@@ -8,6 +8,7 @@ import {
   ENEMY_ATTACK_DAMAGE,
   ENEMY_REPATH_INTERVAL,
   ENEMY_SPEED,
+  ATTACK_ANIM_DURATION,
 } from "@dungeon/shared";
 
 const AIState = {
@@ -18,11 +19,17 @@ const AIState = {
 
 type AIStateType = (typeof AIState)[keyof typeof AIState];
 
+const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
+
 interface EnemyAI {
   enemy: EnemyState;
   state: AIStateType;
   repathTimer: number;
   attackTimer: number;
+  animTimer: number;
+  /** Pending damage: timer counts down, fires onPlayerHit at 0 */
+  damageTimer: number;
+  damageSessionId: string | null;
 }
 
 export class AISystem {
@@ -40,6 +47,9 @@ export class AISystem {
       state: AIState.IDLE,
       repathTimer: 0,
       attackTimer: 0,
+      animTimer: 0,
+      damageTimer: 0,
+      damageSessionId: null,
     });
   }
 
@@ -50,6 +60,23 @@ export class AISystem {
   ): void {
     for (const entry of this.entries) {
       if (entry.enemy.isDead) continue;
+
+      // Tick down anim timer and clear animState when done
+      if (entry.animTimer > 0) {
+        entry.animTimer -= dt;
+        if (entry.animTimer <= 0) {
+          entry.enemy.animState = "";
+        }
+      }
+
+      // Tick down damage timer — apply damage at punch peak
+      if (entry.damageTimer > 0) {
+        entry.damageTimer -= dt;
+        if (entry.damageTimer <= 0 && entry.damageSessionId) {
+          onPlayerHit(entry.damageSessionId, ENEMY_ATTACK_DAMAGE);
+          entry.damageSessionId = null;
+        }
+      }
 
       // Find closest alive player
       let closestPlayer: PlayerState | null = null;
@@ -87,7 +114,11 @@ export class AISystem {
 
         if (entry.attackTimer <= 0) {
           entry.attackTimer = ENEMY_ATTACK_COOLDOWN;
-          onPlayerHit(closestSessionId, ENEMY_ATTACK_DAMAGE);
+          entry.enemy.animState = "punch";
+          entry.animTimer = ATTACK_ANIM_DURATION;
+          // Delay damage to punch peak (midpoint of animation)
+          entry.damageTimer = DAMAGE_DELAY;
+          entry.damageSessionId = closestSessionId;
         }
       } else if (closestDist <= ENEMY_DETECTION_RANGE) {
         // Chase state

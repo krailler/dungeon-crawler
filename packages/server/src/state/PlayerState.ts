@@ -7,6 +7,7 @@ export class PlayerState extends Schema {
   @type("int16") health: number = 0;
   @type("int16") maxHealth: number = 0;
   @type("boolean") isMoving: boolean = false;
+  @type("string") animState: string = "";
 
   // Server-only (not synced)
   path: { x: number; z: number }[] = [];

@@ -31,6 +31,7 @@ export class ClientEnemy {
 
   private animations: Map<AnimName, AnimationGroup> = new Map();
   private currentAnim: AnimName | null = null;
+  private isPlayingOneShot: boolean = false;
 
   // Target state from server
   private targetX: number = 0;
@@ -126,6 +127,25 @@ export class ClientEnemy {
     }
   }
 
+  private playOneShot(name: AnimName): void {
+    if (this.isPlayingOneShot) return;
+
+    if (this.currentAnim) {
+      const current = this.animations.get(this.currentAnim);
+      current?.stop();
+    }
+
+    const anim = this.animations.get(name);
+    if (anim) {
+      this.isPlayingOneShot = true;
+      anim.start(false);
+      anim.onAnimationGroupEndObservable.addOnce(() => {
+        this.isPlayingOneShot = false;
+        this.currentAnim = null;
+      });
+    }
+  }
+
   /** Called when server state changes */
   setServerState(
     x: number,
@@ -134,6 +154,7 @@ export class ClientEnemy {
     health: number,
     maxHealth: number,
     isDead: boolean,
+    animState: string = "",
   ): void {
     this.targetX = x;
     this.targetZ = z;
@@ -145,6 +166,11 @@ export class ClientEnemy {
     this.previousHealth = health;
 
     this.updateHealthBar(health, maxHealth);
+
+    // Trigger one-shot animation if server says so
+    if (animState && !this.isPlayingOneShot && !isDead) {
+      this.playOneShot(animState as AnimName);
+    }
 
     if (isDead && !this.isDead) {
       this.isDead = true;
@@ -182,12 +208,14 @@ export class ClientEnemy {
     if (delta < -Math.PI) delta += 2 * Math.PI;
     this.mesh.rotation.y += delta * (1 - Math.exp(-LERP_FACTOR * dt));
 
-    // Switch animation based on movement
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist > MOVE_THRESHOLD) {
-      this.playAnimation("run");
-    } else {
-      this.playAnimation("idle");
+    // Switch animation based on movement (only if not playing one-shot)
+    if (!this.isPlayingOneShot) {
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > MOVE_THRESHOLD) {
+        this.playAnimation("run");
+      } else {
+        this.playAnimation("idle");
+      }
     }
 
     // Hit flash timer

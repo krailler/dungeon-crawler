@@ -217,7 +217,7 @@ export class ClientGame {
 
       // Listen to changes on this player
       $(player).onChange(() => {
-        clientPlayer.setServerState(player.x, player.z, player.rotY);
+        clientPlayer.setServerState(player.x, player.z, player.rotY, player.animState);
 
         hudStore.updateMember(sessionId, {
           health: player.health,
@@ -247,6 +247,7 @@ export class ClientGame {
         enemy.health,
         enemy.maxHealth,
         enemy.isDead,
+        enemy.animState,
       );
       // Attach zombie GLB model
       const enemyInstance = this.enemyLoader.instantiate(`enemy_${id}`);
@@ -266,6 +267,7 @@ export class ClientGame {
           enemy.health,
           enemy.maxHealth,
           enemy.isDead,
+          enemy.animState,
         );
       });
     });
