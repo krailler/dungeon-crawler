@@ -12,7 +12,8 @@
 - **Bundler**: Vite 8.x (client)
 - **Server runtime**: tsx (esbuild, watch mode)
 - **Pathfinding**: Grid-based A\* on TileMap (server-side)
-- **UI**: HTML/CSS overlay for HUD, Babylon.js GUI only for in-world UI (floating bars)
+- **UI**: React + Tailwind CSS overlay for HUD, Babylon.js GUI only for in-world UI (floating bars)
+- **i18n**: i18next + react-i18next + browser language detector
 
 ## Commands
 
@@ -32,6 +33,10 @@ packages/
       Constants.ts    # All game balance constants (TILE_SIZE, PLAYER_*, ENEMY_*, etc.)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + MoveMessage interface
+      FloorVariants.ts # Deterministic floor tile variant generation
+      WallVariants.ts  # Deterministic wall decoration variant generation
+      TileSets.ts     # Tile set definitions + name↔id mapping
+      random.ts       # Shared seeded PRNG (mulberry32)
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
@@ -43,12 +48,13 @@ packages/
       main.ts         # Server entry point
   client/           # Babylon.js renderer + Colyseus client
     src/
-      core/           # ClientGame, InputManager
+      core/           # ClientGame, InputManager (click-and-hold Diablo-style)
       camera/         # IsometricCamera
-      entities/       # ClientPlayer, ClientEnemy (mesh + interpolation)
-      dungeon/        # DungeonRenderer (3D mesh generation)
-      systems/        # WallOcclusionSystem
-      ui/             # HUD: hudStore (pub-sub state) + HudRoot (React)
+      entities/       # ClientPlayer (mesh + torch + shadows), ClientEnemy (mesh + hit flash)
+      dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
+      systems/        # WallOcclusionSystem, FogOfWarSystem
+      i18n/           # i18next config + locales (en.json)
+      ui/             # HUD: hudStore (pub-sub state) + HudRoot (React + Tailwind)
       main.ts         # Client entry point
     index.html
     vite.config.ts
@@ -74,13 +80,12 @@ packages/
 
 - Server: Schema state classes (PlayerState, EnemyState) + Systems (AISystem, CombatSystem)
 - Client: ClientPlayer, ClientEnemy (mesh + lerp interpolation toward server state)
-- Pure ECS is overkill for MVP with ~3 entity types
 
 ### Camera: ArcRotateCamera in perspective mode
 
 - alpha = -PI/4 (45° diagonal view)
 - beta = PI/3 (60° from zenith = 30° above horizon)
-- radius = 25, zoom range 20-30
+- radius = 15, locked zoom
 - Locked angles, no panning — follows player with lerp
 
 ### Physics: Custom (not Havok)
@@ -93,16 +98,16 @@ packages/
 
 - 2D grid with TileType (WALL, FLOOR, DOOR, SPAWN, EXIT)
 - Algorithm: random room placement + L-shaped corridors
-- DungeonRenderer converts tiles to 3D meshes (boxes)
+- DungeonRenderer converts tiles to 3D meshes (GLB floor tiles + thin wall segments + GLB wall decorations)
 - TILE_SIZE = 2 world units
 
 ### Pathfinding: Grid-based A\* on TileMap
 
 - Custom A\* implementation on the 2D tile grid (8-directional with diagonal wall check)
 - Octile distance heuristic, skips start node in returned path
-- recast-detour available for upgrade to NavMesh if needed later
+- Server uses exact click coordinates as final waypoint
 
-### UI: HTML/CSS overlay
+### UI: React + Tailwind CSS overlay
 
 - Better performance for frequent updates (health, damage)
 - Easier to style than Babylon.js GUI
@@ -110,10 +115,20 @@ packages/
 
 ### Lighting
 
-- HemisphericLight ambient (intensity 0.7 debug, lower to 0.1 for gameplay)
-- SpotLight as player torch (with ShadowGenerator PCF)
-- PointLights for wall torches (no shadows, atmosphere only)
+- HemisphericLight ambient (intensity 0.2)
+- SpotLight as player torch (with ShadowGenerator PCF, local player only)
+- PointLights for wall torches (~18% of walls, deterministic hash) with fire ParticleSystems
 - GlowLayer for emissive effects
+- Fog of war: PostProcess depth-based shader with radial darkness
+
+### Internationalization (i18n)
+
+- i18next with `initReactI18next` plugin (no Provider needed)
+- Browser language auto-detection via `i18next-browser-languagedetector`
+- Locale files: `packages/client/src/i18n/locales/{lang}.json`
+- React components: `useTranslation()` hook
+- Outside React (ClientGame.ts): standalone `t()` from `i18n/i18n.ts`
+- To add a language: create `{lang}.json`, register in `i18n.ts` resources
 
 ## Code Conventions
 
@@ -142,22 +157,13 @@ packages/
 
 - `recast-detour` excluded from optimizeDeps (WASM)
 - `.wasm` included in assetsInclude
-
-## Current MVP Status
-
-- [x] Phase 0: Project setup + documentation + base scene
-- [x] Phase 1: Dungeon generation (DungeonGenerator + DungeonRenderer)
-- [x] Phase 2: Player with click-to-move (Player + A\* Pathfinder + Input)
-- [x] Phase 3: Enemies with basic AI (Enemy + AISystem)
-- [x] Phase 4: Combat system + functional HUD (CombatSystem + damage)
-- [x] Phase 4.5: Client-server migration (Colyseus multiplayer)
-- [ ] Phase 5: Polish (dynamic lighting, particles, sound)
+- React/react-dom aliased to `packages/client/node_modules/` to prevent duplicate instances in monorepo
 
 ## Implemented Files
 
 ### Shared (`packages/shared/src/`)
 
-- `Constants.ts` — All game balance constants (TILE*SIZE, PLAYER*\_, ENEMY\_\_, CAMERA*\*, DUNGEON*\*, WALL_HEIGHT)
+- `Constants.ts` — All game constants: TILE*SIZE, PLAYER*_, ENEMY\__, CAMERA*\*, DUNGEON*_, WALL\__, lighting (AMBIENT/TORCH/WALL_TORCH), fog of war
 - `TileMap.ts` — 2D grid data + TileType + `serializeGrid()` / `fromSerialized()` for network transfer
 - `protocol.ts` — MessageType const object + MoveMessage interface
 - `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
@@ -180,17 +186,20 @@ packages/
 
 ### Client (`packages/client/src/`)
 
-- `main.ts` — Entry point, creates ClientGame
-- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, entity management
-- `core/InputManager.ts` — Click-on-floor raycasting, sends MOVE to server
-- `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles
-- `entities/ClientPlayer.ts` — Player mesh + lerp interpolation from server state
+- `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame
+- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, entity management, shadow casters
+- `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms)
+- `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15
+- `entities/ClientPlayer.ts` — Player mesh + SpotLight torch + ShadowGenerator PCF + lerp interpolation
 - `entities/ClientEnemy.ts` — Enemy mesh + lerp + hit flash on damage
-- `dungeon/DungeonRenderer.ts` — Converts TileMap to 3D floor/wall meshes + GLB wall decorations on exposed faces
+- `dungeon/DungeonRenderer.ts` — GLB floor tiles, thin wall segments, GLB wall decorations, wall torch PointLights + fire ParticleSystems
 - `dungeon/FloorAssetLoader.ts` — Loads floor tile GLBs per set, GPU-efficient instancing via AssetContainer
 - `dungeon/WallAssetLoader.ts` — Loads wall decoration GLBs per set, places on wall faces (N/S/W/E), auto-scales to TILE_SIZE × WALL_HEIGHT
-- `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency + wall decoration toggling
-- `ui/hudStore.ts` — HUD pub-sub store: party members, FPS, ping; React root lifecycle (mountHud/disposeHud)
-- `ui/HudRoot.tsx` — React component: party health bars, FPS counter, ping display
+- `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency + wall decoration toggling (Set-based tracking)
+- `systems/FogOfWarSystem.ts` — PostProcess depth-based shader: radial darkness around player (inner/outer radius)
+- `i18n/i18n.ts` — i18next initialization: LanguageDetector + initReactI18next, standalone t() export
+- `i18n/locales/en.json` — English translations (13 strings: party, connection, player, HUD)
+- `ui/hudStore.ts` — HUD pub-sub store: party members, FPS, ping, connection status; React root lifecycle
+- `ui/HudRoot.tsx` — React + Tailwind component: party health bars, FPS, ping, connection status (i18n)
 - `index.html` — Fullscreen canvas + HUD overlay
-- `vite.config.ts` — WASM exclusion for recast-detour
+- `vite.config.ts` — WASM exclusion, React alias for monorepo dedup
