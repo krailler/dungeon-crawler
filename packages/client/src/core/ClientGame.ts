@@ -25,6 +25,7 @@ import { adminStore } from "../ui/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import {
+  CloseCode,
   TileMap,
   unpackSetId,
   tileSetNameFromId,
@@ -179,6 +180,13 @@ export class ClientGame {
       this.pingInterval = window.setInterval(() => {
         room.ping((ms: number) => hudStore.setPing(ms));
       }, 2000);
+
+      // Handle server-initiated disconnect (e.g. duplicate login)
+      room.onLeave((code: number) => {
+        if (code === CloseCode.KICKED_DUPLICATE) {
+          authStore.kick(t("kick.duplicate"));
+        }
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[Client] Failed to connect:", err);
@@ -192,9 +200,12 @@ export class ClientGame {
     const $ = getStateCallbacks(room as any) as any;
     const state$ = $(room.state);
 
-    // Track dungeon seed for admin panel
+    // Track dungeon seed + tick rate for admin panel
     state$.listen("dungeonSeed", (value: number) => {
       adminStore.setSeed(value);
+    });
+    state$.listen("tickRate", (value: number) => {
+      adminStore.setTickRate(value);
     });
 
     // Listen for tileMap data (sent once on join)

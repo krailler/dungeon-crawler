@@ -39,7 +39,7 @@ export {
   MINIMAP_DISCOVERY_RADIUS,
 } from "./Constants.js";
 
-export { MessageType } from "./protocol.js";
+export { MessageType, CloseCode } from "./protocol.js";
 export type { MoveMessage, AdminRestartMessage } from "./protocol.js";
 
 export {

@@ -4,6 +4,11 @@ export const MessageType = {
   ADMIN_RESTART: "admin:restart",
 } as const;
 
+/** Custom WebSocket close codes (4xxx range) */
+export const CloseCode = {
+  KICKED_DUPLICATE: 4100,
+} as const;
+
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
 
 /** Payload for MOVE message */

@@ -31,6 +31,9 @@
     "you": "You",
     "other": "Player {{id}}"
   },
+  "kick": {
+    "duplicate": "You were disconnected because your account logged in from another session."
+  },
   "pause": {
     "title": "Paused",
     "resume": "Resume",

@@ -31,6 +31,11 @@ import {
 } from "@dungeon/shared";
 import type { MoveMessage, AdminRestartMessage } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
+import {
+  registerSession,
+  unregisterSession,
+  isActiveSession,
+} from "../sessions/activeSessionRegistry";
 
 const TICK_RATE = 64; // ms between simulation ticks
 
@@ -43,6 +48,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private combatSystem!: CombatSystem;
   private tileMap!: TileMap;
   private log!: Logger;
+  private lastTickTime: number = 0;
+  private tickAccum: number = 0;
+  private tickCount: number = 0;
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
@@ -175,6 +183,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       characterName: string;
       role: string;
     };
+
+    // Kick previous session if same account is already connected (any room)
+    registerSession(accountId, client);
+
     this.log.info(
       { player: pid(client.sessionId), accountId, characterName, role },
       "Player joined",
@@ -200,6 +212,20 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   async onDrop(client: Client): Promise<void> {
+    const auth = client.auth as { accountId?: string } | undefined;
+
+    // If this client was kicked (replaced by a new session), clean up immediately
+    if (auth?.accountId && !isActiveSession(auth.accountId, client)) {
+      this.log.info(
+        { player: pid(client.sessionId) },
+        "Kicked session dropped — removing immediately",
+      );
+      this.state.players.delete(client.sessionId);
+      this.combatSystem.removePlayer(client.sessionId);
+      this.reassignLeader();
+      return;
+    }
+
     this.log.warn({ player: pid(client.sessionId) }, "Player dropped — waiting 120s for reconnect");
 
     // Stop the player while disconnected
@@ -219,6 +245,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
+      this.unregisterClient(client);
       this.reassignLeader();
     }
   }
@@ -235,7 +262,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
+    this.unregisterClient(client);
     this.reassignLeader();
+  }
+
+  private unregisterClient(client: Client): void {
+    const auth = client.auth as { accountId?: string } | undefined;
+    if (auth?.accountId) {
+      unregisterSession(auth.accountId, client);
+    }
   }
 
   private handleMove(client: Client, data: MoveMessage): void {
@@ -258,6 +293,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   private update(dt: number): void {
+    const now = performance.now();
+    if (this.lastTickTime > 0) {
+      this.tickAccum += now - this.lastTickTime;
+      this.tickCount++;
+      if (this.tickAccum >= 1000) {
+        this.state.tickRate = Math.round((this.tickCount / this.tickAccum) * 1000);
+        this.tickAccum = 0;
+        this.tickCount = 0;
+      }
+    }
+    this.lastTickTime = now;
+
     const dtSec = dt / 1000;
 
     // Move players along their paths

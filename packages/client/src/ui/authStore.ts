@@ -105,6 +105,13 @@ export const authStore = {
     update({ isAuthenticated: false, characterName: null, role: null, error: null });
   },
 
+  /** Kicked by server — force logout and show reason on login screen */
+  kick(reason: string): void {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem("reconnectionToken");
+    update({ isAuthenticated: false, characterName: null, role: null, error: reason });
+  },
+
   setCharacterName(name: string): void {
     update({ characterName: name });
   },

@@ -20,7 +20,7 @@ const TOGGLES: ToggleEntry[] = [
 export const DebugPanel = (): JSX.Element => {
   const [open, setOpen] = useState(false);
   const [seedInput, setSeedInput] = useState("");
-  const currentSeed = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
+  const admin = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
   const snapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
 
   return (
@@ -73,8 +73,18 @@ export const DebugPanel = (): JSX.Element => {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/70">
               Server
             </span>
-            <div className="mt-1.5 text-[10px] text-slate-500">
-              Seed: <span className="font-mono text-slate-400">{currentSeed}</span>
+            <div className="mt-1.5 flex flex-col gap-0.5 text-[10px] text-slate-500">
+              <div>
+                Seed: <span className="font-mono text-slate-400">{admin.seed}</span>
+              </div>
+              <div>
+                Tick rate:{" "}
+                <span
+                  className={`font-mono ${admin.tickRate >= 14 ? "text-emerald-400" : admin.tickRate >= 10 ? "text-amber-400" : "text-red-400"}`}
+                >
+                  {admin.tickRate > 0 ? `${admin.tickRate} t/s` : "—"}
+                </span>
+              </div>
             </div>
             <div className="mt-2 flex flex-col gap-1.5">
               <button

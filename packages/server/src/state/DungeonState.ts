@@ -11,4 +11,5 @@ export class DungeonState extends Schema {
   @type("uint16") mapWidth: number = 0;
   @type("uint16") mapHeight: number = 0;
   @type("uint32") dungeonSeed: number = 0;
+  @type("float32") tickRate: number = 0;
 }
