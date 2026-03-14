@@ -54,7 +54,11 @@ export class SoundManager {
     }
 
     // Register animation sounds
-    this.registerAnimSound("punch", ["/audio/sfx/chop.ogg"], ATTACK_VOLUME);
+    this.registerAnimSound(
+      "punch",
+      ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"],
+      ATTACK_VOLUME,
+    );
 
     this.loaded = true;
     console.log("[SoundManager] Loaded", this.footsteps.length, "footstep sounds");
