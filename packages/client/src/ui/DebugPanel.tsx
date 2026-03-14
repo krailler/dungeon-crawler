@@ -12,6 +12,7 @@ const TOGGLES: ToggleEntry[] = [
   { key: "wallOcclusion", label: "Wall Occlusion" },
   { key: "freeCamera", label: "Free Camera" },
   { key: "wireframe", label: "Wireframe" },
+  { key: "ambient", label: "Ambient Sound" },
 ];
 
 export const DebugPanel = (): JSX.Element => {
@@ -47,6 +48,13 @@ export const DebugPanel = (): JSX.Element => {
               </label>
             ))}
           </div>
+
+          <button
+            onClick={() => debugStore.resetAll()}
+            className="mt-3 w-full rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-200"
+          >
+            Reset options
+          </button>
         </div>
       )}
     </div>

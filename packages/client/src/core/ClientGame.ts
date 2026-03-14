@@ -60,6 +60,8 @@ export class ClientGame {
   private pingInterval: number = 0;
   private lastDebug: DebugSnapshot = debugStore.getSnapshot();
   private onKeyDown: (ev: KeyboardEvent) => void;
+  private ambientReady: boolean = false;
+  private onPointerDown: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -117,11 +119,18 @@ export class ClientGame {
         this.soundManager.load(),
       ]);
 
-      // Suppress Babylon.js default "click to unmute" button — our game
-      // naturally unlocks audio on the first player click (move command)
+      // Suppress Babylon.js default "click to unmute" button — we unlock
+      // the AudioContext ourselves on the first user click (pointerdown).
       if (Engine.audioEngine) {
         Engine.audioEngine.useCustomUnlockedButton = true;
       }
+
+      // Unlock AudioContext on first user gesture and start ambient if ready
+      this.onPointerDown = () => {
+        Engine.audioEngine?.audioContext?.resume();
+        this.tryStartAmbient();
+      };
+      window.addEventListener("pointerdown", this.onPointerDown, { once: true });
 
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
@@ -215,6 +224,11 @@ export class ClientGame {
         for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
           mesh.receiveShadows = true;
         }
+
+        // Mark ambient as ready — actual playback starts on first user click
+        // (AudioContext requires a user gesture to unlock)
+        this.ambientReady = true;
+        this.tryStartAmbient();
       });
     });
 
@@ -408,6 +422,9 @@ export class ClientGame {
     if (debug.wireframe !== this.lastDebug.wireframe) {
       this.scene.forceWireframe = debug.wireframe;
     }
+    if (debug.ambient !== this.lastDebug.ambient) {
+      this.soundManager.setAmbientMuted(!debug.ambient);
+    }
 
     this.lastDebug = debug;
   }
@@ -419,10 +436,24 @@ export class ClientGame {
     }
   }
 
+  /** Try to start the ambient loop — only succeeds if dungeon loaded AND AudioContext unlocked */
+  private tryStartAmbient(): void {
+    if (!this.ambientReady) return;
+    const ctx = Engine.audioEngine?.audioContext;
+    if (ctx && ctx.state === "suspended") return; // Not yet unlocked
+    this.soundManager.playAmbient();
+    if (!debugStore.getSnapshot().ambient) {
+      this.soundManager.setAmbientMuted(true);
+    }
+  }
+
   dispose(): void {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("keydown", this.onKeyDown);
+    if (this.onPointerDown) {
+      window.removeEventListener("pointerdown", this.onPointerDown);
+    }
     disposeHud();
     minimapStore.reset();
     this.soundManager.dispose();

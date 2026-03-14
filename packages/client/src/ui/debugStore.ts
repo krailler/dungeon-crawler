@@ -3,19 +3,47 @@ export type DebugSnapshot = {
   wallOcclusion: boolean;
   freeCamera: boolean;
   wireframe: boolean;
+  ambient: boolean;
 };
 
 type DebugKey = keyof DebugSnapshot;
 type Listener = () => void;
 
-const listeners = new Set<Listener>();
+const STORAGE_KEY = "dungeon_debug";
 
-let state: DebugSnapshot = {
+const DEFAULTS: DebugSnapshot = {
   fog: true,
   wallOcclusion: true,
   freeCamera: false,
   wireframe: false,
+  ambient: true,
 };
+
+const listeners = new Set<Listener>();
+
+/** Load saved state from localStorage, falling back to defaults */
+const loadState = (): DebugSnapshot => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<DebugSnapshot>;
+      return { ...DEFAULTS, ...saved };
+    }
+  } catch {
+    // Corrupt or unavailable localStorage — use defaults
+  }
+  return { ...DEFAULTS };
+};
+
+const saveState = (s: DebugSnapshot): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  } catch {
+    // Storage full or unavailable — silently ignore
+  }
+};
+
+let state: DebugSnapshot = loadState();
 
 const emit = (): void => {
   for (const listener of listeners) {
@@ -33,6 +61,16 @@ export const debugStore = {
   },
   toggle(key: DebugKey): void {
     state = { ...state, [key]: !state[key] };
+    saveState(state);
+    emit();
+  },
+  resetAll(): void {
+    state = { ...DEFAULTS };
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
     emit();
   },
 };

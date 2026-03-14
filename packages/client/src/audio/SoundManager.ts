@@ -16,6 +16,10 @@ const FOOTSTEP_BASE_PATH = "/audio/footsteps/footstep";
 /** Volume for attack/animation sounds */
 const ATTACK_VOLUME = 0.5;
 
+/** Ambient sound config */
+const AMBIENT_URL = "/audio/ambient/cave_loop.ogg";
+const AMBIENT_VOLUME = 1;
+
 /** Tracks a set of sound variants for a single animation */
 interface AnimSoundEntry {
   sounds: Sound[];
@@ -27,6 +31,7 @@ export class SoundManager {
   private footsteps: Sound[] = [];
   private lastFootstepIndex: number = -1;
   private animSounds: Map<string, AnimSoundEntry> = new Map();
+  private ambient: Sound | null = null;
   private loaded: boolean = false;
 
   constructor(scene: Scene) {
@@ -59,6 +64,13 @@ export class SoundManager {
       ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"],
       ATTACK_VOLUME,
     );
+
+    // Ambient cave loop (starts paused — call playAmbient() to start)
+    this.ambient = new Sound("ambient_cave", AMBIENT_URL, this.scene, null, {
+      volume: AMBIENT_VOLUME,
+      autoplay: false,
+      loop: true,
+    });
 
     this.loaded = true;
     console.log("[SoundManager] Loaded", this.footsteps.length, "footstep sounds");
@@ -123,6 +135,19 @@ export class SoundManager {
     this.footsteps[index].play();
   }
 
+  /** Start the ambient cave loop */
+  playAmbient(): void {
+    if (this.ambient && !this.ambient.isPlaying) {
+      this.ambient.play();
+    }
+  }
+
+  /** Mute or unmute the ambient loop (controls volume, not playback) */
+  setAmbientMuted(muted: boolean): void {
+    if (!this.ambient) return;
+    this.ambient.setVolume(muted ? 0 : AMBIENT_VOLUME);
+  }
+
   dispose(): void {
     for (const sound of this.footsteps) {
       sound.dispose();
@@ -134,6 +159,10 @@ export class SoundManager {
       }
     }
     this.animSounds.clear();
+    if (this.ambient) {
+      this.ambient.dispose();
+      this.ambient = null;
+    }
     this.loaded = false;
   }
 }
