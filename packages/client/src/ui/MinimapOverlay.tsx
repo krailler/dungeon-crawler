@@ -13,7 +13,9 @@ const COLOR_FLOOR = "#555";
 const COLOR_DOOR = "#887744";
 const COLOR_LOCAL_PLAYER = "#38bdf8";
 const COLOR_OTHER_PLAYER = "#4ade80";
+const COLOR_ENEMY = "#f87171";
 const PLAYER_DOT_RADIUS = 4;
+const ENEMY_DOT_RADIUS = 3;
 
 export const MinimapOverlay = (): JSX.Element | null => {
   const { visible, version } = useSyncExternalStore(
@@ -74,6 +76,18 @@ export const MinimapOverlay = (): JSX.Element | null => {
 
         ctx.fillRect(x * PX, y * PX, PX, PX);
       }
+    }
+
+    // Draw active enemies (red dots)
+    const enemies = minimapStore.getEnemyPositions();
+    for (const [, pos] of enemies) {
+      const ex = (pos.x / TILE_SIZE) * PX;
+      const ey = (pos.z / TILE_SIZE) * PX;
+
+      ctx.beginPath();
+      ctx.arc(ex, ey, ENEMY_DOT_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = COLOR_ENEMY;
+      ctx.fill();
     }
 
     // Draw players

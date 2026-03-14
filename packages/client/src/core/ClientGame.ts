@@ -377,6 +377,17 @@ export class ClientGame {
       const p = player.getWorldPosition();
       minimapStore.updatePlayerPosition(sessionId, p.x, p.z);
     }
+
+    // Minimap: update active enemy positions (moving or attacking only)
+    const activeEnemies = new Map<string, { x: number; z: number }>();
+    for (const [id, enemy] of this.enemies) {
+      if (enemy.isActive) {
+        const ep = enemy.getWorldPosition();
+        activeEnemies.set(id, { x: ep.x, z: ep.z });
+      }
+    }
+    minimapStore.setActiveEnemies(activeEnemies);
+
     // Single batched emit per frame (only when minimap is visible)
     minimapStore.flush();
 

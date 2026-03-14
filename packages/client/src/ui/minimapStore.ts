@@ -12,6 +12,7 @@ const listeners = new Set<Listener>();
 let tileMap: TileMap | null = null;
 let discovered: Set<number> = new Set();
 let playerPositions: Map<string, { x: number; z: number }> = new Map();
+let enemyPositions: Map<string, { x: number; z: number }> = new Map();
 let localSessionId: string = "";
 let visible = false;
 let version = 0;
@@ -64,6 +65,12 @@ export const minimapStore = {
     dirty = true;
   },
 
+  /** Replace active enemy positions each frame (only active enemies are passed) */
+  setActiveEnemies(active: Map<string, { x: number; z: number }>): void {
+    enemyPositions = active;
+    dirty = true;
+  },
+
   revealAround(tileX: number, tileY: number, radius: number): void {
     if (!tileMap) return;
     for (let dy = -radius; dy <= radius; dy++) {
@@ -108,10 +115,15 @@ export const minimapStore = {
     return localSessionId;
   },
 
+  getEnemyPositions(): Map<string, { x: number; z: number }> {
+    return enemyPositions;
+  },
+
   reset(): void {
     tileMap = null;
     discovered = new Set();
     playerPositions = new Map();
+    enemyPositions = new Map();
     localSessionId = "";
     visible = false;
     version = 0;

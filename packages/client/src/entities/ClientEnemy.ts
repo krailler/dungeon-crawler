@@ -203,6 +203,18 @@ export class ClientEnemy {
     }
   }
 
+  /** Whether enemy is moving or attacking (for minimap visibility) */
+  get isActive(): boolean {
+    if (this.isDead) return false;
+    const dx = this.targetX - this.mesh.position.x;
+    const dz = this.targetZ - this.mesh.position.z;
+    return Math.sqrt(dx * dx + dz * dz) > MOVE_THRESHOLD || this.isPlayingOneShot;
+  }
+
+  getWorldPosition(): Vector3 {
+    return this.mesh.position;
+  }
+
   /** Snap position immediately */
   snapToPosition(x: number, z: number): void {
     this.mesh.position.x = x;
