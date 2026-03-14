@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { authStore } from "./authStore";
+import { authStore } from "../stores/authStore";
 
 export const PauseMenu = (): JSX.Element | null => {
   const { t } = useTranslation();

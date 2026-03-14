@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import type { PartyMember } from "./hudStore";
-import { hudStore } from "./hudStore";
-import { authStore } from "./authStore";
+import type { PartyMember } from "../stores/hudStore";
+import { hudStore } from "../stores/hudStore";
+import { authStore } from "../stores/authStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";

@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { HudRoot } from "./HudRoot";
+import { HudRoot } from "../hud/HudRoot";
 
 export type CharacterStats = {
   strength: number;

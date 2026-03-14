@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { TileType, TILE_SIZE } from "@dungeon/shared";
-import { minimapStore } from "./minimapStore";
+import { minimapStore } from "../stores/minimapStore";
 
 /** Pixels per tile on the minimap canvas */
 const PX = 6;

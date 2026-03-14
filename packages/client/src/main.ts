@@ -2,8 +2,8 @@ import "./ui/index.css";
 import "./i18n/i18n";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { LoginScreen } from "./ui/LoginScreen";
-import { authStore } from "./ui/authStore";
+import { LoginScreen } from "./ui/screens/LoginScreen";
+import { authStore } from "./ui/stores/authStore";
 import { ClientGame } from "./core/ClientGame";
 
 const loginRoot = createRoot(document.getElementById("login-root")!);
@@ -27,9 +27,9 @@ authStore.subscribe(() => {
     if (import.meta.env.DEV) {
       const w = window as unknown as Record<string, unknown>;
       w.game = game;
-      import("./ui/debugStore").then(({ debugStore }) => (w.debug = debugStore));
-      import("./ui/adminStore").then(({ adminStore }) => (w.admin = adminStore));
-      import("./ui/minimapStore").then(({ minimapStore }) => (w.minimap = minimapStore));
+      import("./ui/stores/debugStore").then(({ debugStore }) => (w.debug = debugStore));
+      import("./ui/stores/adminStore").then(({ adminStore }) => (w.admin = adminStore));
+      import("./ui/stores/minimapStore").then(({ minimapStore }) => (w.minimap = minimapStore));
     }
   }
 

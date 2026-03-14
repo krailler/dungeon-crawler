@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { hudStore } from "./hudStore";
-import type { CharacterStats } from "./hudStore";
+import { hudStore } from "../stores/hudStore";
+import type { CharacterStats } from "../stores/hudStore";
 
 const StatRow = ({ label, value, color }: { label: string; value: number; color: string }) => (
   <div className="flex items-center justify-between py-1">

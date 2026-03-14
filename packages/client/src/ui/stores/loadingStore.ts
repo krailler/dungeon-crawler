@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { LoadingScreen } from "./LoadingScreen";
+import { LoadingScreen } from "../screens/LoadingScreen";
 
 export const LoadingPhase = {
   MODELS: "models",

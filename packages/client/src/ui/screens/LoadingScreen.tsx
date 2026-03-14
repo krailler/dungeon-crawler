@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { loadingStore, LoadingPhase } from "./loadingStore";
+import { loadingStore, LoadingPhase } from "../stores/loadingStore";
 
 export const LoadingScreen = (): JSX.Element | null => {
   const { t } = useTranslation();

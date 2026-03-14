@@ -1,8 +1,8 @@
 import { useState, useSyncExternalStore } from "react";
-import { debugStore } from "./debugStore";
-import type { DebugSnapshot } from "./debugStore";
-import { adminStore } from "./adminStore";
-import { minimapStore } from "./minimapStore";
+import { debugStore } from "../stores/debugStore";
+import type { DebugSnapshot } from "../stores/debugStore";
+import { adminStore } from "../stores/adminStore";
+import { minimapStore } from "../stores/minimapStore";
 
 type ToggleEntry = {
   key: keyof DebugSnapshot;

@@ -19,9 +19,9 @@ import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
-import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
-import { debugStore, type DebugSnapshot } from "../ui/debugStore";
-import { adminStore } from "../ui/adminStore";
+import { hudStore, mountHud, disposeHud } from "../ui/stores/hudStore";
+import { debugStore, type DebugSnapshot } from "../ui/stores/debugStore";
+import { adminStore } from "../ui/stores/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import {
@@ -33,9 +33,14 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
 } from "@dungeon/shared";
-import { minimapStore } from "../ui/minimapStore";
-import { loadingStore, LoadingPhase, mountLoading, disposeLoading } from "../ui/loadingStore";
-import { authStore } from "../ui/authStore";
+import { minimapStore } from "../ui/stores/minimapStore";
+import {
+  loadingStore,
+  LoadingPhase,
+  mountLoading,
+  disposeLoading,
+} from "../ui/stores/loadingStore";
+import { authStore } from "../ui/stores/authStore";
 import { t } from "../i18n/i18n";
 
 export class ClientGame {

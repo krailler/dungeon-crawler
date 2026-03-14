@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { authStore } from "./authStore";
+import { authStore } from "../stores/authStore";
 
 export const LoginScreen = (): JSX.Element | null => {
   const { t } = useTranslation();
