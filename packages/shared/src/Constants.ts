@@ -37,12 +37,12 @@ export const WALL_TORCH_RANGE = 6;
 export const WALL_TORCH_CHANCE = 0.18;
 
 // Fog of war
-export const FOG_INNER_RADIUS = 4;
-export const FOG_OUTER_RADIUS = 12;
+export const FOG_INNER_RADIUS = 1;
+export const FOG_OUTER_RADIUS = 7;
 
 // Camera (client-only but shared for consistency)
 export const CAMERA_ALPHA = -Math.PI / 4;
-export const CAMERA_BETA = Math.PI / 3;
+export const CAMERA_BETA = (Math.PI * 3) / 11;
 export const CAMERA_RADIUS = 15;
 export const CAMERA_RADIUS_MIN = 15;
 export const CAMERA_RADIUS_MAX = 15;
