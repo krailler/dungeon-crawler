@@ -119,6 +119,16 @@ export const minimapStore = {
     return enemyPositions;
   },
 
+  revealAll(): void {
+    if (!tileMap) return;
+    for (let y = 0; y < tileMap.height; y++) {
+      for (let x = 0; x < tileMap.width; x++) {
+        discovered.add(y * tileMap.width + x);
+      }
+    }
+    dirty = true;
+  },
+
   reset(): void {
     tileMap = null;
     discovered = new Set();

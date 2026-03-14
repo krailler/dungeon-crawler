@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { debugStore } from "./debugStore";
 import type { DebugSnapshot } from "./debugStore";
 import { adminStore } from "./adminStore";
+import { minimapStore } from "./minimapStore";
 
 type ToggleEntry = {
   key: keyof DebugSnapshot;
@@ -50,6 +51,14 @@ export const DebugPanel = (): JSX.Element => {
                 {label}
               </label>
             ))}
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300 transition-colors hover:text-slate-100">
+              <input
+                type="checkbox"
+                onChange={() => minimapStore.revealAll()}
+                className="h-3.5 w-3.5 cursor-pointer rounded border-slate-500 bg-slate-800 accent-amber-500"
+              />
+              Full minimap
+            </label>
           </div>
 
           <button
