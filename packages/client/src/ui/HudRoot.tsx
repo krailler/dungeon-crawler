@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "./hudStore";
 import { hudStore } from "./hudStore";
@@ -6,6 +6,7 @@ import { authStore } from "./authStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
+import { CharacterPanel } from "./CharacterPanel";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -39,7 +40,12 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
     >
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold text-slate-100">{member.name}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-100">{member.name}</span>
+            <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
+              {t("character.level", { level: member.level })}
+            </span>
+          </div>
           <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
             {member.isLeader ? t("party.roleLeader") : t("party.roleMember")}
           </span>
@@ -56,18 +62,75 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
   );
 };
 
+/** Character sheet toggle button (bottom-right) */
+const CharacterButton = ({
+  isOpen,
+  onClick,
+}: {
+  isOpen: boolean;
+  onClick: () => void;
+}): JSX.Element => {
+  const { t } = useTranslation();
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "pointer-events-auto flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg shadow-black/30",
+        "backdrop-blur-md transition-all",
+        isOpen
+          ? "border-sky-400/50 bg-sky-900/40 text-sky-300"
+          : "border-slate-500/30 bg-slate-900/60 text-slate-300 hover:border-slate-400/40 hover:text-slate-200",
+      ].join(" ")}
+    >
+      {/* Simple person icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span className="uppercase tracking-wider">{t("character.title")}</span>
+      <kbd className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+        C
+      </kbd>
+    </button>
+  );
+};
+
 export const HudRoot = (): JSX.Element => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
   const members = useMemo(() => snapshot.members, [snapshot.members]);
   const isAdmin = authSnapshot.role === "admin";
+  const [characterOpen, setCharacterOpen] = useState(false);
+  const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
+  const closeCharacter = useCallback(() => setCharacterOpen(false), []);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "c" || e.key === "C") {
+        // Don't toggle if user is typing in an input
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        setCharacterOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
       {isAdmin && <DebugPanel />}
       <PauseMenu />
       <MinimapOverlay />
+      {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       <div className="absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">
@@ -113,6 +176,10 @@ export const HudRoot = (): JSX.Element => {
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
           {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
         </div>
+      </div>
+      {/* Character panel toggle — bottom right */}
+      <div className="absolute bottom-5 right-5">
+        <CharacterButton isOpen={characterOpen} onClick={toggleCharacter} />
       </div>
     </div>
   );

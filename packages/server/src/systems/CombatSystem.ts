@@ -1,11 +1,6 @@
 import type { PlayerState } from "../state/PlayerState";
 import type { EnemyState } from "../state/EnemyState";
-import {
-  PLAYER_ATTACK_DAMAGE,
-  PLAYER_ATTACK_RANGE,
-  PLAYER_ATTACK_COOLDOWN,
-  ATTACK_ANIM_DURATION,
-} from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, computeDamage } from "@dungeon/shared";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
@@ -16,6 +11,7 @@ interface PlayerCombat {
   /** Pending damage: timer counts down, applies damage at 0 */
   damageTimer: number;
   damageTarget: EnemyState | null;
+  damageAmount: number;
 }
 
 export class CombatSystem {
@@ -28,6 +24,7 @@ export class CombatSystem {
       animTimer: 0,
       damageTimer: 0,
       damageTarget: null,
+      damageAmount: 0,
     });
   }
 
@@ -51,7 +48,7 @@ export class CombatSystem {
       if (combat.damageTimer > 0) {
         combat.damageTimer -= dt;
         if (combat.damageTimer <= 0 && combat.damageTarget) {
-          combat.damageTarget.health -= PLAYER_ATTACK_DAMAGE;
+          combat.damageTarget.health -= combat.damageAmount;
           if (combat.damageTarget.health <= 0) {
             combat.damageTarget.health = 0;
             combat.damageTarget.isDead = true;
@@ -74,14 +71,14 @@ export class CombatSystem {
         const dx = enemy.x - player.x;
         const dz = enemy.z - player.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist <= PLAYER_ATTACK_RANGE && dist < closestDist) {
+        if (dist <= player.attackRange && dist < closestDist) {
           closest = enemy;
           closestDist = dist;
         }
       }
 
       if (closest) {
-        combat.attackCooldown = PLAYER_ATTACK_COOLDOWN;
+        combat.attackCooldown = player.attackCooldown;
 
         // Face the enemy
         const angle = Math.atan2(closest.x - player.x, closest.z - player.z);
@@ -92,6 +89,7 @@ export class CombatSystem {
         combat.animTimer = ATTACK_ANIM_DURATION;
         combat.damageTimer = DAMAGE_DELAY;
         combat.damageTarget = closest;
+        combat.damageAmount = computeDamage(player.attackDamage, closest.defense);
       }
     }
   }

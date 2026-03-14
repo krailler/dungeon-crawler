@@ -2,6 +2,14 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { HudRoot } from "./HudRoot";
 
+export type CharacterStats = {
+  strength: number;
+  vitality: number;
+  agility: number;
+  attackDamage: number;
+  defense: number;
+};
+
 export type PartyMember = {
   id: string;
   name: string;
@@ -10,6 +18,8 @@ export type PartyMember = {
   isLocal: boolean;
   online: boolean;
   isLeader: boolean;
+  level: number;
+  stats?: CharacterStats;
 };
 
 export type ConnectionStatus = "connecting" | "connected" | "error";

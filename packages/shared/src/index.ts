@@ -58,3 +58,14 @@ export type { TileSetName } from "./TileSets.js";
 export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
 
 export { mulberry32 } from "./random.js";
+
+export {
+  computeDerivedStats,
+  computeDamage,
+  PLAYER_SCALING,
+  DEFAULT_PLAYER_STATS,
+} from "./Stats.js";
+export type { BaseStats, DerivedStats, StatScaling } from "./Stats.js";
+
+export { EnemyTypeId, ENEMY_TYPES, computeEnemyDerivedStats } from "./EnemyTypes.js";
+export type { EnemyTypeIdValue, EnemyTypeDefinition } from "./EnemyTypes.js";

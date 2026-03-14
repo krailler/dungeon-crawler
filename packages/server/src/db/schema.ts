@@ -17,6 +17,10 @@ export const characters = sqliteTable(
       .notNull()
       .references(() => accounts.id),
     name: text("name").notNull(),
+    strength: integer("strength").notNull().default(10),
+    vitality: integer("vitality").notNull().default(10),
+    agility: integer("agility").notNull().default(10),
+    level: integer("level").notNull().default(1),
     createdAt: integer("created_at", { mode: "number" }).notNull(),
     updatedAt: integer("updated_at", { mode: "number" }).notNull(),
   },

@@ -321,6 +321,15 @@ export class ClientGame {
       }
 
       const name = player.characterName || sessionId.slice(0, 4).toUpperCase();
+      const localStats = isLocal
+        ? {
+            strength: player.strength,
+            vitality: player.vitality,
+            agility: player.agility,
+            attackDamage: player.attackDamage,
+            defense: player.defense,
+          }
+        : undefined;
       hudStore.setMember({
         id: sessionId,
         name,
@@ -329,6 +338,8 @@ export class ClientGame {
         isLocal,
         online: player.online,
         isLeader: player.isLeader,
+        level: player.level,
+        stats: localStats,
       });
 
       // Listen to changes on this player
@@ -340,6 +351,16 @@ export class ClientGame {
           maxHealth: player.maxHealth,
           online: player.online,
           isLeader: player.isLeader,
+          level: player.level,
+          ...(isLocal && {
+            stats: {
+              strength: player.strength,
+              vitality: player.vitality,
+              agility: player.agility,
+              attackDamage: player.attackDamage,
+              defense: player.defense,
+            },
+          }),
         });
       });
     });

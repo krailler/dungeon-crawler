@@ -18,16 +18,15 @@ import {
   DUNGEON_HEIGHT,
   DUNGEON_ROOMS,
   TILE_SIZE,
-  PLAYER_SPEED,
-  PLAYER_HEALTH,
-  ENEMY_HEALTH,
-  ENEMY_SPEED,
   TileType,
   type TileMap,
   MessageType,
   generateFloorVariants,
   generateWallVariants,
   assignRoomSets,
+  computeDerivedStats,
+  ENEMY_TYPES,
+  computeEnemyDerivedStats,
 } from "@dungeon/shared";
 import type { MoveMessage, AdminRestartMessage } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
@@ -145,7 +144,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     _client: Client,
     _options: unknown,
     context: AuthContext,
-  ): Promise<{ accountId: string; characterId: string; characterName: string; role: string }> {
+  ): Promise<{
+    accountId: string;
+    characterId: string;
+    characterName: string;
+    role: string;
+    strength: number;
+    vitality: number;
+    agility: number;
+    level: number;
+  }> {
     if (!context.token) throw new Error("No auth token provided");
 
     const payload = (await JWT.verify(context.token)) as { accountId?: string };
@@ -159,9 +167,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       .get();
     if (!account) throw new Error("Account not found");
 
-    // Load first character (v1: one character per account)
+    // Load first character with stats (v1: one character per account)
     const character = db
-      .select({ id: characters.id, name: characters.name })
+      .select({
+        id: characters.id,
+        name: characters.name,
+        strength: characters.strength,
+        vitality: characters.vitality,
+        agility: characters.agility,
+        level: characters.level,
+      })
       .from(characters)
       .where(eq(characters.accountId, account.id))
       .limit(1)
@@ -173,15 +188,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       characterId: character.id,
       characterName: character.name,
       role: account.role,
+      strength: character.strength,
+      vitality: character.vitality,
+      agility: character.agility,
+      level: character.level,
     };
   }
 
   onJoin(client: Client): void {
-    const { accountId, characterName, role } = client.auth as {
+    const { accountId, characterName, role, strength, vitality, agility, level } = client.auth as {
       accountId: string;
       characterId: string;
       characterName: string;
       role: string;
+      strength: number;
+      vitality: number;
+      agility: number;
+      level: number;
     };
 
     // Kick previous session if same account is already connected (any room)
@@ -193,11 +216,24 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     );
 
     const player = new PlayerState();
-    player.speed = PLAYER_SPEED;
-    player.health = PLAYER_HEALTH;
-    player.maxHealth = PLAYER_HEALTH;
     player.characterName = characterName;
     player.role = role;
+
+    // Apply base stats from DB
+    player.strength = strength;
+    player.vitality = vitality;
+    player.agility = agility;
+    player.level = level;
+
+    // Compute derived stats
+    const derived = computeDerivedStats({ strength, vitality, agility });
+    player.maxHealth = derived.maxHealth;
+    player.health = derived.maxHealth;
+    player.speed = derived.moveSpeed;
+    player.attackDamage = derived.attackDamage;
+    player.defense = derived.defense;
+    player.attackCooldown = derived.attackCooldown;
+    player.attackRange = derived.attackRange;
 
     // Find spawn position
     const spawnPos = this.findSpawnPosition();
@@ -381,6 +417,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number): void {
+    const typeDef = ENEMY_TYPES.zombie;
+    const derived = computeEnemyDerivedStats(typeDef);
+
     let enemyId = 0;
     // Skip first room (player spawn)
     for (let i = 1; i < rooms.length; i++) {
@@ -394,9 +433,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const enemy = new EnemyState();
         enemy.x = tileX * TILE_SIZE;
         enemy.z = tileY * TILE_SIZE;
-        enemy.health = ENEMY_HEALTH;
-        enemy.maxHealth = ENEMY_HEALTH;
-        enemy.speed = ENEMY_SPEED;
+        enemy.enemyType = typeDef.id;
+        enemy.maxHealth = derived.maxHealth;
+        enemy.health = derived.maxHealth;
+        enemy.speed = derived.moveSpeed;
+        enemy.attackDamage = derived.attackDamage;
+        enemy.defense = derived.defense;
+        enemy.attackCooldown = derived.attackCooldown;
+        enemy.attackRange = derived.attackRange;
+        enemy.detectionRange = typeDef.detectionRange;
 
         const id = `enemy_${enemyId++}`;
         this.state.enemies.set(id, enemy);

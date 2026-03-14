@@ -1,15 +1,7 @@
 import type { EnemyState } from "../state/EnemyState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder, WorldPos } from "../navigation/Pathfinder";
-import {
-  ENEMY_DETECTION_RANGE,
-  ENEMY_ATTACK_RANGE,
-  ENEMY_ATTACK_COOLDOWN,
-  ENEMY_ATTACK_DAMAGE,
-  ENEMY_REPATH_INTERVAL,
-  ENEMY_SPEED,
-  ATTACK_ANIM_DURATION,
-} from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, ENEMY_REPATH_INTERVAL, computeDamage } from "@dungeon/shared";
 
 const AIState = {
   IDLE: 0,
@@ -30,6 +22,7 @@ interface EnemyAI {
   /** Pending damage: timer counts down, fires onPlayerHit at 0 */
   damageTimer: number;
   damageSessionId: string | null;
+  damageAmount: number;
 }
 
 export class AISystem {
@@ -41,7 +34,6 @@ export class AISystem {
   }
 
   register(enemy: EnemyState): void {
-    enemy.speed = ENEMY_SPEED;
     this.entries.push({
       enemy,
       state: AIState.IDLE,
@@ -50,6 +42,7 @@ export class AISystem {
       animTimer: 0,
       damageTimer: 0,
       damageSessionId: null,
+      damageAmount: 0,
     });
   }
 
@@ -73,7 +66,7 @@ export class AISystem {
       if (entry.damageTimer > 0) {
         entry.damageTimer -= dt;
         if (entry.damageTimer <= 0 && entry.damageSessionId) {
-          onPlayerHit(entry.damageSessionId, ENEMY_ATTACK_DAMAGE);
+          onPlayerHit(entry.damageSessionId, entry.damageAmount);
           entry.damageSessionId = null;
         }
       }
@@ -102,7 +95,7 @@ export class AISystem {
       entry.repathTimer -= dt;
       entry.attackTimer -= dt;
 
-      if (closestDist <= ENEMY_ATTACK_RANGE) {
+      if (closestDist <= entry.enemy.attackRange) {
         // Attack state
         entry.state = AIState.ATTACK;
         entry.enemy.isMoving = false;
@@ -113,14 +106,15 @@ export class AISystem {
         entry.enemy.rotY = angle;
 
         if (entry.attackTimer <= 0) {
-          entry.attackTimer = ENEMY_ATTACK_COOLDOWN;
+          entry.attackTimer = entry.enemy.attackCooldown;
           entry.enemy.animState = "punch";
           entry.animTimer = ATTACK_ANIM_DURATION;
           // Delay damage to punch peak (midpoint of animation)
           entry.damageTimer = DAMAGE_DELAY;
           entry.damageSessionId = closestSessionId;
+          entry.damageAmount = computeDamage(entry.enemy.attackDamage, closestPlayer.defense);
         }
-      } else if (closestDist <= ENEMY_DETECTION_RANGE) {
+      } else if (closestDist <= entry.enemy.detectionRange) {
         // Chase state
         entry.state = AIState.CHASE;
 

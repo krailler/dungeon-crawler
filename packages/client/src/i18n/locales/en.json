@@ -42,6 +42,18 @@
     "resume": "Resume",
     "logout": "Logout"
   },
+  "character": {
+    "title": "Character",
+    "level": "Lv.{{level}}",
+    "strength": "Strength",
+    "vitality": "Vitality",
+    "agility": "Agility",
+    "attackDamage": "Attack",
+    "defense": "Defense",
+    "health": "Health",
+    "baseStats": "Attributes",
+    "derivedStats": "Combat"
+  },
   "hud": {
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",
