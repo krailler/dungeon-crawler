@@ -2,8 +2,10 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "./hudStore";
 import { hudStore } from "./hudStore";
+import { authStore } from "./authStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
+import { PauseMenu } from "./PauseMenu";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -30,13 +32,16 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
         "backdrop-blur-md transition-all",
         "bg-[color:var(--ui-panel)] border-[color:var(--ui-panel-border)]",
         member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10",
-      ].join(" ")}
+        !member.online && "opacity-40",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold text-slate-100">{member.name}</span>
           <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-            {member.isLocal ? t("party.roleLeader") : t("party.roleMember")}
+            {member.isLeader ? t("party.roleLeader") : t("party.roleMember")}
           </span>
         </div>
         <span className="font-mono text-[11px] text-slate-300">{formatHealth(member)}</span>
@@ -54,11 +59,14 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
 export const HudRoot = (): JSX.Element => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
+  const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
   const members = useMemo(() => snapshot.members, [snapshot.members]);
+  const isAdmin = authSnapshot.role === "admin";
 
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
-      {import.meta.env.DEV && <DebugPanel />}
+      {isAdmin && <DebugPanel />}
+      <PauseMenu />
       <MinimapOverlay />
       <div className="absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">

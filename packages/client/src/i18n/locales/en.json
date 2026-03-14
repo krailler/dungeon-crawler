@@ -1,4 +1,11 @@
 {
+  "login": {
+    "title": "Dungeon Crawler",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Enter the Dungeon",
+    "loading": "Logging in..."
+  },
   "loading": {
     "title": "Dungeon Crawler",
     "models": "Loading models and audio...",
@@ -23,6 +30,11 @@
   "player": {
     "you": "You",
     "other": "Player {{id}}"
+  },
+  "pause": {
+    "title": "Paused",
+    "resume": "Resume",
+    "logout": "Logout"
   },
   "hud": {
     "ping": "{{value}} ms",

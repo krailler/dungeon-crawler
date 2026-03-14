@@ -34,9 +34,8 @@ import {
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/minimapStore";
 import { loadingStore, LoadingPhase, mountLoading, disposeLoading } from "../ui/loadingStore";
+import { authStore } from "../ui/authStore";
 import { t } from "../i18n/i18n";
-
-const SERVER_URL = "ws://localhost:3000";
 
 export class ClientGame {
   private engine: Engine;
@@ -65,7 +64,7 @@ export class ClientGame {
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
     this.engine = new Engine(canvas, true, {
       preserveDrawingBuffer: true,
       stencil: true,
@@ -85,7 +84,7 @@ export class ClientGame {
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     mountLoading();
     mountHud();
-    this.client = new Client(SERVER_URL);
+    this.client = colyseusClient;
 
     // Game loop — render + interpolation
     this.scene.onBeforeRenderObservable.add(() => {
@@ -280,6 +279,7 @@ export class ClientGame {
 
       if (isLocal) {
         this.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
+        authStore.setRole(player.role);
       }
 
       // Attach GLB character model
@@ -291,15 +291,15 @@ export class ClientGame {
         this.addShadowCaster(m);
       }
 
-      const name = isLocal
-        ? t("player.you")
-        : t("player.other", { id: sessionId.slice(0, 4).toUpperCase() });
+      const name = player.characterName || sessionId.slice(0, 4).toUpperCase();
       hudStore.setMember({
         id: sessionId,
         name,
         health: player.health,
         maxHealth: player.maxHealth,
         isLocal,
+        online: player.online,
+        isLeader: player.isLeader,
       });
 
       // Listen to changes on this player
@@ -309,6 +309,8 @@ export class ClientGame {
         hudStore.updateMember(sessionId, {
           health: player.health,
           maxHealth: player.maxHealth,
+          online: player.online,
+          isLeader: player.isLeader,
         });
       });
     });

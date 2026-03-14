@@ -1,7 +1,10 @@
-import { Room } from "colyseus";
-import type { Client } from "colyseus";
+import { Room, JWT } from "colyseus";
+import type { Client, AuthContext } from "colyseus";
 import type { Logger } from "pino";
+import { eq } from "drizzle-orm";
 import { createRoomLogger, pid } from "../logger";
+import { getDb } from "../db/database";
+import { accounts, characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { EnemyState } from "../state/EnemyState";
@@ -95,7 +98,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     );
   }
 
-  private handleAdminRestart(_client: Client, data: AdminRestartMessage): void {
+  private handleAdminRestart(client: Client, data: AdminRestartMessage): void {
+    const auth = client.auth as { role: string };
+    if (auth.role !== "admin") {
+      this.log.warn({ player: pid(client.sessionId) }, "Non-admin tried to restart room");
+      return;
+    }
+
     const seed = data.seed ?? this.state.dungeonSeed;
     this.log.warn({ seed }, "Admin restart requested");
 
@@ -124,13 +133,59 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
   }
 
+  async onAuth(
+    _client: Client,
+    _options: unknown,
+    context: AuthContext,
+  ): Promise<{ accountId: string; characterId: string; characterName: string; role: string }> {
+    if (!context.token) throw new Error("No auth token provided");
+
+    const payload = (await JWT.verify(context.token)) as { accountId?: string };
+    if (!payload?.accountId) throw new Error("Invalid token payload");
+
+    const db = getDb();
+    const account = db
+      .select({ id: accounts.id, role: accounts.role })
+      .from(accounts)
+      .where(eq(accounts.id, payload.accountId))
+      .get();
+    if (!account) throw new Error("Account not found");
+
+    // Load first character (v1: one character per account)
+    const character = db
+      .select({ id: characters.id, name: characters.name })
+      .from(characters)
+      .where(eq(characters.accountId, account.id))
+      .limit(1)
+      .get();
+    if (!character) throw new Error("No character found");
+
+    return {
+      accountId: account.id,
+      characterId: character.id,
+      characterName: character.name,
+      role: account.role,
+    };
+  }
+
   onJoin(client: Client): void {
-    this.log.info({ player: pid(client.sessionId) }, "Player joined");
+    const { accountId, characterName, role } = client.auth as {
+      accountId: string;
+      characterId: string;
+      characterName: string;
+      role: string;
+    };
+    this.log.info(
+      { player: pid(client.sessionId), accountId, characterName, role },
+      "Player joined",
+    );
 
     const player = new PlayerState();
     player.speed = PLAYER_SPEED;
     player.health = PLAYER_HEALTH;
     player.maxHealth = PLAYER_HEALTH;
+    player.characterName = characterName;
+    player.role = role;
 
     // Find spawn position
     const spawnPos = this.findSpawnPosition();
@@ -141,6 +196,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     this.state.players.set(client.sessionId, player);
     this.combatSystem.registerPlayer(client.sessionId);
+    this.reassignLeader();
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -150,6 +206,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.isMoving = false;
+      player.online = false;
       player.path = [];
       player.currentPathIndex = 0;
     }
@@ -162,17 +219,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
+      this.reassignLeader();
     }
   }
 
   onReconnect(client: Client): void {
     this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
+    const player = this.state.players.get(client.sessionId);
+    if (player) {
+      player.online = true;
+    }
   }
 
   onLeave(client: Client): void {
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
+    this.reassignLeader();
   }
 
   private handleMove(client: Client, data: MoveMessage): void {
@@ -293,6 +356,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.aiSystem.register(enemy);
       }
     }
+  }
+
+  private reassignLeader(): void {
+    // Leader is the first player in the map
+    let leaderAssigned = false;
+    this.state.players.forEach((player: PlayerState) => {
+      if (!leaderAssigned) {
+        player.isLeader = true;
+        leaderAssigned = true;
+      } else {
+        player.isLeader = false;
+      }
+    });
   }
 
   private findSpawnPosition(): { x: number; z: number } | null {

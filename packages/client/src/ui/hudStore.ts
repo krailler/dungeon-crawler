@@ -8,6 +8,8 @@ export type PartyMember = {
   health: number;
   maxHealth: number;
   isLocal: boolean;
+  online: boolean;
+  isLeader: boolean;
 };
 
 export type ConnectionStatus = "connecting" | "connected" | "error";
@@ -64,9 +66,9 @@ const sortedMembers = (): PartyMember[] => {
     .map((id) => members.get(id))
     .filter((member): member is PartyMember => Boolean(member));
 
-  const local = list.filter((member) => member.isLocal);
-  const others = list.filter((member) => !member.isLocal);
-  return [...local, ...others];
+  const leaders = list.filter((member) => member.isLeader);
+  const others = list.filter((member) => !member.isLeader);
+  return [...leaders, ...others];
 };
 
 export const hudStore = {

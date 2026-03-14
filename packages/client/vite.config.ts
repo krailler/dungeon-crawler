@@ -10,6 +10,16 @@ export default defineConfig({
       "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
     },
   },
+  server: {
+    proxy: {
+      "/auth": "http://localhost:3000",
+      "/matchmake": "http://localhost:3000",
+      "/colyseus": {
+        target: "http://localhost:3000",
+        ws: true,
+      },
+    },
+  },
   optimizeDeps: {
     exclude: ["recast-detour"],
   },
