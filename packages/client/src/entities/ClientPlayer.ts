@@ -71,7 +71,7 @@ export class ClientPlayer {
       this.torchLight = new SpotLight(
         `playerTorch_${id}`,
         new Vector3(0, 3, 0),
-        new Vector3(0, -0.8, 0.2).normalize(),
+        new Vector3(0, -1, 0),
         TORCH_ANGLE,
         1,
         scene,
@@ -101,6 +101,7 @@ export class ClientPlayer {
 
     // Parent to our invisible anchor and scale to fit dungeon proportions
     this.modelRoot.parent = this.mesh;
+    this.modelRoot.position.setAll(0);
     this.modelRoot.scaling.setAll(0.5);
 
     // Fix GLB material: exported with alpha=0 (transparent) — force opaque
