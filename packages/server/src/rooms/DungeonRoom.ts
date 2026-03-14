@@ -1,5 +1,7 @@
 import { Room } from "colyseus";
 import type { Client } from "colyseus";
+import type { Logger } from "pino";
+import { createRoomLogger, pid } from "../logger";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { EnemyState } from "../state/EnemyState";
@@ -37,8 +39,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private aiSystem!: AISystem;
   private combatSystem!: CombatSystem;
   private tileMap!: TileMap;
+  private log!: Logger;
 
   onCreate(): void {
+    this.log = createRoomLogger(this.roomId);
     // Keep the room alive even when all players leave
     this.autoDispose = false;
 
@@ -79,11 +83,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Game loop
     this.setSimulationInterval(this.update.bind(this), TICK_RATE);
 
-    console.log("[DungeonRoom] Created with", rooms.length, "rooms");
+    this.log.info({ rooms: rooms.length, enemies: this.state.enemies.size }, "Room created");
   }
 
   onJoin(client: Client): void {
-    console.log("[DungeonRoom] Player joined:", client.sessionId);
+    this.log.info({ player: pid(client.sessionId) }, "Player joined");
 
     const player = new PlayerState();
     player.speed = PLAYER_SPEED;
@@ -102,7 +106,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   async onDrop(client: Client): Promise<void> {
-    console.log("[DungeonRoom] Player dropped:", client.sessionId);
+    this.log.warn({ player: pid(client.sessionId) }, "Player dropped — waiting 120s for reconnect");
 
     // Stop the player while disconnected
     const player = this.state.players.get(client.sessionId);
@@ -117,18 +121,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       await this.allowReconnection(client, 120);
     } catch {
       // Reconnection timed out — remove player
-      console.log("[DungeonRoom] Reconnection timed out — removing player:", client.sessionId);
+      this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
     }
   }
 
   onReconnect(client: Client): void {
-    console.log("[DungeonRoom] Player reconnected:", client.sessionId);
+    this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
   }
 
   onLeave(client: Client): void {
-    console.log("[DungeonRoom] Player left (consented):", client.sessionId);
+    this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
   }
@@ -251,8 +255,6 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.aiSystem.register(enemy);
       }
     }
-
-    console.log(`[DungeonRoom] Spawned ${enemyId} enemies`);
   }
 
   private findSpawnPosition(): { x: number; z: number } | null {
