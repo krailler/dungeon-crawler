@@ -10,6 +10,12 @@
     "build": "npm run build --workspace=@dungeon/client",
     "server": "npm run start --workspace=@dungeon/server",
     "server:dev": "npm run dev --workspace=@dungeon/server",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "npm run db:generate --workspace=@dungeon/server",
+    "db:migrate": "npm run db:migrate --workspace=@dungeon/server",
+    "db:seed": "npm run seed --workspace=@dungeon/server",
+    "db:studio": "npm run db:studio --workspace=@dungeon/server",
     "prepare": "husky"
   },
   "lint-staged": {

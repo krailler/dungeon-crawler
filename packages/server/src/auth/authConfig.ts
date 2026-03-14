@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { auth, Hash, JWT } from "colyseus";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/database";
@@ -9,7 +8,7 @@ JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-pr
 
 auth.settings.onFindUserByEmail = async (email: string) => {
   const db = getDb();
-  const account = db.select().from(accounts).where(eq(accounts.email, email)).get();
+  const [account] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
   if (!account) return null as unknown as { password: string };
   return account;
 };
@@ -20,32 +19,22 @@ auth.settings.onRegisterWithEmailAndPassword = async (
   options: { displayName?: string },
 ) => {
   const db = getDb();
-  const now = Date.now();
-  const accountId = randomUUID();
-  const characterId = randomUUID();
   const hashedPassword = await Hash.make(password);
 
-  db.insert(accounts)
+  const [account] = await db
+    .insert(accounts)
     .values({
-      id: accountId,
       email,
       password: hashedPassword,
-      createdAt: now,
-      updatedAt: now,
     })
-    .run();
+    .returning({ id: accounts.id, email: accounts.email });
 
-  db.insert(characters)
-    .values({
-      id: characterId,
-      accountId,
-      name: options.displayName ?? "Hero",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(characters).values({
+    accountId: account.id,
+    name: options.displayName ?? "Hero",
+  });
 
-  return { id: accountId, email };
+  return { id: account.id, email: account.email };
 };
 
 auth.settings.onGenerateToken = async (userdata: unknown) => {
@@ -57,10 +46,10 @@ auth.settings.onParseToken = async (token) => {
   const { accountId } = token as Record<string, string>;
   if (!accountId) return null;
   const db = getDb();
-  const account = db
+  const [account] = await db
     .select({ id: accounts.id, email: accounts.email })
     .from(accounts)
     .where(eq(accounts.id, accountId))
-    .get();
+    .limit(1);
   return account ?? null;
 };

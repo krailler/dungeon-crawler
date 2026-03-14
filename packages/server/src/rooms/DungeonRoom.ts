@@ -160,15 +160,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     if (!payload?.accountId) throw new Error("Invalid token payload");
 
     const db = getDb();
-    const account = db
+    const [account] = await db
       .select({ id: accounts.id, role: accounts.role })
       .from(accounts)
       .where(eq(accounts.id, payload.accountId))
-      .get();
+      .limit(1);
     if (!account) throw new Error("Account not found");
 
     // Load first character with stats (v1: one character per account)
-    const character = db
+    const [character] = await db
       .select({
         id: characters.id,
         name: characters.name,
@@ -179,8 +179,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       })
       .from(characters)
       .where(eq(characters.accountId, account.id))
-      .limit(1)
-      .get();
+      .limit(1);
     if (!character) throw new Error("No character found");
 
     return {

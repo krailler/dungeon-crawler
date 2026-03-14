@@ -1,9 +1,61 @@
-// ── Base stats ───────────────────────────────────────────────────────────────
+// ── Base stats ──────────────────────────────────────────────────────────────
 
-export type BaseStats = {
+export interface BaseStats {
   strength: number;
   vitality: number;
   agility: number;
+}
+
+// ── Derived stats ───────────────────────────────────────────────────────────
+
+export interface DerivedStats {
+  maxHealth: number;
+  attackDamage: number;
+  defense: number;
+  moveSpeed: number;
+  attackCooldown: number;
+  attackRange: number;
+}
+
+// ── Scaling configuration ───────────────────────────────────────────────────
+
+export interface StatScaling {
+  healthBase: number;
+  healthPerVit: number;
+  attackBase: number;
+  attackPerStr: number;
+  defenseBase: number;
+  defensePerVit: number;
+  speedBase: number;
+  speedPerAgi: number;
+  cooldownBase: number;
+  cooldownPerAgi: number;
+  attackRange: number;
+}
+
+/**
+ * Default player scaling — calibrated so stats 10/10/10 produce the same
+ * values as the original hardcoded constants:
+ *
+ *   maxHealth     = 50 + 10 × 5    = 100
+ *   attackDamage  = 5  + 10 × 0.5  = 10
+ *   defense       = 0  + 10 × 0.3  = 3
+ *   moveSpeed     = 4  + 10 × 0.1  = 5
+ *   attackCooldown = 1.2 - 10 × 0.02 = 1.0
+ *   attackRange   = 2.5
+ */
+export const PLAYER_SCALING: StatScaling = {
+  healthBase: 50,
+  healthPerVit: 5,
+  attackBase: 5,
+  attackPerStr: 0.5,
+  defenseBase: 0,
+  defensePerVit: 0.3,
+  speedBase: 4,
+  speedPerAgi: 0.1,
+  cooldownBase: 1.2,
+  cooldownPerAgi: 0.02,
+  attackRange: 2.5,
 };
 
 export const DEFAULT_PLAYER_STATS: BaseStats = {
@@ -12,71 +64,25 @@ export const DEFAULT_PLAYER_STATS: BaseStats = {
   agility: 10,
 };
 
-// ── Derived stats ────────────────────────────────────────────────────────────
-
-export type DerivedStats = {
-  maxHealth: number;
-  attackDamage: number;
-  defense: number;
-  moveSpeed: number;
-  attackCooldown: number;
-  attackRange: number;
-};
-
-// ── Scaling constants ────────────────────────────────────────────────────────
-// Calibrated so DEFAULT_PLAYER_STATS (10/10/10) produces the original values:
-//   maxHealth=100, attackDamage=10, defense=3, moveSpeed=5, attackCooldown=1.0
-
-export type StatScaling = {
-  baseHealth: number;
-  healthPerVit: number;
-  baseAttack: number;
-  attackPerStr: number;
-  baseDefense: number;
-  defensePerVit: number;
-  baseSpeed: number;
-  speedPerAgi: number;
-  baseAttackCooldown: number;
-  attackCooldownPerAgi: number;
-  attackRange: number;
-};
-
-export const PLAYER_SCALING: StatScaling = {
-  baseHealth: 50,
-  healthPerVit: 5,
-  baseAttack: 5,
-  attackPerStr: 0.5,
-  baseDefense: 0,
-  defensePerVit: 0.3,
-  baseSpeed: 4,
-  speedPerAgi: 0.1,
-  baseAttackCooldown: 1.2,
-  attackCooldownPerAgi: -0.02,
-  attackRange: 2.5,
-};
-
-// ── Compute functions ────────────────────────────────────────────────────────
+// ── Compute functions ───────────────────────────────────────────────────────
 
 export function computeDerivedStats(
   base: BaseStats,
   scaling: StatScaling = PLAYER_SCALING,
 ): DerivedStats {
   return {
-    maxHealth: Math.round(scaling.baseHealth + base.vitality * scaling.healthPerVit),
-    attackDamage: Math.round(scaling.baseAttack + base.strength * scaling.attackPerStr),
-    defense: Math.round(scaling.baseDefense + base.vitality * scaling.defensePerVit),
-    moveSpeed: scaling.baseSpeed + base.agility * scaling.speedPerAgi,
-    attackCooldown: Math.max(
-      0.2,
-      scaling.baseAttackCooldown + base.agility * scaling.attackCooldownPerAgi,
-    ),
+    maxHealth: Math.round(scaling.healthBase + base.vitality * scaling.healthPerVit),
+    attackDamage: Math.round(scaling.attackBase + base.strength * scaling.attackPerStr),
+    defense: Math.round(scaling.defenseBase + base.vitality * scaling.defensePerVit),
+    moveSpeed: scaling.speedBase + base.agility * scaling.speedPerAgi,
+    attackCooldown: Math.max(0.3, scaling.cooldownBase - base.agility * scaling.cooldownPerAgi),
     attackRange: scaling.attackRange,
   };
 }
 
 /**
- * Flat damage reduction with minimum 1.
- * Simple and predictable — easy to reason about at low stat values.
+ * Final damage formula: flat subtraction with minimum 1.
+ * Simple, predictable, easy to balance.
  */
 export function computeDamage(attackDamage: number, targetDefense: number): number {
   return Math.max(1, attackDamage - targetDefense);

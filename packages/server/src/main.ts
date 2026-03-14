@@ -13,8 +13,8 @@ Encoder.BUFFER_SIZE = 32 * 1024; // 32 KB
 const port = parseInt(process.env.PORT ?? "3000", 10);
 
 const server = new Server({
-  beforeListen: () => {
-    initDatabase();
+  beforeListen: async () => {
+    await initDatabase();
   },
   express: (app) => {
     app.use("/auth", auth.routes());

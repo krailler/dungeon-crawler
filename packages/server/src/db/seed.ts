@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { Hash } from "colyseus";
 import { initDatabase } from "./database";
@@ -17,43 +16,40 @@ const SEED_ACCOUNTS: SeedAccount[] = [
 ];
 
 async function seed() {
-  const db = initDatabase();
-  const now = Date.now();
+  const db = await initDatabase();
 
   for (const entry of SEED_ACCOUNTS) {
-    const existing = db.select().from(accounts).where(eq(accounts.email, entry.email)).get();
-    if (existing) {
+    const existing = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.email, entry.email))
+      .limit(1);
+    if (existing.length > 0) {
       console.log(`Account "${entry.email}" already exists — skipping.`);
       continue;
     }
 
-    const accountId = randomUUID();
-    const characterId = randomUUID();
     const hashedPassword = await Hash.make(entry.password);
 
-    db.insert(accounts)
+    const [account] = await db
+      .insert(accounts)
       .values({
-        id: accountId,
         email: entry.email,
         password: hashedPassword,
         role: entry.role,
-        createdAt: now,
-        updatedAt: now,
       })
-      .run();
+      .returning({ id: accounts.id });
 
-    db.insert(characters)
-      .values({
-        id: characterId,
-        accountId,
-        name: entry.characterName,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(characters).values({
+      accountId: account.id,
+      name: entry.characterName,
+    });
 
     console.log(`Created account "${entry.email}" with character "${entry.characterName}"`);
   }
+
+  console.log("Seed complete.");
+  process.exit(0);
 }
 
 seed().catch((err) => {

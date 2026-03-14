@@ -24,5 +24,9 @@ dist-ssr
 *.sw?
 .history
 
-# Database
+# Database (legacy SQLite)
 packages/server/data/
+
+# Environment variables
+.env
+.env.local
