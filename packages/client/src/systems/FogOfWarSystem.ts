@@ -66,9 +66,12 @@ export class FogOfWarSystem {
   private playerX: number = 0;
   private playerZ: number = 0;
   private scene: Scene;
+  private camera: Camera;
+  private enabled: boolean = true;
 
   constructor(scene: Scene, camera: Camera) {
     this.scene = scene;
+    this.camera = camera;
 
     // Enable depth texture
     const depthRenderer = scene.enableDepthRenderer(camera, false);
@@ -97,6 +100,16 @@ export class FogOfWarSystem {
   update(playerX: number, playerZ: number): void {
     this.playerX = playerX;
     this.playerZ = playerZ;
+  }
+
+  setEnabled(on: boolean): void {
+    if (on === this.enabled) return;
+    this.enabled = on;
+    if (on) {
+      this.camera.attachPostProcess(this.postProcess);
+    } else {
+      this.camera.detachPostProcess(this.postProcess);
+    }
   }
 
   dispose(): void {

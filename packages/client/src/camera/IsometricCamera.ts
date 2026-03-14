@@ -43,4 +43,25 @@ export class IsometricCamera {
   followTarget(position: Vector3): void {
     this.camera.target = Vector3.Lerp(this.camera.target, position, CAMERA_FOLLOW_SPEED);
   }
+
+  setFreeCamera(on: boolean): void {
+    if (on) {
+      this.camera.lowerAlphaLimit = null;
+      this.camera.upperAlphaLimit = null;
+      this.camera.lowerBetaLimit = 0.1;
+      this.camera.upperBetaLimit = Math.PI / 2;
+      this.camera.lowerRadiusLimit = 5;
+      this.camera.upperRadiusLimit = 50;
+    } else {
+      this.camera.alpha = CAMERA_ALPHA;
+      this.camera.beta = CAMERA_BETA;
+      this.camera.radius = CAMERA_RADIUS;
+      this.camera.lowerAlphaLimit = CAMERA_ALPHA;
+      this.camera.upperAlphaLimit = CAMERA_ALPHA;
+      this.camera.lowerBetaLimit = CAMERA_BETA;
+      this.camera.upperBetaLimit = CAMERA_BETA;
+      this.camera.lowerRadiusLimit = CAMERA_RADIUS_MIN;
+      this.camera.upperRadiusLimit = CAMERA_RADIUS_MAX;
+    }
+  }
 }

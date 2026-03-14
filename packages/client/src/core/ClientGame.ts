@@ -20,6 +20,7 @@ import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
 import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
+import { debugStore, type DebugSnapshot } from "../ui/debugStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { TileMap, unpackSetId, tileSetNameFromId, AMBIENT_INTENSITY } from "@dungeon/shared";
@@ -49,6 +50,7 @@ export class ClientGame {
   private enemies: Map<string, ClientEnemy> = new Map();
   private localSessionId: string = "";
   private pingInterval: number = 0;
+  private lastDebug: DebugSnapshot = debugStore.getSnapshot();
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -313,6 +315,9 @@ export class ClientGame {
   }
 
   private update(dt: number): void {
+    // Apply debug toggles (only when changed)
+    this.applyDebugFlags();
+
     // Interpolate all entities toward server state
     for (const [, player] of this.players) {
       player.update(dt);
@@ -326,10 +331,15 @@ export class ClientGame {
     const localPlayer = this.players.get(this.localSessionId);
     if (localPlayer) {
       const pos = localPlayer.getWorldPosition();
-      this.isoCamera.followTarget(pos);
+
+      // Free camera: don't follow player
+      const debug = debugStore.getSnapshot();
+      if (!debug.freeCamera) {
+        this.isoCamera.followTarget(pos);
+      }
 
       // Wall occlusion
-      if (this.wallOcclusion) {
+      if (this.wallOcclusion && debug.wallOcclusion) {
         this.wallOcclusion.update(pos.x, pos.z);
       }
 
@@ -339,6 +349,23 @@ export class ClientGame {
 
     // FPS
     hudStore.updateFPS(dt);
+  }
+
+  private applyDebugFlags(): void {
+    const debug = debugStore.getSnapshot();
+    if (debug === this.lastDebug) return;
+
+    if (debug.fog !== this.lastDebug.fog) {
+      this.fogOfWar.setEnabled(debug.fog);
+    }
+    if (debug.freeCamera !== this.lastDebug.freeCamera) {
+      this.isoCamera.setFreeCamera(debug.freeCamera);
+    }
+    if (debug.wireframe !== this.lastDebug.wireframe) {
+      this.scene.forceWireframe = debug.wireframe;
+    }
+
+    this.lastDebug = debug;
   }
 
   private addShadowCaster(mesh: AbstractMesh): void {

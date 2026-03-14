@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "./hudStore";
 import { hudStore } from "./hudStore";
+import { DebugPanel } from "./DebugPanel";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -56,6 +57,7 @@ export const HudRoot = (): JSX.Element => {
 
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
+      {import.meta.env.DEV && <DebugPanel />}
       <div className="absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">
