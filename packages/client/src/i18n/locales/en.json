@@ -4,7 +4,10 @@
     "email": "Email",
     "password": "Password",
     "submit": "Enter the Dungeon",
-    "loading": "Logging in..."
+    "loading": "Logging in...",
+    "devMode": "Dev Mode",
+    "devAdmin": "Login as Admin",
+    "devPlayer": "Login as Player"
   },
   "loading": {
     "title": "Dungeon Crawler",

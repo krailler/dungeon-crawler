@@ -52,6 +52,31 @@ export const LoginScreen = (): JSX.Element | null => {
 
         {auth.error && <p className="text-center text-xs text-red-400">{auth.error}</p>}
       </form>
+
+      {/* Dev quick-login */}
+      {import.meta.env.DEV && (
+        <div className="mt-10 w-80 rounded-lg border-2 border-dashed border-yellow-500/30 bg-yellow-950/10 p-4">
+          <div className="mb-3 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-500/70">
+            {t("login.devMode")}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => authStore.login("admin@admin.com", "admin")}
+              disabled={auth.loading}
+              className="flex-1 rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-2 text-xs text-amber-400 transition-colors hover:bg-amber-900/40 disabled:opacity-40"
+            >
+              {t("login.devAdmin")}
+            </button>
+            <button
+              onClick={() => authStore.login("test@test.com", "password")}
+              disabled={auth.loading}
+              className="flex-1 rounded-lg border border-sky-500/30 bg-sky-900/20 px-4 py-2 text-xs text-sky-400 transition-colors hover:bg-sky-900/40 disabled:opacity-40"
+            >
+              {t("login.devPlayer")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
