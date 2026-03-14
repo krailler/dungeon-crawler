@@ -24,7 +24,10 @@
   },
   "connection": {
     "connecting": "Connecting...",
+    "reconnecting": "Reconnecting...",
+    "reconnected": "Reconnected!",
     "failed": "Connection failed",
+    "lost": "Connection lost",
     "info": "Room {{roomId}} · {{sessionId}}"
   },
   "player": {

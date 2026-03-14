@@ -181,10 +181,28 @@ export class ClientGame {
         room.ping((ms: number) => hudStore.setPing(ms));
       }, 2000);
 
-      // Handle server-initiated disconnect (e.g. duplicate login)
+      // Connection dropped — show reconnecting state
+      room.onDrop(() => {
+        hudStore.setConnection("connecting", t("connection.reconnecting"));
+      });
+
+      // Successfully reconnected
+      room.onReconnect(() => {
+        hudStore.setConnection(
+          "connected",
+          t("connection.info", {
+            roomId: room.roomId,
+            sessionId: room.sessionId.slice(0, 6).toUpperCase(),
+          }),
+        );
+      });
+
+      // Permanently left (kicked, or reconnection failed)
       room.onLeave((code: number) => {
         if (code === CloseCode.KICKED_DUPLICATE) {
           authStore.kick(t("kick.duplicate"));
+        } else {
+          hudStore.setConnection("error", t("connection.lost"));
         }
       });
     } catch (err) {
