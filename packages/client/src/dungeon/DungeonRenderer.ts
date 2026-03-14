@@ -137,16 +137,16 @@ export class DungeonRenderer {
   }
 
   dispose(): void {
-    // Dispose wall decoration instances
+    // Dispose wall decoration instances (keep shared AssetContainer materials)
     for (const root of this.wallDecoRoots) {
-      root.dispose(false, true);
+      root.dispose(false, false);
     }
     this.wallDecoRoots = [];
     this.wallDecoMap.clear();
 
-    // Dispose GLB floor instances
+    // Dispose GLB floor instances (keep shared AssetContainer materials)
     for (const root of this.floorRoots) {
-      root.dispose(false, true);
+      root.dispose(false, false);
     }
     this.floorRoots = [];
     this.floorMeshes = [];

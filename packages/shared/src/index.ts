@@ -40,7 +40,7 @@ export {
 } from "./Constants.js";
 
 export { MessageType } from "./protocol.js";
-export type { MoveMessage } from "./protocol.js";
+export type { MoveMessage, AdminRestartMessage } from "./protocol.js";
 
 export {
   generateFloorVariants,

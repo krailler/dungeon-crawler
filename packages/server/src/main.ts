@@ -14,3 +14,11 @@ server.define("dungeon", DungeonRoom);
 server.listen(port).then(() => {
   logger.info({ port }, "Game server listening");
 });
+
+// Graceful shutdown — release the port before tsx watch restarts
+function shutdown() {
+  logger.info("Shutting down…");
+  server.gracefullyShutdown(false).finally(() => process.exit(0));
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

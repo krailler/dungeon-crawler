@@ -26,7 +26,7 @@ import {
   generateWallVariants,
   assignRoomSets,
 } from "@dungeon/shared";
-import type { MoveMessage } from "@dungeon/shared";
+import type { MoveMessage, AdminRestartMessage } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
 const TICK_RATE = 64; // ms between simulation ticks
@@ -50,6 +50,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Generate dungeon
     const seed = DUNGEON_SEED ?? Date.now();
+    this.generateDungeon(seed);
+
+    // Register message handlers
+    this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
+    this.onMessage(MessageType.ADMIN_RESTART, this.handleAdminRestart.bind(this));
+
+    // Game loop
+    this.setSimulationInterval(this.update.bind(this), TICK_RATE);
+  }
+
+  private generateDungeon(seed: number): void {
+    this.state.dungeonSeed = seed;
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
 
@@ -71,19 +83,45 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Setup pathfinding
     this.pathfinder = new Pathfinder(this.tileMap);
 
-    // Setup systems
+    // Setup AI + combat systems
     this.aiSystem = new AISystem(this.pathfinder);
     this.combatSystem = new CombatSystem();
-    const spawnRng = mulberry32(seed ^ 0x454e454d); // separate sequence for enemy spawns
+    const spawnRng = mulberry32(seed ^ 0x454e454d);
     this.spawnEnemies(rooms, spawnRng);
 
-    // Register message handlers
-    this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
+    this.log.info(
+      { seed, rooms: rooms.length, enemies: this.state.enemies.size },
+      "Dungeon generated",
+    );
+  }
 
-    // Game loop
-    this.setSimulationInterval(this.update.bind(this), TICK_RATE);
+  private handleAdminRestart(_client: Client, data: AdminRestartMessage): void {
+    const seed = data.seed ?? this.state.dungeonSeed;
+    this.log.warn({ seed }, "Admin restart requested");
 
-    this.log.info({ rooms: rooms.length, enemies: this.state.enemies.size }, "Room created");
+    // Clear all enemies
+    this.state.enemies.clear();
+
+    // Regenerate dungeon
+    this.generateDungeon(seed);
+
+    // Reset all connected players to spawn with full health
+    const spawnPos = this.findSpawnPosition();
+    this.state.players.forEach((player: PlayerState) => {
+      player.health = player.maxHealth;
+      player.isMoving = false;
+      player.path = [];
+      player.currentPathIndex = 0;
+      if (spawnPos) {
+        player.x = spawnPos.x;
+        player.z = spawnPos.z;
+      }
+    });
+
+    // Re-register existing players in combat system
+    this.state.players.forEach((_player: PlayerState, sessionId: string) => {
+      this.combatSystem.registerPlayer(sessionId);
+    });
   }
 
   onJoin(client: Client): void {

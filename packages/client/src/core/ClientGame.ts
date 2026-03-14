@@ -21,6 +21,7 @@ import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
 import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { debugStore, type DebugSnapshot } from "../ui/debugStore";
+import { adminStore } from "../ui/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import {
@@ -158,6 +159,7 @@ export class ClientGame {
       sessionStorage.setItem("reconnectionToken", room.reconnectionToken);
 
       this.room = room;
+      adminStore.setRoom(room);
       this.localSessionId = room.sessionId;
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
@@ -190,6 +192,11 @@ export class ClientGame {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const $ = getStateCallbacks(room as any) as any;
     const state$ = $(room.state);
+
+    // Track dungeon seed for admin panel
+    state$.listen("dungeonSeed", (value: number) => {
+      adminStore.setSeed(value);
+    });
 
     // Listen for tileMap data (sent once on join)
     state$.listen("tileMapData", (value: string) => {
@@ -479,6 +486,7 @@ export class ClientGame {
   }
 
   dispose(): void {
+    adminStore.clearRoom();
     sessionStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);

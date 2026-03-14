@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { debugStore } from "./debugStore";
 import type { DebugSnapshot } from "./debugStore";
+import { adminStore } from "./adminStore";
 
 type ToggleEntry = {
   key: keyof DebugSnapshot;
@@ -17,6 +18,8 @@ const TOGGLES: ToggleEntry[] = [
 
 export const DebugPanel = (): JSX.Element => {
   const [open, setOpen] = useState(false);
+  const [seedInput, setSeedInput] = useState("");
+  const currentSeed = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
   const snapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
 
   return (
@@ -55,6 +58,48 @@ export const DebugPanel = (): JSX.Element => {
           >
             Reset options
           </button>
+
+          {/* Server admin section */}
+          <div className="mt-3 border-t border-slate-600/40 pt-2.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/70">
+              Server
+            </span>
+            <div className="mt-1.5 text-[10px] text-slate-500">
+              Seed: <span className="font-mono text-slate-400">{currentSeed}</span>
+            </div>
+            <div className="mt-2 flex flex-col gap-1.5">
+              <button
+                onClick={() => adminStore.restartRoom()}
+                className="w-full rounded border border-red-500/30 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-red-400 transition-colors hover:border-red-400/50 hover:bg-red-950/40 hover:text-red-300"
+              >
+                Restart room
+              </button>
+              <div className="flex gap-1">
+                <input
+                  type="number"
+                  value={seedInput}
+                  onChange={(e) => setSeedInput(e.target.value)}
+                  placeholder="Seed"
+                  className="w-full min-w-0 rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] text-slate-300 placeholder-slate-500 outline-none focus:border-amber-500/50"
+                />
+                <button
+                  onClick={() => {
+                    const seed = seedInput ? parseInt(seedInput, 10) : null;
+                    adminStore.restartRoom(Number.isNaN(seed) ? null : seed);
+                  }}
+                  className="shrink-0 rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-200"
+                >
+                  Go
+                </button>
+              </div>
+              <button
+                onClick={() => adminStore.randomRestart()}
+                className="w-full rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-200"
+              >
+                Random seed
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

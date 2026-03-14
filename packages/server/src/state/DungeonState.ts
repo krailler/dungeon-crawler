@@ -10,4 +10,5 @@ export class DungeonState extends Schema {
   @type("string") wallVariantData: string = "";
   @type("uint16") mapWidth: number = 0;
   @type("uint16") mapHeight: number = 0;
+  @type("uint32") dungeonSeed: number = 0;
 }
