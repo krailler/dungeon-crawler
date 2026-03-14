@@ -13,7 +13,7 @@ export const LoadingScreen = (): JSX.Element | null => {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d] transition-opacity duration-700 ${
+      className={`pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d] transition-opacity duration-700 ${
         snapshot.fadingOut ? "opacity-0" : "opacity-100"
       }`}
     >
