@@ -36,6 +36,7 @@ export {
   WALL_TORCH_CHANCE,
   FOG_INNER_RADIUS,
   FOG_OUTER_RADIUS,
+  MINIMAP_DISCOVERY_RADIUS,
 } from "./Constants.js";
 
 export { MessageType } from "./protocol.js";

@@ -23,7 +23,15 @@ import { hudStore, mountHud, disposeHud } from "../ui/hudStore";
 import { debugStore, type DebugSnapshot } from "../ui/debugStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
-import { TileMap, unpackSetId, tileSetNameFromId, AMBIENT_INTENSITY } from "@dungeon/shared";
+import {
+  TileMap,
+  unpackSetId,
+  tileSetNameFromId,
+  AMBIENT_INTENSITY,
+  TILE_SIZE,
+  MINIMAP_DISCOVERY_RADIUS,
+} from "@dungeon/shared";
+import { minimapStore } from "../ui/minimapStore";
 import { t } from "../i18n/i18n";
 
 const SERVER_URL = "ws://localhost:3000";
@@ -51,6 +59,7 @@ export class ClientGame {
   private localSessionId: string = "";
   private pingInterval: number = 0;
   private lastDebug: DebugSnapshot = debugStore.getSnapshot();
+  private onKeyDown: (ev: KeyboardEvent) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -86,6 +95,14 @@ export class ClientGame {
       this.engine.resize();
     });
 
+    // Keyboard shortcuts
+    this.onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "m" || ev.key === "M") {
+        minimapStore.toggle();
+      }
+    };
+    window.addEventListener("keydown", this.onKeyDown);
+
     // Load assets then connect to server
     this.init();
   }
@@ -109,6 +126,7 @@ export class ClientGame {
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
       this.localSessionId = room.sessionId;
+      minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
       hudStore.setConnection(
@@ -145,6 +163,7 @@ export class ClientGame {
       const width = (room.state as any).mapWidth;
       const height = (room.state as any).mapHeight;
       const tileMap = TileMap.fromSerialized(width, height, flat);
+      minimapStore.setTileMap(tileMap);
 
       // Parse packed floor variant data from server
       const variantRaw = (room.state as any).floorVariantData;
@@ -250,6 +269,7 @@ export class ClientGame {
         this.players.delete(sessionId);
       }
       hudStore.removeMember(sessionId);
+      minimapStore.removePlayer(sessionId);
     });
 
     // Enemies added
@@ -345,7 +365,20 @@ export class ClientGame {
 
       // Fog of war
       this.fogOfWar.update(pos.x, pos.z);
+
+      // Minimap: reveal tiles around local player
+      const tileX = Math.floor(pos.x / TILE_SIZE);
+      const tileY = Math.floor(pos.z / TILE_SIZE);
+      minimapStore.revealAround(tileX, tileY, MINIMAP_DISCOVERY_RADIUS);
     }
+
+    // Minimap: update all player positions (silent, no emit)
+    for (const [sessionId, player] of this.players) {
+      const p = player.getWorldPosition();
+      minimapStore.updatePlayerPosition(sessionId, p.x, p.z);
+    }
+    // Single batched emit per frame (only when minimap is visible)
+    minimapStore.flush();
 
     // FPS
     hudStore.updateFPS(dt);
@@ -378,7 +411,9 @@ export class ClientGame {
   dispose(): void {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
+    window.removeEventListener("keydown", this.onKeyDown);
     disposeHud();
+    minimapStore.reset();
     this.soundManager.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();

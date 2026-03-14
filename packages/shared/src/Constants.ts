@@ -40,6 +40,9 @@ export const WALL_TORCH_CHANCE = 0.18;
 export const FOG_INNER_RADIUS = 1;
 export const FOG_OUTER_RADIUS = 7;
 
+// Minimap
+export const MINIMAP_DISCOVERY_RADIUS = 4; // tiles revealed around player
+
 // Camera (client-only but shared for consistency)
 export const CAMERA_ALPHA = -Math.PI / 4;
 export const CAMERA_BETA = (Math.PI * 3) / 11;
