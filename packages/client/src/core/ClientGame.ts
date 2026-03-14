@@ -32,6 +32,7 @@ import {
   MINIMAP_DISCOVERY_RADIUS,
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/minimapStore";
+import { loadingStore, LoadingPhase, mountLoading, disposeLoading } from "../ui/loadingStore";
 import { t } from "../i18n/i18n";
 
 const SERVER_URL = "ws://localhost:3000";
@@ -81,6 +82,7 @@ export class ClientGame {
     this.enemyLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
     this.soundManager = new SoundManager(this.scene);
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
+    mountLoading();
     mountHud();
     this.client = new Client(SERVER_URL);
 
@@ -111,6 +113,7 @@ export class ClientGame {
 
   private async init(): Promise<void> {
     hudStore.setConnection("connecting", "");
+    loadingStore.setPhase(LoadingPhase.MODELS);
     try {
       // Pre-load character models + audio while connecting
       await Promise.all([
@@ -132,6 +135,7 @@ export class ClientGame {
       };
       window.addEventListener("pointerdown", this.onPointerDown, { once: true });
 
+      loadingStore.setPhase(LoadingPhase.SERVER);
       const room = await this.client.joinOrCreate("dungeon");
       this.room = room;
       this.localSessionId = room.sessionId;
@@ -146,6 +150,7 @@ export class ClientGame {
         }),
       );
 
+      loadingStore.setPhase(LoadingPhase.DUNGEON_ASSETS);
       this.setupStateListeners(room);
 
       // Ping polling — every 2 seconds
@@ -157,6 +162,7 @@ export class ClientGame {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[Client] Failed to connect:", err);
       hudStore.setConnection("error", msg);
+      loadingStore.setPhase(LoadingPhase.ERROR);
     }
   }
 
@@ -206,6 +212,7 @@ export class ClientGame {
       console.log("[Client] Loading floor tile sets:", floorSetNames);
       console.log("[Client] Loading wall tile sets:", wallSetNames);
       this.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
+        loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
         console.log("[Client] Assets loaded, rendering dungeon");
         this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
 
@@ -224,6 +231,10 @@ export class ClientGame {
         for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
           mesh.receiveShadows = true;
         }
+
+        // Loading complete — fade out loading screen
+        loadingStore.setPhase(LoadingPhase.COMPLETE);
+        loadingStore.startFadeOut();
 
         // Mark ambient as ready — actual playback starts on first user click
         // (AudioContext requires a user gesture to unlock)
@@ -454,6 +465,7 @@ export class ClientGame {
     if (this.onPointerDown) {
       window.removeEventListener("pointerdown", this.onPointerDown);
     }
+    disposeLoading();
     disposeHud();
     minimapStore.reset();
     this.soundManager.dispose();

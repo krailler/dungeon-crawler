@@ -1,4 +1,13 @@
 {
+  "loading": {
+    "title": "Dungeon Crawler",
+    "models": "Loading models and audio...",
+    "server": "Connecting to server...",
+    "dungeon_assets": "Loading dungeon...",
+    "dungeon_render": "Building dungeon...",
+    "complete": "Ready!",
+    "error": "Connection failed. Please refresh."
+  },
   "party": {
     "title": "Party",
     "subtitle": "Expedition",
