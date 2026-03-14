@@ -136,7 +136,27 @@ export class ClientGame {
       window.addEventListener("pointerdown", this.onPointerDown, { once: true });
 
       loadingStore.setPhase(LoadingPhase.SERVER);
-      const room = await this.client.joinOrCreate("dungeon");
+
+      // Try to reconnect using a saved token (e.g. after page reload)
+      let room: Room;
+      const savedToken = sessionStorage.getItem("reconnectionToken");
+      if (savedToken) {
+        try {
+          console.log("[Client] Attempting reconnection…");
+          room = await this.client.reconnect(savedToken);
+          console.log("[Client] Reconnected to room:", room.sessionId);
+        } catch (err) {
+          console.warn("[Client] Reconnection failed, joining new room:", err);
+          sessionStorage.removeItem("reconnectionToken");
+          room = await this.client.joinOrCreate("dungeon");
+        }
+      } else {
+        room = await this.client.joinOrCreate("dungeon");
+      }
+
+      // Persist reconnection token for future page reloads
+      sessionStorage.setItem("reconnectionToken", room.reconnectionToken);
+
       this.room = room;
       this.localSessionId = room.sessionId;
       minimapStore.setLocalSessionId(room.sessionId);
@@ -459,6 +479,7 @@ export class ClientGame {
   }
 
   dispose(): void {
+    sessionStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("keydown", this.onKeyDown);

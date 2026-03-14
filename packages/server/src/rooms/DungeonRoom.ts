@@ -39,6 +39,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tileMap!: TileMap;
 
   onCreate(): void {
+    // Keep the room alive even when all players leave
+    this.autoDispose = false;
+
     this.state = new DungeonState();
 
     // Generate dungeon
@@ -98,8 +101,34 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.combatSystem.registerPlayer(client.sessionId);
   }
 
+  async onDrop(client: Client): Promise<void> {
+    console.log("[DungeonRoom] Player dropped:", client.sessionId);
+
+    // Stop the player while disconnected
+    const player = this.state.players.get(client.sessionId);
+    if (player) {
+      player.isMoving = false;
+      player.path = [];
+      player.currentPathIndex = 0;
+    }
+
+    // Allow reconnection for 120 seconds
+    try {
+      await this.allowReconnection(client, 120);
+    } catch {
+      // Reconnection timed out — remove player
+      console.log("[DungeonRoom] Reconnection timed out — removing player:", client.sessionId);
+      this.state.players.delete(client.sessionId);
+      this.combatSystem.removePlayer(client.sessionId);
+    }
+  }
+
+  onReconnect(client: Client): void {
+    console.log("[DungeonRoom] Player reconnected:", client.sessionId);
+  }
+
   onLeave(client: Client): void {
-    console.log("[DungeonRoom] Player left:", client.sessionId);
+    console.log("[DungeonRoom] Player left (consented):", client.sessionId);
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
   }
