@@ -32,7 +32,9 @@ packages/
     src/
       Constants.ts    # All game balance constants (TILE_SIZE, PLAYER_*, ENEMY_*, etc.)
       TileMap.ts      # 2D grid data + TileType + serialization
-      protocol.ts     # MessageType + MoveMessage interface
+      protocol.ts     # MessageType + MoveMessage + CombatLogMessage interfaces
+      Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
+      EnemyTypes.ts   # Enemy type definitions (zombie) + computeEnemyDerivedStats()
       FloorVariants.ts # Deterministic floor tile variant generation
       WallVariants.ts  # Deterministic wall decoration variant generation
       TileSets.ts     # Tile set definitions + name↔id mapping
@@ -41,10 +43,12 @@ packages/
   server/           # Authoritative game server (Colyseus)
     src/
       state/          # Schema state classes (PlayerState, EnemyState, DungeonState)
-      rooms/          # DungeonRoom (game loop, message handlers)
-      systems/        # AISystem, CombatSystem (server-side logic)
+      rooms/          # DungeonRoom (game loop, message handlers, broadcastToAdmins)
+      systems/        # AISystem, CombatSystem (server-side logic, combat event callbacks)
       dungeon/        # DungeonGenerator (procedural, no Babylon deps)
       navigation/     # Pathfinder (A* on TileMap, uses WorldPos)
+      sessions/       # activeSessionRegistry (global duplicate login detection)
+      db/             # Drizzle ORM schema + migrations (SQLite)
       main.ts         # Server entry point
   client/           # Babylon.js renderer + Colyseus client
     src/
@@ -53,8 +57,13 @@ packages/
       entities/       # ClientPlayer, ClientEnemy (GLB models + animations), CharacterAssetLoader
       dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
       systems/        # WallOcclusionSystem, FogOfWarSystem
+      audio/          # SoundManager (ambient + SFX)
       i18n/           # i18next config + locales (en.json)
-      ui/             # HUD: hudStore (pub-sub state) + HudRoot (React + Tailwind)
+      ui/
+        stores/       # Pub-sub stores: authStore, hudStore, debugStore, adminStore, loadingStore, minimapStore
+        hud/          # HUD components: HudRoot, CharacterPanel, DebugPanel, MinimapOverlay, PauseMenu
+        screens/      # Full-screen views: LoginScreen, LoadingScreen
+        index.css     # Tailwind base styles
       main.ts         # Client entry point
     public/
       models/
@@ -142,6 +151,23 @@ assets/
 - Animations are procedural (Python in Blender), not from FBX source
 - To add a new character/enemy: run scripts with new skin name, create loader with new basePath
 
+### Stats System
+
+- 3 base stats: `strength`, `vitality`, `agility` (persisted in DB, default 10)
+- Derived stats computed via `computeDerivedStats(base, scaling?)` in shared package
+- Formulas calibrated so 10/10/10 matches original hardcoded values (HP=100, dmg=10, speed=5)
+- Damage formula: `max(1, attackDamage - targetDefense)` — simple, minimum 1
+- Enemy types use `overrides: Partial<DerivedStats>` for hand-tuning
+- CombatSystem and AISystem read stats from entity state, not from global constants
+
+### Admin & Combat Log
+
+- Server actions (restart, seed change) protected by admin role check
+- `broadcastToAdmins()` sends messages only to clients with `role === "admin"`
+- Combat log: server emits `COMBAT_LOG` messages on every hit (player→enemy and enemy→player)
+- Client logs to console with colors when debug toggle `combatLog` is enabled
+- Debug panel: combat log toggle and server section only visible to admin users
+
 ### Internationalization (i18n)
 
 - i18next with `initReactI18next` plugin (no Provider needed)
@@ -184,9 +210,11 @@ assets/
 
 ### Shared (`packages/shared/src/`)
 
-- `Constants.ts` — All game constants: TILE*SIZE, PLAYER*\_, ENEMY\__, CAMERA*\*, DUNGEON*_, WALL\_\_, lighting (AMBIENT/TORCH/WALL_TORCH), fog of war
+- `Constants.ts` — All game constants: TILE*SIZE, PLAYER*\_, ENEMY\__, CAMERA*\*, DUNGEON*_, WALL\_\_, lighting (AMBIENT/TORCH/WALL_TORCH), fog of war (many deprecated in favor of Stats.ts)
 - `TileMap.ts` — 2D grid data + TileType + `serializeGrid()` / `fromSerialized()` for network transfer
-- `protocol.ts` — MessageType const object + MoveMessage interface
+- `protocol.ts` — MessageType const object (MOVE, ADMIN_RESTART, COMBAT_LOG) + message interfaces
+- `Stats.ts` — Base stats (strength/vitality/agility) → derived stats (maxHealth/attackDamage/defense/moveSpeed/attackCooldown/attackRange), `computeDerivedStats()`, `computeDamage()`
+- `EnemyTypes.ts` — Enemy type definitions with baseStats + overrides, `computeEnemyDerivedStats()`
 - `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
 - `WallVariants.ts` — Deterministic wall decoration variant generation (3 variants, weighted: 40/45/15%), per-room sets inherited from adjacent floor
 - `TileSets.ts` — Tile set definitions + name↔id mapping
@@ -196,19 +224,22 @@ assets/
 ### Server (`packages/server/src/`)
 
 - `main.ts` — Colyseus Server entry, defines "dungeon" room
-- `rooms/DungeonRoom.ts` — Game room: dungeon gen, message handlers, 20-tick game loop
-- `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies, tileMapData)
-- `state/PlayerState.ts` — Player Schema (position, health, synced) + server-only path data
-- `state/EnemyState.ts` — Enemy Schema (position, health, isDead) + server-only AI data
-- `systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK, multi-player targeting, A\* repath
-- `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, closest enemy targeting
+- `rooms/DungeonRoom.ts` — Game room: dungeon gen, message handlers, game loop, combat log broadcast to admins
+- `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies, tileMapData, tickRate)
+- `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats synced) + server-only path/combat data
+- `state/EnemyState.ts` — Enemy Schema (position, health, isDead, enemyType) + server-only AI/combat data
+- `systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK, multi-player targeting, A\* repath, combat event callbacks
+- `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, closest enemy targeting, combat event callbacks
 - `dungeon/DungeonGenerator.ts` — Procedural dungeon (no Babylon deps)
 - `navigation/Pathfinder.ts` — A\* on TileMap (uses WorldPos, no Babylon deps)
+- `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
+- `db/schema.ts` — Drizzle ORM schema: accounts, characters (with strength/vitality/agility/level columns)
+- `db/database.ts` — SQLite connection + auto-migration
 
 ### Client (`packages/client/src/`)
 
-- `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame
-- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, two CharacterAssetLoaders (player + enemy), shadow casters
+- `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame, auth state watcher
+- `core/ClientGame.ts` — Colyseus client, state listeners, render loop, reconnection (onDrop/onReconnect/onLeave), combat log listener
 - `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms)
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15
 - `entities/CharacterAssetLoader.ts` — Loads GLB character models per skin (basePath), instantiates with retargeted animations
@@ -219,9 +250,21 @@ assets/
 - `dungeon/WallAssetLoader.ts` — Loads wall decoration GLBs per set, places on wall faces (N/S/W/E), auto-scales to TILE_SIZE × WALL_HEIGHT
 - `systems/WallOcclusionSystem.ts` — Diablo-style wall transparency + wall decoration toggling (Set-based tracking)
 - `systems/FogOfWarSystem.ts` — PostProcess depth-based shader: radial darkness around player (inner/outer radius)
+- `audio/SoundManager.ts` — Ambient music + SFX (combat sounds)
 - `i18n/i18n.ts` — i18next initialization: LanguageDetector + initReactI18next, standalone t() export
-- `i18n/locales/en.json` — English translations (13 strings: party, connection, player, HUD)
-- `ui/hudStore.ts` — HUD pub-sub store: party members, FPS, ping, connection status; React root lifecycle
-- `ui/HudRoot.tsx` — React + Tailwind component: party health bars, FPS, ping, connection status (i18n)
-- `index.html` — Fullscreen canvas + HUD overlay
+- `i18n/locales/en.json` — English translations: login, loading, party, connection, player, kick, pause, character stats, HUD
+- `ui/stores/authStore.ts` — Auth state: login/logout/kick, token persistence, Colyseus client, role tracking
+- `ui/stores/hudStore.ts` — HUD pub-sub store: party members (with stats + level), FPS, ping, connection status; React root lifecycle
+- `ui/stores/debugStore.ts` — Debug toggles (fog, wallOcclusion, freeCamera, wireframe, ambient, combatLog), persisted in localStorage
+- `ui/stores/adminStore.ts` — Admin state: room reference, seed, tickRate, restart/randomRestart actions
+- `ui/stores/loadingStore.ts` — Loading screen state: phase progression + fade-out
+- `ui/stores/minimapStore.ts` — Minimap state: tile map, player positions, fog of war discovery
+- `ui/hud/HudRoot.tsx` — React + Tailwind: party health bars (with level badges), FPS, ping, connection status, character button (C key)
+- `ui/hud/CharacterPanel.tsx` — Side panel: character name, level, health bar, base stats (color-coded), derived combat stats
+- `ui/hud/DebugPanel.tsx` — Debug toggles + admin-only section (server info, restart, seed, combat log)
+- `ui/hud/MinimapOverlay.tsx` — Minimap with fog of war, player dots, enemy dots
+- `ui/hud/PauseMenu.tsx` — Escape key pause overlay with resume + logout
+- `ui/screens/LoginScreen.tsx` — Login form + dev-only quick-login buttons (admin/player)
+- `ui/screens/LoadingScreen.tsx` — Loading progress bar with phase text
+- `index.html` — Fullscreen canvas + HUD overlay + login root
 - `vite.config.ts` — WASM exclusion, React alias for monorepo dedup

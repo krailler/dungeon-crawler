@@ -28,7 +28,7 @@ import {
   ENEMY_TYPES,
   computeEnemyDerivedStats,
 } from "@dungeon/shared";
-import type { MoveMessage, AdminRestartMessage } from "@dungeon/shared";
+import type { MoveMessage, AdminRestartMessage, CombatLogMessage } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 import {
   registerSession,
@@ -358,12 +358,33 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       playersMap.set(sessionId, player);
     });
 
-    this.aiSystem.update(dtSec, playersMap, (sessionId, damage) => {
-      const player = this.state.players.get(sessionId);
-      if (!player) return;
-      player.health -= damage;
-      if (player.health < 0) player.health = 0;
-    });
+    this.aiSystem.update(
+      dtSec,
+      playersMap,
+      (sessionId, damage) => {
+        const player = this.state.players.get(sessionId);
+        if (!player) return;
+        player.health -= damage;
+        if (player.health < 0) player.health = 0;
+      },
+      (event) => {
+        const enemy = this.state.enemies.get(event.enemyId);
+        const player = this.state.players.get(event.sessionId);
+        if (!player) return;
+        const msg: CombatLogMessage = {
+          dir: "e2p",
+          src: `${enemy?.enemyType ?? "enemy"}[${event.enemyId}]`,
+          tgt: player.characterName || event.sessionId.slice(0, 6),
+          atk: event.attackDamage,
+          def: event.targetDefense,
+          dmg: event.finalDamage,
+          hp: player.health,
+          maxHp: player.maxHealth,
+          kill: player.health <= 0,
+        };
+        this.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+      },
+    );
 
     // Combat system: player auto-attack
     const enemiesMap = new Map<string, EnemyState>();
@@ -371,7 +392,21 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       enemiesMap.set(id, enemy);
     });
 
-    this.combatSystem.update(dtSec, playersMap, enemiesMap);
+    this.combatSystem.update(dtSec, playersMap, enemiesMap, (event) => {
+      const player = this.state.players.get(event.sessionId);
+      const msg: CombatLogMessage = {
+        dir: "p2e",
+        src: player?.characterName || event.sessionId.slice(0, 6),
+        tgt: `zombie[${event.enemyId}]`,
+        atk: event.attackDamage,
+        def: event.targetDefense,
+        dmg: event.finalDamage,
+        hp: event.targetHealth,
+        maxHp: event.targetMaxHealth,
+        kill: event.killed,
+      };
+      this.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+    });
   }
 
   private moveEntity(entity: PlayerState, dt: number): void {
@@ -445,7 +480,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
         const id = `enemy_${enemyId++}`;
         this.state.enemies.set(id, enemy);
-        this.aiSystem.register(enemy);
+        this.aiSystem.register(enemy, id);
       }
     }
   }
@@ -461,6 +496,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         player.isLeader = false;
       }
     });
+  }
+
+  /** Send a message only to clients with admin role */
+  private broadcastToAdmins(type: string, message: unknown): void {
+    for (const client of this.clients) {
+      const auth = client.auth as { role?: string } | undefined;
+      if (auth?.role === "admin") {
+        client.send(type, message);
+      }
+    }
   }
 
   private findSpawnPosition(): { x: number; z: number } | null {

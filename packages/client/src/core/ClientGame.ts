@@ -26,6 +26,7 @@ import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import {
   CloseCode,
+  MessageType,
   TileMap,
   unpackSetId,
   tileSetNameFromId,
@@ -33,6 +34,7 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
 } from "@dungeon/shared";
+import type { CombatLogMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
   loadingStore,
@@ -209,6 +211,22 @@ export class ClientGame {
         } else {
           hudStore.setConnection("error", t("connection.lost"));
         }
+      });
+
+      // Combat log — admin-only messages, logged when debug toggle is on
+      room.onMessage(MessageType.COMBAT_LOG, (msg: CombatLogMessage) => {
+        if (!debugStore.getSnapshot().combatLog) return;
+        const arrow = msg.dir === "p2e" ? "⚔️→" : "💀→";
+        const hpBar = `${msg.hp}/${msg.maxHp} HP`;
+        const killTag = msg.kill ? " 💀 KILL" : "";
+        console.log(
+          `%c[Combat] ${arrow} ${msg.src} hit ${msg.tgt} for ${msg.dmg} dmg (${msg.atk} atk - ${msg.def} def) → ${hpBar}${killTag}`,
+          msg.kill
+            ? "color: #f87171; font-weight: bold"
+            : msg.dir === "p2e"
+              ? "color: #60a5fa"
+              : "color: #fbbf24",
+        );
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -4,6 +4,17 @@ import { ATTACK_ANIM_DURATION, computeDamage } from "@dungeon/shared";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
+export interface CombatHitEvent {
+  sessionId: string;
+  enemyId: string;
+  attackDamage: number;
+  targetDefense: number;
+  finalDamage: number;
+  targetHealth: number;
+  targetMaxHealth: number;
+  killed: boolean;
+}
+
 interface PlayerCombat {
   sessionId: string;
   attackCooldown: number;
@@ -11,7 +22,10 @@ interface PlayerCombat {
   /** Pending damage: timer counts down, applies damage at 0 */
   damageTimer: number;
   damageTarget: EnemyState | null;
+  damageTargetId: string;
   damageAmount: number;
+  damageAttack: number;
+  damageDefense: number;
 }
 
 export class CombatSystem {
@@ -24,7 +38,10 @@ export class CombatSystem {
       animTimer: 0,
       damageTimer: 0,
       damageTarget: null,
+      damageTargetId: "",
       damageAmount: 0,
+      damageAttack: 0,
+      damageDefense: 0,
     });
   }
 
@@ -32,7 +49,12 @@ export class CombatSystem {
     this.playerCooldowns.delete(sessionId);
   }
 
-  update(dt: number, players: Map<string, PlayerState>, enemies: Map<string, EnemyState>): void {
+  update(
+    dt: number,
+    players: Map<string, PlayerState>,
+    enemies: Map<string, EnemyState>,
+    onHit?: (event: CombatHitEvent) => void,
+  ): void {
     for (const [sessionId, combat] of this.playerCooldowns) {
       const player = players.get(sessionId);
 
@@ -49,9 +71,22 @@ export class CombatSystem {
         combat.damageTimer -= dt;
         if (combat.damageTimer <= 0 && combat.damageTarget) {
           combat.damageTarget.health -= combat.damageAmount;
-          if (combat.damageTarget.health <= 0) {
+          const killed = combat.damageTarget.health <= 0;
+          if (killed) {
             combat.damageTarget.health = 0;
             combat.damageTarget.isDead = true;
+          }
+          if (onHit) {
+            onHit({
+              sessionId,
+              enemyId: combat.damageTargetId,
+              attackDamage: combat.damageAttack,
+              targetDefense: combat.damageDefense,
+              finalDamage: combat.damageAmount,
+              targetHealth: combat.damageTarget.health,
+              targetMaxHealth: combat.damageTarget.maxHealth,
+              killed,
+            });
           }
           combat.damageTarget = null;
         }
@@ -64,15 +99,17 @@ export class CombatSystem {
 
       // Find closest alive enemy in range
       let closest: EnemyState | null = null;
+      let closestId = "";
       let closestDist = Infinity;
 
-      for (const [, enemy] of enemies) {
+      for (const [enemyId, enemy] of enemies) {
         if (enemy.isDead) continue;
         const dx = enemy.x - player.x;
         const dz = enemy.z - player.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         if (dist <= player.attackRange && dist < closestDist) {
           closest = enemy;
+          closestId = enemyId;
           closestDist = dist;
         }
       }
@@ -89,7 +126,10 @@ export class CombatSystem {
         combat.animTimer = ATTACK_ANIM_DURATION;
         combat.damageTimer = DAMAGE_DELAY;
         combat.damageTarget = closest;
+        combat.damageTargetId = closestId;
         combat.damageAmount = computeDamage(player.attackDamage, closest.defense);
+        combat.damageAttack = player.attackDamage;
+        combat.damageDefense = closest.defense;
       }
     }
   }

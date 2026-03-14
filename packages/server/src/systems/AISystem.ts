@@ -13,8 +13,17 @@ type AIStateType = (typeof AIState)[keyof typeof AIState];
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
+export interface AIHitEvent {
+  enemyId: string;
+  sessionId: string;
+  attackDamage: number;
+  targetDefense: number;
+  finalDamage: number;
+}
+
 interface EnemyAI {
   enemy: EnemyState;
+  enemyId: string;
   state: AIStateType;
   repathTimer: number;
   attackTimer: number;
@@ -23,6 +32,8 @@ interface EnemyAI {
   damageTimer: number;
   damageSessionId: string | null;
   damageAmount: number;
+  damageAttack: number;
+  damageDefense: number;
 }
 
 export class AISystem {
@@ -33,9 +44,10 @@ export class AISystem {
     this.pathfinder = pathfinder;
   }
 
-  register(enemy: EnemyState): void {
+  register(enemy: EnemyState, enemyId: string): void {
     this.entries.push({
       enemy,
+      enemyId,
       state: AIState.IDLE,
       repathTimer: 0,
       attackTimer: 0,
@@ -43,6 +55,8 @@ export class AISystem {
       damageTimer: 0,
       damageSessionId: null,
       damageAmount: 0,
+      damageAttack: 0,
+      damageDefense: 0,
     });
   }
 
@@ -50,6 +64,7 @@ export class AISystem {
     dt: number,
     players: Map<string, PlayerState>,
     onPlayerHit: (sessionId: string, damage: number) => void,
+    onHit?: (event: AIHitEvent) => void,
   ): void {
     for (const entry of this.entries) {
       if (entry.enemy.isDead) continue;
@@ -67,6 +82,15 @@ export class AISystem {
         entry.damageTimer -= dt;
         if (entry.damageTimer <= 0 && entry.damageSessionId) {
           onPlayerHit(entry.damageSessionId, entry.damageAmount);
+          if (onHit) {
+            onHit({
+              enemyId: entry.enemyId,
+              sessionId: entry.damageSessionId,
+              attackDamage: entry.damageAttack,
+              targetDefense: entry.damageDefense,
+              finalDamage: entry.damageAmount,
+            });
+          }
           entry.damageSessionId = null;
         }
       }
@@ -113,6 +137,8 @@ export class AISystem {
           entry.damageTimer = DAMAGE_DELAY;
           entry.damageSessionId = closestSessionId;
           entry.damageAmount = computeDamage(entry.enemy.attackDamage, closestPlayer.defense);
+          entry.damageAttack = entry.enemy.attackDamage;
+          entry.damageDefense = closestPlayer.defense;
         }
       } else if (closestDist <= entry.enemy.detectionRange) {
         // Chase state
