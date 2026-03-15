@@ -14,51 +14,38 @@ import type { Room as DungeonRoomDef } from "../dungeon/DungeonGenerator";
 import { Pathfinder } from "../navigation/Pathfinder";
 import { AISystem } from "../systems/AISystem";
 import { CombatSystem } from "../systems/CombatSystem";
+import { GateSystem } from "../systems/GateSystem";
+import { GameLoop } from "../systems/GameLoop";
 import { ChatSystem } from "../chat/ChatSystem";
 import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
+import { PlayerSessionManager } from "./PlayerSessionManager";
 import {
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
   DUNGEON_ROOMS,
   TILE_SIZE,
-  TileType,
   type TileMap,
   MessageType,
   generateFloorVariants,
   generateWallVariants,
   assignRoomSets,
-  computeDerivedStats,
   ENEMY_TYPES,
   computeEnemyDerivedStats,
   scaleEnemyDerivedStats,
-  computeGoldDrop,
-  GATE_INTERACT_RANGE,
-  GATE_COUNTDOWN_SECONDS,
   GOLD_SAVE_INTERVAL,
   CloseCode,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
   AdminRestartMessage,
-  CombatLogMessage,
   ChatSendPayload,
   PromoteLeaderMessage,
-  GateInteractMessage,
   PartyKickMessage,
-  DebugPathEntry,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
-import {
-  registerSession,
-  unregisterSession,
-  isActiveSession,
-} from "../sessions/activeSessionRegistry";
 
 const TICK_RATE = 64; // ms between simulation ticks
-const RECONNECT_TIMEOUT = 60 * 5; // seconds - default: 5 minutes
-/** Remaining seconds at which to send reconnection warnings */
-const RECONNECT_WARNINGS = [30, 10];
 
 /** Fixed seed for deterministic dungeon generation (set to null for random). */
 const DUNGEON_SEED: number | null = 42;
@@ -68,26 +55,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private aiSystem!: AISystem;
   private combatSystem!: CombatSystem;
   private chatSystem!: ChatSystem;
+  private gateSystem!: GateSystem;
+  private gameLoop!: GameLoop;
+  private sessionManager!: PlayerSessionManager;
   private tileMap!: TileMap;
   private log!: Logger;
-  private lastTickTime: number = 0;
-  private tickAccum: number = 0;
-  private tickCount: number = 0;
-  /** Sessions kicked via /kick — skip reconnection in onDrop */
-  private kickedSessions: Set<string> = new Set();
-  /** Pending reconnection warning timers — cancelled on reconnect */
-  private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
-  /** Maps accountId → sessionId so we can find a disconnected player on re-login */
-  private accountToSession: Map<string, string> = new Map();
-  /** Clients subscribed to debug path visualization */
-  private debugPathClients: Set<string> = new Set();
-  /** Gate ids with an active countdown in progress */
-  private gateCountdowns: Set<string> = new Set();
-  // Pre-allocated maps reused each tick to avoid GC pressure
-  private tickPlayersMap: Map<string, PlayerState> = new Map();
-  private tickEnemiesMap: Map<string, EnemyState> = new Map();
-  /** Last saved gold per characterId — avoids unnecessary DB writes */
-  private lastSavedGold: Map<string, number> = new Map();
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
@@ -96,11 +68,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     this.state = new DungeonState();
 
-    // Generate dungeon
+    // Generate dungeon (also creates pathfinder, AI, combat systems)
     const seed = DUNGEON_SEED ?? Date.now();
     this.generateDungeon(seed);
 
     // Setup chat system
+    const self = this;
     const chatBridge: ChatRoomBridge = {
       getClients: () => this.clients,
       getPlayer: (sid) => this.state.players.get(sid),
@@ -125,22 +98,72 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         return map;
       },
       kickPlayer: (sessionId: string) => {
-        this.kickedSessions.add(sessionId);
-        // Clean account mapping for the kicked session
-        const kickedClient = this.clients.find((c) => c.sessionId === sessionId);
-        if (kickedClient) {
-          const kickAuth = kickedClient.auth as { accountId?: string } | undefined;
-          if (kickAuth?.accountId) this.accountToSession.delete(kickAuth.accountId);
-        }
-        this.state.players.delete(sessionId);
-        this.combatSystem.removePlayer(sessionId);
-        this.aiSystem.removePlayer(sessionId);
-        this.chatSystem.removePlayer(sessionId);
-        this.reassignLeader();
+        this.sessionManager.markKicked(sessionId);
+        this.sessionManager.removePlayerFromAllSystems(sessionId);
+        this.sessionManager.reassignLeader();
       },
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
+
+    // Setup gate system (after dungeon + chat system are ready)
+    this.gateSystem = new GateSystem({
+      state: this.state,
+      pathfinder: this.pathfinder,
+      chatSystem: this.chatSystem,
+      clock: this.clock,
+    });
+
+    // Setup session manager
+    this.sessionManager = new PlayerSessionManager(
+      {
+        get state() {
+          return self.state;
+        },
+        get clients() {
+          return self.clients;
+        },
+        get tileMap() {
+          return self.tileMap;
+        },
+        get combatSystem() {
+          return self.combatSystem;
+        },
+        get aiSystem() {
+          return self.aiSystem;
+        },
+        get chatSystem() {
+          return self.chatSystem;
+        },
+        allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
+        onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
+      },
+      this.log,
+    );
+
+    // Setup game loop
+    this.gameLoop = new GameLoop({
+      get state() {
+        return self.state;
+      },
+      get aiSystem() {
+        return self.aiSystem;
+      },
+      get combatSystem() {
+        return self.combatSystem;
+      },
+      get chatSystem() {
+        return self.chatSystem;
+      },
+      broadcastToAdmins: (type, message) => self.broadcastToAdmins(type, message),
+      sendToClient: (sessionId, type, message) => {
+        const client = self.clients.find((c) => c.sessionId === sessionId);
+        if (client) client.send(type, message);
+      },
+      get clock() {
+        return self.clock;
+      },
+    });
 
     // Register message handlers
     this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
@@ -185,106 +208,33 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         `${targetName} has been kicked.`,
       );
 
-      // Reuse the same kick logic as /kick command
-      this.kickedSessions.add(data.targetSessionId);
+      this.sessionManager.markKicked(data.targetSessionId);
       const kickedClient = this.clients.find((c) => c.sessionId === data.targetSessionId);
       if (kickedClient) {
-        const kickAuth = kickedClient.auth as { accountId?: string } | undefined;
-        if (kickAuth?.accountId) this.accountToSession.delete(kickAuth.accountId);
         kickedClient.leave(CloseCode.KICKED);
       }
-      this.state.players.delete(data.targetSessionId);
-      this.combatSystem.removePlayer(data.targetSessionId);
-      this.aiSystem.removePlayer(data.targetSessionId);
-      this.chatSystem.removePlayer(data.targetSessionId);
-      this.reassignLeader();
+      this.sessionManager.removePlayerFromAllSystems(data.targetSessionId);
+      this.sessionManager.reassignLeader();
     });
     // Gate: leader opens a gate (with countdown for lobby type)
-    this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: GateInteractMessage) => {
-      const gate = this.state.gates.get(data.gateId);
-      if (!gate || gate.open || this.gateCountdowns.has(data.gateId)) return;
+    this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: { gateId: string }) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player) return;
-
-      // Lobby gates require leader
-      if (gate.gateType === "lobby" && !player.isLeader) {
-        this.chatSystem.sendToClientI18n(
-          client,
-          "message",
-          "chat.gateLeaderOnly",
-          {},
-          "Only the party leader can open the gate.",
-          "error",
-        );
-        return;
-      }
-
-      // Check proximity
-      const gateWX = gate.tileX * TILE_SIZE;
-      const gateWZ = gate.tileY * TILE_SIZE;
-      const dx = player.x - gateWX;
-      const dz = player.z - gateWZ;
-      if (dx * dx + dz * dz > GATE_INTERACT_RANGE * GATE_INTERACT_RANGE) return;
-
-      // Lobby gates use countdown; other types open immediately
-      if (gate.gateType === "lobby") {
-        this.gateCountdowns.add(data.gateId);
-        const leaderName = player.characterName || client.sessionId.slice(0, 6);
-        this.chatSystem.broadcastAnnouncement(
-          "announce.gateCountdownStart",
-          { name: leaderName, seconds: GATE_COUNTDOWN_SECONDS },
-          `${leaderName} is opening the gate... ${GATE_COUNTDOWN_SECONDS}`,
-        );
-
-        for (let s = GATE_COUNTDOWN_SECONDS - 1; s >= 1; s--) {
-          this.clock.setTimeout(
-            () => {
-              if (gate.open) return;
-              this.chatSystem.broadcastAnnouncement(
-                "announce.gateCountdownStart",
-                { name: leaderName, seconds: s },
-                `${leaderName} is opening the gate... ${s}`,
-              );
-            },
-            (GATE_COUNTDOWN_SECONDS - s) * 1000,
-          );
-        }
-
-        this.clock.setTimeout(() => {
-          if (gate.open) return;
-          gate.open = true;
-          this.gateCountdowns.delete(data.gateId);
-          this.pathfinder.unblockTile(gate.tileX, gate.tileY);
-          this.chatSystem.broadcastAnnouncement(
-            "announce.gateOpened",
-            {},
-            "The gate opens... The dungeon awaits!",
-          );
-        }, GATE_COUNTDOWN_SECONDS * 1000);
-      } else {
-        // Non-lobby gates open immediately
-        gate.open = true;
-        this.pathfinder.unblockTile(gate.tileX, gate.tileY);
-      }
+      if (player) this.gateSystem.handleInteract(client, player, data);
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? "user";
       if (role !== "admin") return;
-      if (data.enabled) {
-        this.debugPathClients.add(client.sessionId);
-      } else {
-        this.debugPathClients.delete(client.sessionId);
-      }
+      this.gameLoop.setDebugPaths(client.sessionId, data.enabled);
     });
 
     // Auto-save gold for all players periodically
     this.clock.setInterval(() => {
-      this.saveAllPlayersGold();
+      this.sessionManager.saveAllPlayersGold();
     }, GOLD_SAVE_INTERVAL);
 
     // Game loop
-    this.setSimulationInterval(this.update.bind(this), TICK_RATE);
+    this.setSimulationInterval(this.gameLoop.update.bind(this.gameLoop), TICK_RATE);
   }
 
   private generateDungeon(seed: number): void {
@@ -302,7 +252,6 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Clear existing gates
     this.state.gates.clear();
-    this.gateCountdowns.clear();
 
     // Create lobby gate from dungeon generator
     const gatePos = generator.getGatePosition();
@@ -342,6 +291,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Setup AI + combat systems
     this.aiSystem = new AISystem(this.pathfinder);
     this.combatSystem = new CombatSystem();
+
+    // Reset gate system with new dependencies (null on first call — created in onCreate after)
+    this.gateSystem?.reset({
+      state: this.state,
+      pathfinder: this.pathfinder,
+      chatSystem: this.chatSystem,
+    });
+
     const spawnRng = mulberry32(seed ^ 0x454e454d);
     this.spawnEnemies(rooms, spawnRng, dungeonLevel);
 
@@ -368,7 +325,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.generateDungeon(seed);
 
     // Reset all connected players to spawn with full health
-    const spawnPos = this.findSpawnPosition();
+    const spawnPos = this.sessionManager.findSpawnPosition();
     this.state.players.forEach((player: PlayerState) => {
       player.health = player.maxHealth;
       player.isMoving = false;
@@ -439,7 +396,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Block new players if the dungeon has already started (lobby gate open)
     // Allow returning players (account already has a disconnected player in the room)
     if (this.isDungeonStarted()) {
-      const oldSessionId = this.accountToSession.get(account.id);
+      const oldSessionId = this.sessionManager.getSessionForAccount(account.id);
       const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
       if (!existingPlayer) {
         throw new Error("DUNGEON_STARTED");
@@ -460,277 +417,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   onJoin(client: Client): void {
-    const {
-      accountId,
-      characterId,
-      characterName,
-      role,
-      strength,
-      vitality,
-      agility,
-      level,
-      gold,
-    } = client.auth as {
-      accountId: string;
-      characterId: string;
-      characterName: string;
-      role: string;
-      strength: number;
-      vitality: number;
-      agility: number;
-      level: number;
-      gold: number;
-    };
-
-    // Kick previous session if same account is already connected (any room)
-    registerSession(accountId, client);
-
-    this.log.info(
-      { player: pid(client.sessionId), accountId, characterName, role },
-      "Player joined",
-    );
-
-    // Check if this account already has a disconnected player in this room
-    const oldSessionId = this.accountToSession.get(accountId);
-    const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
-
-    if (existingPlayer && oldSessionId && oldSessionId !== client.sessionId) {
-      // Migrate existing player state to the new session
-      this.log.info(
-        { player: pid(client.sessionId), oldSession: pid(oldSessionId) },
-        "Migrating player state from old session",
-      );
-
-      // Clean up old session references
-      this.clearReconnectTimers(oldSessionId);
-      this.state.players.delete(oldSessionId);
-      this.combatSystem.removePlayer(oldSessionId);
-      this.aiSystem.removePlayer(oldSessionId);
-      this.chatSystem.removePlayer(oldSessionId);
-
-      // Revive the player under the new session
-      existingPlayer.online = true;
-      existingPlayer.isMoving = false;
-      existingPlayer.path = [];
-      existingPlayer.currentPathIndex = 0;
-      existingPlayer.role = role;
-
-      this.state.players.set(client.sessionId, existingPlayer);
-      this.combatSystem.registerPlayer(client.sessionId);
-      this.accountToSession.set(accountId, client.sessionId);
-      this.reassignLeader();
-
-      // Chat: broadcast reconnect event
-      this.chatSystem.broadcastSystemI18n(
-        "chat.reconnected",
-        { name: characterName },
-        `${characterName} reconnected.`,
-      );
-      return;
-    }
-
-    // Brand new player — create fresh state
-    const player = new PlayerState();
-    player.characterName = characterName;
-    player.role = role;
-
-    // Apply base stats from DB
-    player.strength = strength;
-    player.vitality = vitality;
-    player.agility = agility;
-    player.level = level;
-    player.gold = gold;
-    player.characterId = characterId;
-    this.lastSavedGold.set(characterId, gold);
-
-    // Compute derived stats
-    const derived = computeDerivedStats({ strength, vitality, agility });
-    player.maxHealth = derived.maxHealth;
-    player.health = derived.maxHealth;
-    player.speed = derived.moveSpeed;
-    player.attackDamage = derived.attackDamage;
-    player.defense = derived.defense;
-    player.attackCooldown = derived.attackCooldown;
-    player.attackRange = derived.attackRange;
-
-    // Find spawn position
-    const spawnPos = this.findSpawnPosition();
-    if (spawnPos) {
-      player.x = spawnPos.x;
-      player.z = spawnPos.z;
-    }
-    player.rotY = Math.PI;
-
-    this.state.players.set(client.sessionId, player);
-    this.combatSystem.registerPlayer(client.sessionId);
-    this.accountToSession.set(accountId, client.sessionId);
-    this.reassignLeader();
-
-    // Chat: broadcast join event
-    this.chatSystem.broadcastSystemI18n(
-      "chat.joined",
-      { name: characterName },
-      `${characterName} joined the dungeon.`,
-    );
+    this.sessionManager.handleJoin(client);
   }
 
   async onDrop(client: Client): Promise<void> {
-    const auth = client.auth as { accountId?: string } | undefined;
-
-    // If this client was kicked via /kick or party kick, state already cleaned up — just unregister
-    // Don't delete from kickedSessions here; onLeave will consume it to skip the "left" broadcast
-    if (this.kickedSessions.has(client.sessionId)) {
-      this.log.info(
-        { player: pid(client.sessionId) },
-        "Kicked player dropped — skipping reconnect",
-      );
-      this.unregisterClient(client);
-      return;
-    }
-
-    // If this client was kicked (replaced by a new session), clean up immediately
-    if (auth?.accountId && !isActiveSession(auth.accountId, client)) {
-      this.log.info(
-        { player: pid(client.sessionId) },
-        "Kicked session dropped — removing immediately",
-      );
-      this.clearReconnectTimers(client.sessionId);
-      this.state.players.delete(client.sessionId);
-      this.combatSystem.removePlayer(client.sessionId);
-      this.aiSystem.removePlayer(client.sessionId);
-      this.chatSystem.removePlayer(client.sessionId);
-      this.reassignLeader();
-      return;
-    }
-
-    this.log.warn(
-      { player: pid(client.sessionId) },
-      `Player dropped — waiting ${RECONNECT_TIMEOUT}s for reconnect`,
-    );
-
-    // Stop the player while disconnected
-    const player = this.state.players.get(client.sessionId);
-    if (player) {
-      player.isMoving = false;
-      player.online = false;
-      player.path = [];
-      player.currentPathIndex = 0;
-      this.chatSystem.broadcastSystemI18n(
-        "chat.disconnectedWithTime",
-        { name: player.characterName, seconds: RECONNECT_TIMEOUT },
-        `${player.characterName} disconnected. ${RECONNECT_TIMEOUT}s to reconnect.`,
-      );
-    }
-
-    // Schedule warning timers
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const playerName = player?.characterName || client.sessionId.slice(0, 6);
-    for (const remaining of RECONNECT_WARNINGS) {
-      const delay = (RECONNECT_TIMEOUT - remaining) * 1000;
-      timers.push(
-        setTimeout(() => {
-          this.chatSystem.broadcastSystemI18n(
-            "chat.reconnectWarning",
-            { name: playerName, seconds: remaining },
-            `${playerName} has ${remaining}s to reconnect.`,
-          );
-        }, delay),
-      );
-    }
-    this.reconnectTimers.set(client.sessionId, timers);
-
-    // Allow reconnection
-    try {
-      await this.allowReconnection(client, RECONNECT_TIMEOUT);
-    } catch {
-      // Reconnection timed out — remove player
-      this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
-      this.clearReconnectTimers(client.sessionId);
-      // Save gold before removing
-      const droppedPlayer = this.state.players.get(client.sessionId);
-      if (droppedPlayer?.characterId) {
-        this.savePlayerGold(droppedPlayer.characterId, droppedPlayer.gold);
-      }
-      this.chatSystem.broadcastSystemI18n(
-        "chat.reconnectExpired",
-        { name: playerName },
-        `${playerName} failed to reconnect and has been removed.`,
-      );
-      this.state.players.delete(client.sessionId);
-      this.combatSystem.removePlayer(client.sessionId);
-      this.aiSystem.removePlayer(client.sessionId);
-      this.removeAccountMapping(client);
-      this.unregisterClient(client);
-      this.reassignLeader();
-    }
+    await this.sessionManager.handleDrop(client);
   }
 
   onReconnect(client: Client): void {
-    this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
-    this.clearReconnectTimers(client.sessionId);
-    const player = this.state.players.get(client.sessionId);
-    if (player) {
-      player.online = true;
-      this.chatSystem.broadcastSystemI18n(
-        "chat.reconnected",
-        { name: player.characterName },
-        `${player.characterName} reconnected.`,
-      );
-    }
+    this.sessionManager.handleReconnect(client);
   }
 
   onLeave(client: Client): void {
-    // If already cleaned up by kick, skip everything
-    if (this.kickedSessions.has(client.sessionId)) {
-      this.kickedSessions.delete(client.sessionId);
-      // Still save gold for kicked players
-      const kickedPlayer = this.state.players.get(client.sessionId);
-      if (kickedPlayer?.characterId) {
-        this.savePlayerGold(kickedPlayer.characterId, kickedPlayer.gold);
-      }
-      this.removeAccountMapping(client);
-      this.unregisterClient(client);
-      return;
-    }
-    const player = this.state.players.get(client.sessionId);
-    const name = player?.characterName || client.sessionId.slice(0, 6);
-    // Save gold to DB before removing player
-    if (player?.characterId) {
-      this.savePlayerGold(player.characterId, player.gold);
-    }
-    this.log.info({ player: pid(client.sessionId) }, "Player left");
-    this.state.players.delete(client.sessionId);
-    this.combatSystem.removePlayer(client.sessionId);
-    this.aiSystem.removePlayer(client.sessionId);
-    this.chatSystem.removePlayer(client.sessionId);
-    this.removeAccountMapping(client);
-    this.unregisterClient(client);
-    this.reassignLeader();
-    this.chatSystem.broadcastSystemI18n("chat.left", { name }, `${name} left the dungeon.`);
-  }
-
-  /** Remove the accountId→sessionId mapping (only if it still points to this session) */
-  private removeAccountMapping(client: Client): void {
-    const auth = client.auth as { accountId?: string } | undefined;
-    if (auth?.accountId && this.accountToSession.get(auth.accountId) === client.sessionId) {
-      this.accountToSession.delete(auth.accountId);
-    }
-    this.debugPathClients.delete(client.sessionId);
-  }
-
-  private clearReconnectTimers(sessionId: string): void {
-    const timers = this.reconnectTimers.get(sessionId);
-    if (timers) {
-      for (const t of timers) clearTimeout(t);
-      this.reconnectTimers.delete(sessionId);
-    }
-  }
-
-  private unregisterClient(client: Client): void {
-    const auth = client.auth as { accountId?: string } | undefined;
-    if (auth?.accountId) {
-      unregisterSession(auth.accountId, client);
-    }
+    this.sessionManager.handleLeave(client);
   }
 
   private handleMove(client: Client, data: MoveMessage): void {
@@ -749,213 +448,6 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.path = path;
       player.currentPathIndex = 0;
       player.isMoving = true;
-    }
-  }
-
-  private update(dt: number): void {
-    const now = performance.now();
-    if (this.lastTickTime > 0) {
-      this.tickAccum += now - this.lastTickTime;
-      this.tickCount++;
-      if (this.tickAccum >= 1000) {
-        this.state.tickRate = Math.round((this.tickCount / this.tickAccum) * 1000);
-        this.tickAccum = 0;
-        this.tickCount = 0;
-      }
-    }
-    this.lastTickTime = now;
-
-    const dtSec = dt / 1000;
-
-    // Move players along their paths
-    for (const [, player] of this.state.players) {
-      if (player.health <= 0) {
-        player.isMoving = false;
-        continue;
-      }
-      this.moveEntity(player, dtSec);
-    }
-
-    // AI system: enemies chase and attack players
-    this.tickPlayersMap.clear();
-    this.state.players.forEach((player: PlayerState, sessionId: string) => {
-      this.tickPlayersMap.set(sessionId, player);
-    });
-
-    this.aiSystem.update(
-      dtSec,
-      this.tickPlayersMap,
-      (sessionId, damage) => {
-        const player = this.state.players.get(sessionId);
-        if (!player) return;
-        player.health -= damage;
-        if (player.health < 0) player.health = 0;
-        if (player.health <= 0) {
-          const name = player.characterName || sessionId.slice(0, 6);
-          this.chatSystem.broadcastSystemI18n("chat.slain", { name }, `${name} has been slain!`);
-        }
-      },
-      (event) => {
-        const enemy = this.state.enemies.get(event.enemyId);
-        const player = this.state.players.get(event.sessionId);
-        if (!player) return;
-        const msg: CombatLogMessage = {
-          dir: "e2p",
-          src: `${enemy?.enemyType ?? "enemy"}[${event.enemyId}]`,
-          tgt: player.characterName || event.sessionId.slice(0, 6),
-          atk: event.attackDamage,
-          def: event.targetDefense,
-          dmg: event.finalDamage,
-          hp: player.health,
-          maxHp: player.maxHealth,
-          kill: player.health <= 0,
-        };
-        this.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
-      },
-    );
-
-    // Combat system: player auto-attack
-    this.tickEnemiesMap.clear();
-    this.state.enemies.forEach((enemy: EnemyState, id: string) => {
-      this.tickEnemiesMap.set(id, enemy);
-    });
-
-    this.combatSystem.update(dtSec, this.tickPlayersMap, this.tickEnemiesMap, (event) => {
-      // Player hit generates threat on the enemy
-      this.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
-
-      const player = this.state.players.get(event.sessionId);
-      const msg: CombatLogMessage = {
-        dir: "p2e",
-        src: player?.characterName || event.sessionId.slice(0, 6),
-        tgt: `zombie[${event.enemyId}]`,
-        atk: event.attackDamage,
-        def: event.targetDefense,
-        dmg: event.finalDamage,
-        hp: event.targetHealth,
-        maxHp: event.targetMaxHealth,
-        kill: event.killed,
-      };
-      this.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
-
-      // Remove dead enemy from state after a short delay so clients see the death
-      if (event.killed) {
-        // Distribute gold to alive party members
-        const killedEnemy = this.state.enemies.get(event.enemyId);
-        if (killedEnemy) {
-          let aliveCount = 0;
-          let levelSum = 0;
-          this.state.players.forEach((p: PlayerState) => {
-            if (p.health > 0) {
-              aliveCount++;
-              levelSum += p.level;
-            }
-          });
-          const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
-          const goldPerPlayer = computeGoldDrop(killedEnemy.level, avgPartyLevel, aliveCount);
-
-          this.state.players.forEach((p: PlayerState) => {
-            if (p.health > 0) {
-              p.gold += goldPerPlayer;
-            }
-          });
-
-          // Broadcast gold earned in chat
-          this.chatSystem.broadcastSystemI18n(
-            "chat.goldGained",
-            { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
-            `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
-          );
-        }
-
-        this.clock.setTimeout(() => {
-          this.state.enemies.delete(event.enemyId);
-          this.aiSystem.unregister(event.enemyId);
-        }, 1000);
-      }
-    });
-
-    // Debug: send path data to subscribed admin clients
-    if (this.debugPathClients.size > 0) {
-      this.sendDebugPaths();
-    }
-  }
-
-  private sendDebugPaths(): void {
-    const paths: DebugPathEntry[] = [];
-
-    this.state.players.forEach((player: PlayerState, sessionId: string) => {
-      if (player.path.length > 0 && player.currentPathIndex < player.path.length) {
-        paths.push({
-          id: sessionId,
-          kind: "player",
-          x: player.x,
-          z: player.z,
-          path: player.path.slice(player.currentPathIndex),
-        });
-      }
-    });
-
-    this.state.enemies.forEach((enemy: EnemyState, enemyId: string) => {
-      if (enemy.path.length > 0 && enemy.currentPathIndex < enemy.path.length) {
-        paths.push({
-          id: enemyId,
-          kind: "enemy",
-          x: enemy.x,
-          z: enemy.z,
-          path: enemy.path.slice(enemy.currentPathIndex),
-        });
-      }
-    });
-
-    const msg = { paths };
-    for (const sessionId of this.debugPathClients) {
-      const client = this.clients.find((c) => c.sessionId === sessionId);
-      if (client) {
-        client.send(MessageType.DEBUG_PATHS, msg);
-      }
-    }
-  }
-
-  private moveEntity(entity: PlayerState, dt: number): void {
-    if (!entity.isMoving || entity.currentPathIndex >= entity.path.length) {
-      entity.isMoving = false;
-      return;
-    }
-
-    let remaining = entity.speed * dt;
-
-    while (remaining > 0 && entity.currentPathIndex < entity.path.length) {
-      const target = entity.path[entity.currentPathIndex];
-      const dx = target.x - entity.x;
-      const dz = target.z - entity.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-
-      if (dist < 0.01) {
-        entity.currentPathIndex++;
-        continue;
-      }
-
-      const ndx = dx / dist;
-      const ndz = dz / dist;
-      entity.rotY = Math.atan2(ndx, ndz);
-
-      if (remaining >= dist) {
-        // Snap to waypoint and consume distance, continue to next
-        entity.x = target.x;
-        entity.z = target.z;
-        remaining -= dist;
-        entity.currentPathIndex++;
-      } else {
-        // Partial move toward waypoint
-        entity.x += ndx * remaining;
-        entity.z += ndz * remaining;
-        remaining = 0;
-      }
-    }
-
-    if (entity.currentPathIndex >= entity.path.length) {
-      entity.isMoving = false;
     }
   }
 
@@ -1007,19 +499,6 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     return lobbyGate ? lobbyGate.open : false;
   }
 
-  private reassignLeader(): void {
-    // Leader is the first player in the map
-    let leaderAssigned = false;
-    this.state.players.forEach((player: PlayerState) => {
-      if (!leaderAssigned) {
-        player.isLeader = true;
-        leaderAssigned = true;
-      } else {
-        player.isLeader = false;
-      }
-    });
-  }
-
   /** Send a message only to clients with admin role */
   private broadcastToAdmins(type: string, message: unknown): void {
     for (const client of this.clients) {
@@ -1028,91 +507,5 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(type, message);
       }
     }
-  }
-
-  /** Save a single player's gold to the database (skips if unchanged) */
-  private savePlayerGold(characterId: string, gold: number): void {
-    if (this.lastSavedGold.get(characterId) === gold) return;
-    const db = getDb();
-    db.update(characters)
-      .set({ gold })
-      .where(eq(characters.id, characterId))
-      .then(() => {
-        this.lastSavedGold.set(characterId, gold);
-        this.log.debug({ characterId, gold }, "Gold saved");
-      })
-      .catch((err) => {
-        this.log.error({ characterId, err }, "Failed to save gold");
-      });
-  }
-
-  /** Save gold for all connected players */
-  private saveAllPlayersGold(): void {
-    this.state.players.forEach((player: PlayerState) => {
-      if (player.characterId) {
-        this.savePlayerGold(player.characterId, player.gold);
-      }
-    });
-  }
-
-  private findSpawnPosition(): { x: number; z: number } | null {
-    // Find the SPAWN tile as base position
-    let spawnTileX = -1;
-    let spawnTileY = -1;
-    for (let y = 0; y < this.tileMap.height; y++) {
-      for (let x = 0; x < this.tileMap.width; x++) {
-        if (this.tileMap.get(x, y) === TileType.SPAWN) {
-          spawnTileX = x;
-          spawnTileY = y;
-          break;
-        }
-      }
-      if (spawnTileX >= 0) break;
-    }
-    if (spawnTileX < 0) return null;
-
-    const minDist = 1.2; // minimum distance between players (world units)
-
-    // BFS outward from spawn tile to find a free walkable position
-    const visited = new Set<string>();
-    const queue: { tx: number; tz: number }[] = [{ tx: spawnTileX, tz: spawnTileY }];
-    visited.add(`${spawnTileX},${spawnTileY}`);
-
-    while (queue.length > 0) {
-      const { tx, tz } = queue.shift()!;
-      const wx = tx * TILE_SIZE;
-      const wz = tz * TILE_SIZE;
-
-      // Check if any existing player is too close to this position
-      let occupied = false;
-      this.state.players.forEach((p) => {
-        const dx = p.x - wx;
-        const dz = p.z - wz;
-        if (dx * dx + dz * dz < minDist * minDist) {
-          occupied = true;
-        }
-      });
-
-      if (!occupied) {
-        return { x: wx, z: wz };
-      }
-
-      // Expand to neighboring walkable tiles
-      for (const [nx, nz] of [
-        [tx - 1, tz],
-        [tx + 1, tz],
-        [tx, tz - 1],
-        [tx, tz + 1],
-      ]) {
-        const key = `${nx},${nz}`;
-        if (!visited.has(key) && this.tileMap.isFloor(nx, nz)) {
-          visited.add(key);
-          queue.push({ tx: nx, tz: nz });
-        }
-      }
-    }
-
-    // Fallback: all nearby tiles occupied, return spawn anyway
-    return { x: spawnTileX * TILE_SIZE, z: spawnTileY * TILE_SIZE };
   }
 }
