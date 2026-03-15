@@ -126,10 +126,12 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       if (!ctx.args[0]) throw new Error("Usage: /kick <player_name>");
       const target = bridge.findPlayerByName(ctx.args[0]);
       if (!target) throw new Error(`Player not found: ${ctx.args[0]}`);
-      // Find the client for the target player
       const targetClient = findClient(bridge, target.sessionId);
       if (targetClient) {
-        chat.broadcastSystem(`${target.player.characterName} has been kicked.`);
+        const name = target.player.characterName;
+        // Clean up player state BEFORE disconnecting
+        bridge.kickPlayer(target.sessionId);
+        chat.broadcastSystem(`${name} has been kicked.`);
         targetClient.leave(4101);
       }
     },

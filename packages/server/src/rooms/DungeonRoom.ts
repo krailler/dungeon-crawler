@@ -59,6 +59,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private lastTickTime: number = 0;
   private tickAccum: number = 0;
   private tickCount: number = 0;
+  /** Sessions kicked via /kick — skip reconnection in onDrop */
+  private kickedSessions: Set<string> = new Set();
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
@@ -94,6 +96,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const map = new Map<string, PlayerState>();
         this.state.players.forEach((p: PlayerState, sid: string) => map.set(sid, p));
         return map;
+      },
+      kickPlayer: (sessionId: string) => {
+        this.kickedSessions.add(sessionId);
+        this.state.players.delete(sessionId);
+        this.combatSystem.removePlayer(sessionId);
+        this.aiSystem.removePlayer(sessionId);
+        this.chatSystem.removePlayer(sessionId);
+        this.reassignLeader();
       },
     };
     this.chatSystem = new ChatSystem(chatBridge);
@@ -299,6 +309,17 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   async onDrop(client: Client): Promise<void> {
     const auth = client.auth as { accountId?: string } | undefined;
+
+    // If this client was kicked via /kick, state already cleaned up — just unregister
+    if (this.kickedSessions.has(client.sessionId)) {
+      this.kickedSessions.delete(client.sessionId);
+      this.log.info(
+        { player: pid(client.sessionId) },
+        "Kicked player dropped — skipping reconnect",
+      );
+      this.unregisterClient(client);
+      return;
+    }
 
     // If this client was kicked (replaced by a new session), clean up immediately
     if (auth?.accountId && !isActiveSession(auth.accountId, client)) {

@@ -18,6 +18,8 @@ export interface ChatRoomBridge {
   getPlayerName(client: Client): string;
   findPlayerByName(name: string): { sessionId: string; player: PlayerState } | null;
   getAllPlayers(): Map<string, PlayerState>;
+  /** Remove a player from all room systems (state, combat, AI, etc.) */
+  kickPlayer(sessionId: string): void;
 }
 
 export class ChatSystem {
