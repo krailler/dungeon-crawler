@@ -10,6 +10,10 @@ import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE, ATTACK_ANIM_DURATION } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
+import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
+import { Control } from "@babylonjs/gui/2D/controls/control";
+import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
 import type { SoundManager } from "../audio/SoundManager";
 
@@ -30,6 +34,15 @@ const FOOTSTEP_INTERVAL = 0.32;
 
 /** Delay before playing attack sound (at punch peak) */
 const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
+
+/** How long the chat bubble stays fully visible (seconds) */
+const BUBBLE_DURATION = 5;
+
+/** Fade-out duration (seconds) */
+const BUBBLE_FADE = 1;
+
+/** Max width of the bubble in pixels */
+const BUBBLE_MAX_WIDTH = 220;
 
 export class ClientPlayer {
   /** Invisible anchor mesh used for positioning and torch parenting */
@@ -52,13 +65,26 @@ export class ClientPlayer {
   private pendingSoundName: string | null = null;
   private pendingSoundTimer: number = 0;
 
+  // Chat bubble
+  private guiTexture: AdvancedDynamicTexture | null = null;
+  private bubbleContainer: Rectangle | null = null;
+  private bubbleText: TextBlock | null = null;
+  private bubbleTimer: number = 0;
+
   // Target state from server
   private targetX: number = 0;
   private targetZ: number = 0;
   private targetRotY: number = 0;
 
-  constructor(scene: Scene, isLocal: boolean, id: string, soundManager?: SoundManager) {
+  constructor(
+    scene: Scene,
+    isLocal: boolean,
+    id: string,
+    guiTexture: AdvancedDynamicTexture,
+    soundManager?: SoundManager,
+  ) {
     this.isLocal = isLocal;
+    this.guiTexture = guiTexture;
 
     // Invisible anchor for position/rotation
     this.mesh = MeshBuilder.CreateGround(`player_${id}`, { width: 0.1, height: 0.1 }, scene);
@@ -195,6 +221,16 @@ export class ClientPlayer {
       }
     }
 
+    // Tick chat bubble timer
+    if (this.bubbleTimer > 0 && this.bubbleContainer) {
+      this.bubbleTimer -= dt;
+      if (this.bubbleTimer <= 0) {
+        this.bubbleContainer.isVisible = false;
+      } else if (this.bubbleTimer < BUBBLE_FADE) {
+        this.bubbleContainer.alpha = this.bubbleTimer / BUBBLE_FADE;
+      }
+    }
+
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
 
     const dx = this.targetX - this.mesh.position.x;
@@ -230,6 +266,57 @@ export class ClientPlayer {
     }
   }
 
+  /** Show a chat bubble above the player's head. */
+  showChatBubble(text: string): void {
+    if (!this.guiTexture) return;
+
+    // Reuse or create bubble container
+    if (!this.bubbleContainer) {
+      this.bubbleContainer = new Rectangle(`playerBubble_${this.mesh.name}`);
+      this.bubbleContainer.adaptWidthToChildren = true;
+      this.bubbleContainer.adaptHeightToChildren = true;
+      this.bubbleContainer.cornerRadius = 12;
+      this.bubbleContainer.thickness = 1;
+      this.bubbleContainer.color = "rgba(255, 255, 255, 0.12)";
+      this.bubbleContainer.background = "rgba(15, 23, 42, 0.88)";
+      this.bubbleContainer.paddingTopInPixels = 0;
+      this.bubbleContainer.paddingBottomInPixels = 0;
+      this.bubbleContainer.paddingLeftInPixels = 0;
+      this.bubbleContainer.paddingRightInPixels = 0;
+      this.bubbleContainer.linkOffsetY = -200;
+      this.bubbleContainer.shadowColor = "rgba(0, 0, 0, 0.5)";
+      this.bubbleContainer.shadowBlur = 8;
+      this.bubbleContainer.shadowOffsetY = 2;
+      this.bubbleContainer.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      this.bubbleContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+
+      this.bubbleText = new TextBlock(`playerBubbleText_${this.mesh.name}`);
+      this.bubbleText.color = "#e2e8f0";
+      this.bubbleText.fontSize = 15;
+      this.bubbleText.fontFamily = "system-ui, -apple-system, sans-serif";
+      this.bubbleText.textWrapping = true;
+      this.bubbleText.resizeToFit = true;
+      this.bubbleText.lineSpacing = "3px";
+      this.bubbleText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      this.bubbleText.paddingTopInPixels = 12;
+      this.bubbleText.paddingBottomInPixels = 12;
+      this.bubbleText.paddingLeftInPixels = 18;
+      this.bubbleText.paddingRightInPixels = 18;
+
+      this.bubbleContainer.addControl(this.bubbleText);
+      this.guiTexture.addControl(this.bubbleContainer);
+      this.bubbleContainer.linkWithMesh(this.mesh);
+    }
+
+    // Update text and clamp width
+    this.bubbleText!.text = text;
+    const innerWidth = Math.min(Math.max(text.length * 8, 40), BUBBLE_MAX_WIDTH);
+    this.bubbleText!.widthInPixels = innerWidth + 36; // +18px padding each side
+    this.bubbleContainer.alpha = 1;
+    this.bubbleContainer.isVisible = true;
+    this.bubbleTimer = BUBBLE_DURATION + BUBBLE_FADE;
+  }
+
   getWorldPosition(): Vector3 {
     return this.mesh.position.clone();
   }
@@ -237,6 +324,10 @@ export class ClientPlayer {
   dispose(): void {
     for (const [, anim] of this.animations) {
       anim.dispose();
+    }
+    if (this.bubbleContainer) {
+      this.guiTexture?.removeControl(this.bubbleContainer);
+      this.bubbleContainer.dispose();
     }
     this.modelRoot?.dispose(false, false);
     this.shadowGenerator?.dispose();

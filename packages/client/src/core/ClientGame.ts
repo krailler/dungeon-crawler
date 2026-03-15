@@ -179,6 +179,17 @@ export class ClientGame {
       // Chat messages from server
       room.onMessage(MessageType.CHAT_ENTRY, (entry: ChatEntry) => {
         chatStore.addMessage(entry);
+
+        // Show chat bubble above player's head for player messages
+        if (entry.category === "player" && entry.sender) {
+          for (const [sessionId, clientPlayer] of this.players) {
+            const member = hudStore.getSnapshot().members.find((m) => m.id === sessionId);
+            if (member && member.name === entry.sender) {
+              clientPlayer.showChatBubble(entry.text);
+              break;
+            }
+          }
+        }
       });
 
       // Chat commands list from server
@@ -349,7 +360,13 @@ export class ClientGame {
     // Players added
     state$.players.onAdd((player: any, sessionId: string) => {
       const isLocal = sessionId === this.localSessionId;
-      const clientPlayer = new ClientPlayer(this.scene, isLocal, sessionId, this.soundManager);
+      const clientPlayer = new ClientPlayer(
+        this.scene,
+        isLocal,
+        sessionId,
+        this.guiTexture,
+        this.soundManager,
+      );
       clientPlayer.snapToPosition(player.x, player.z);
       clientPlayer.setServerState(player.x, player.z, player.rotY);
       this.players.set(sessionId, clientPlayer);
