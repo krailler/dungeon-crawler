@@ -66,6 +66,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private kickedSessions: Set<string> = new Set();
   /** Pending reconnection warning timers — cancelled on reconnect */
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
+  /** Maps accountId → sessionId so we can find a disconnected player on re-login */
+  private accountToSession: Map<string, string> = new Map();
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
@@ -107,6 +109,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
       kickPlayer: (sessionId: string) => {
         this.kickedSessions.add(sessionId);
+        // Clean account mapping for the kicked session
+        const kickedClient = this.clients.find((c) => c.sessionId === sessionId);
+        if (kickedClient) {
+          const kickAuth = kickedClient.auth as { accountId?: string } | undefined;
+          if (kickAuth?.accountId) this.accountToSession.delete(kickAuth.accountId);
+        }
         this.state.players.delete(sessionId);
         this.combatSystem.removePlayer(sessionId);
         this.aiSystem.removePlayer(sessionId);
@@ -284,6 +292,46 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       "Player joined",
     );
 
+    // Check if this account already has a disconnected player in this room
+    const oldSessionId = this.accountToSession.get(accountId);
+    const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
+
+    if (existingPlayer && oldSessionId && oldSessionId !== client.sessionId) {
+      // Migrate existing player state to the new session
+      this.log.info(
+        { player: pid(client.sessionId), oldSession: pid(oldSessionId) },
+        "Migrating player state from old session",
+      );
+
+      // Clean up old session references
+      this.clearReconnectTimers(oldSessionId);
+      this.state.players.delete(oldSessionId);
+      this.combatSystem.removePlayer(oldSessionId);
+      this.aiSystem.removePlayer(oldSessionId);
+      this.chatSystem.removePlayer(oldSessionId);
+
+      // Revive the player under the new session
+      existingPlayer.online = true;
+      existingPlayer.isMoving = false;
+      existingPlayer.path = [];
+      existingPlayer.currentPathIndex = 0;
+      existingPlayer.role = role;
+
+      this.state.players.set(client.sessionId, existingPlayer);
+      this.combatSystem.registerPlayer(client.sessionId);
+      this.accountToSession.set(accountId, client.sessionId);
+      this.reassignLeader();
+
+      // Chat: broadcast reconnect event
+      this.chatSystem.broadcastSystemI18n(
+        "chat.reconnected",
+        { name: characterName },
+        `${characterName} reconnected.`,
+      );
+      return;
+    }
+
+    // Brand new player — create fresh state
     const player = new PlayerState();
     player.characterName = characterName;
     player.role = role;
@@ -313,6 +361,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     this.state.players.set(client.sessionId, player);
     this.combatSystem.registerPlayer(client.sessionId);
+    this.accountToSession.set(accountId, client.sessionId);
     this.reassignLeader();
 
     // Chat: broadcast join event
@@ -343,9 +392,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         { player: pid(client.sessionId) },
         "Kicked session dropped — removing immediately",
       );
+      this.clearReconnectTimers(client.sessionId);
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
       this.aiSystem.removePlayer(client.sessionId);
+      this.chatSystem.removePlayer(client.sessionId);
       this.reassignLeader();
       return;
     }
@@ -398,6 +449,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
       this.aiSystem.removePlayer(client.sessionId);
+      this.removeAccountMapping(client);
       this.unregisterClient(client);
       this.reassignLeader();
     }
@@ -425,9 +477,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.combatSystem.removePlayer(client.sessionId);
     this.aiSystem.removePlayer(client.sessionId);
     this.chatSystem.removePlayer(client.sessionId);
+    this.removeAccountMapping(client);
     this.unregisterClient(client);
     this.reassignLeader();
     this.chatSystem.broadcastSystemI18n("chat.left", { name }, `${name} left the dungeon.`);
+  }
+
+  /** Remove the accountId→sessionId mapping (only if it still points to this session) */
+  private removeAccountMapping(client: Client): void {
+    const auth = client.auth as { accountId?: string } | undefined;
+    if (auth?.accountId && this.accountToSession.get(auth.accountId) === client.sessionId) {
+      this.accountToSession.delete(auth.accountId);
+    }
   }
 
   private clearReconnectTimers(sessionId: string): void {

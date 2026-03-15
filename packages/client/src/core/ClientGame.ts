@@ -154,7 +154,7 @@ export class ClientGame {
 
       // Try to reconnect using a saved token (e.g. after page reload)
       let room: Room;
-      const savedToken = sessionStorage.getItem("reconnectionToken");
+      const savedToken = localStorage.getItem("reconnectionToken");
       if (savedToken) {
         try {
           console.log("[Client] Attempting reconnection…");
@@ -162,15 +162,15 @@ export class ClientGame {
           console.log("[Client] Reconnected to room:", room.sessionId);
         } catch (err) {
           console.warn("[Client] Reconnection failed, joining new room:", err);
-          sessionStorage.removeItem("reconnectionToken");
+          localStorage.removeItem("reconnectionToken");
           room = await this.client.joinOrCreate("dungeon");
         }
       } else {
         room = await this.client.joinOrCreate("dungeon");
       }
 
-      // Persist reconnection token for future page reloads
-      sessionStorage.setItem("reconnectionToken", room.reconnectionToken);
+      // Persist reconnection token (localStorage survives tab close)
+      localStorage.setItem("reconnectionToken", room.reconnectionToken);
 
       this.room = room;
       adminStore.setRoom(room);
@@ -625,7 +625,7 @@ export class ClientGame {
     adminStore.clearRoom();
     clearChatSendFn();
     chatStore.reset();
-    sessionStorage.removeItem("reconnectionToken");
+    localStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("keydown", this.onKeyDown);

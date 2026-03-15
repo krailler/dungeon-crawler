@@ -108,7 +108,7 @@ export const authStore = {
   /** Kicked by server — force logout and show reason on login screen */
   kick(reason: string): void {
     localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem("reconnectionToken");
+    localStorage.removeItem("reconnectionToken");
     update({ isAuthenticated: false, characterName: null, role: null, error: reason });
   },
 
