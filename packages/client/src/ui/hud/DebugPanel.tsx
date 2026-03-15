@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { debugStore } from "../stores/debugStore";
 import type { DebugSnapshot } from "../stores/debugStore";
 import { adminStore } from "../stores/adminStore";
 import { authStore } from "../stores/authStore";
 import { minimapStore } from "../stores/minimapStore";
+import { HudButton } from "../components/HudButton";
 
 type ToggleEntry = {
   key: keyof DebugSnapshot;
@@ -31,30 +32,17 @@ export const DebugPanel = (): JSX.Element => {
   const isAdmin = auth.role === "admin";
   const toggleOpen = useCallback(() => setOpen((v) => !v), []);
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "d" || e.key === "D") {
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-        setOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
   return (
     <div className="pointer-events-auto absolute left-4 top-4 z-50 select-none">
-      <button
+      <HudButton
         onClick={toggleOpen}
-        className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-slate-900/90 px-3 py-1.5 text-xs font-semibold text-amber-400 backdrop-blur transition-colors hover:border-amber-400/50 hover:bg-slate-800/90"
-      >
-        <span>⚙</span>
-        <span>Debug</span>
-        <kbd className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-mono text-amber-400/60">
-          D
-        </kbd>
-        <span className="text-[10px] text-amber-400/60">{open ? "▲" : "▼"}</span>
-      </button>
+        isOpen={open}
+        variant="amber"
+        icon={<span>⚙</span>}
+        label="Debug"
+        shortcut="D"
+        suffix={<span className="text-[10px] text-amber-400/60">{open ? "▲" : "▼"}</span>}
+      />
 
       {open && (
         <div className="mt-1.5 rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2.5 backdrop-blur">

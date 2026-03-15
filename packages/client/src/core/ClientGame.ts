@@ -124,9 +124,6 @@ export class ClientGame {
 
     // Keyboard shortcuts
     this.onKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key === "m" || ev.key === "M") {
-        minimapStore.toggle();
-      }
       if (ev.key === "f" || ev.key === "F") {
         // Don't trigger if typing in an input
         if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement)
