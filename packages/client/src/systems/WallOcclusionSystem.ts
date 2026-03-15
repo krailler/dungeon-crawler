@@ -6,10 +6,12 @@ import type { Material } from "@babylonjs/core/Materials/material";
 import type { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 
 const OCCLUDE_RADIUS = 10;
+const OCCLUDE_RADIUS_SQ = OCCLUDE_RADIUS * OCCLUDE_RADIUS;
 const FADED_ALPHA = 0.12;
+/** Spatial grid cell size — matches occlusion radius for efficient 3×3 lookup */
+const GRID_CELL_SIZE = OCCLUDE_RADIUS;
 
 export class WallOcclusionSystem {
-  private wallMeshes: Mesh[];
   /** Original shared material + per-mesh faded clone */
   private decoMaterialCache: Map<AbstractMesh, { original: Material; faded: Material }> = new Map();
   /** Track which walls are currently faded */
@@ -17,6 +19,8 @@ export class WallOcclusionSystem {
   private camera: ArcRotateCamera;
   /** Map from wall cap → decoration root nodes (faded with wall) */
   private wallDecoMap: Map<Mesh, TransformNode[]>;
+  /** Spatial grid: cell key → walls in that cell */
+  private grid: Map<number, Mesh[]> = new Map();
 
   constructor(
     _scene: Scene,
@@ -25,8 +29,26 @@ export class WallOcclusionSystem {
     wallDecoMap: Map<Mesh, TransformNode[]>,
   ) {
     this.camera = camera;
-    this.wallMeshes = wallMeshes;
     this.wallDecoMap = wallDecoMap;
+
+    // Build spatial grid — walls never move so this is done once
+    for (const wall of wallMeshes) {
+      const key = this.cellKey(wall.position.x, wall.position.z);
+      let bucket = this.grid.get(key);
+      if (!bucket) {
+        bucket = [];
+        this.grid.set(key, bucket);
+      }
+      bucket.push(wall);
+    }
+  }
+
+  /** Compute grid cell key from world coordinates */
+  private cellKey(x: number, z: number): number {
+    const cx = Math.floor(x / GRID_CELL_SIZE);
+    const cz = Math.floor(z / GRID_CELL_SIZE);
+    // Use prime multiplier to reduce hash collisions
+    return cx * 10007 + cz;
   }
 
   update(playerX: number, playerZ: number): void {
@@ -39,39 +61,61 @@ export class WallOcclusionSystem {
     const normX = dirX / dirLen;
     const normZ = dirZ / dirLen;
 
-    for (const wall of this.wallMeshes) {
-      const wx = wall.position.x - playerX;
-      const wz = wall.position.z - playerZ;
-      const dist = Math.sqrt(wx * wx + wz * wz);
+    // Only check walls in the 3×3 grid cells around the player
+    const pcx = Math.floor(playerX / GRID_CELL_SIZE);
+    const pcz = Math.floor(playerZ / GRID_CELL_SIZE);
 
-      if (dist > OCCLUDE_RADIUS) {
-        this.restoreWall(wall);
-        continue;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const key = (pcx + dx) * 10007 + (pcz + dz);
+        const bucket = this.grid.get(key);
+        if (!bucket) continue;
+
+        for (const wall of bucket) {
+          const wx = wall.position.x - playerX;
+          const wz = wall.position.z - playerZ;
+          const distSq = wx * wx + wz * wz;
+
+          if (distSq > OCCLUDE_RADIUS_SQ) {
+            this.restoreWall(wall);
+            continue;
+          }
+
+          // Negative dot = wall is between camera and player
+          const dot = wx * normX + wz * normZ;
+
+          // Only fade walls whose exposed face points TOWARD the camera.
+          const meta = wall.metadata as {
+            floorN: boolean;
+            floorS: boolean;
+            floorW: boolean;
+            floorE: boolean;
+          } | null;
+
+          let facesCamera = true; // fallback: fade if no metadata
+          if (meta) {
+            facesCamera =
+              (meta.floorS && normZ > 0) || // south face blocks camera from -Z
+              (meta.floorN && normZ < 0) || // north face blocks camera from +Z
+              (meta.floorE && normX > 0) || // east face blocks camera from -X
+              (meta.floorW && normX < 0); // west face blocks camera from +X
+          }
+
+          if (dot < 0 && facesCamera) {
+            this.fadeWall(wall);
+          } else {
+            this.restoreWall(wall);
+          }
+        }
       }
+    }
 
-      // Negative dot = wall is between camera and player
-      const dot = wx * normX + wz * normZ;
-
-      // Only fade walls whose exposed face points TOWARD the camera.
-      const meta = wall.metadata as {
-        floorN: boolean;
-        floorS: boolean;
-        floorW: boolean;
-        floorE: boolean;
-      } | null;
-
-      let facesCamera = true; // fallback: fade if no metadata
-      if (meta) {
-        facesCamera =
-          (meta.floorS && normZ > 0) || // south face blocks camera from -Z
-          (meta.floorN && normZ < 0) || // north face blocks camera from +Z
-          (meta.floorE && normX > 0) || // east face blocks camera from -X
-          (meta.floorW && normX < 0); // west face blocks camera from +X
-      }
-
-      if (dot < 0 && facesCamera) {
-        this.fadeWall(wall);
-      } else {
+    // Restore any faded walls that are no longer in nearby grid cells
+    // (player moved away — these walls weren't visited in the loop above)
+    for (const wall of this.fadedWalls) {
+      const wcx = Math.floor(wall.position.x / GRID_CELL_SIZE);
+      const wcz = Math.floor(wall.position.z / GRID_CELL_SIZE);
+      if (Math.abs(wcx - pcx) > 1 || Math.abs(wcz - pcz) > 1) {
         this.restoreWall(wall);
       }
     }
