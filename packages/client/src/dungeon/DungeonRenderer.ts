@@ -1,9 +1,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { Material } from "@babylonjs/core/Materials/material";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -42,8 +40,8 @@ export class DungeonRenderer {
   /** Wall torch lights and particles */
   private torchLights: PointLight[] = [];
   private torchParticles: ParticleSystem[] = [];
-
-  private wallMaterial!: Material;
+  /** Shared particle texture for all torches (created once, reused) */
+  private fireTexture: Texture | null = null;
 
   private scene: Scene;
   private floorAssetLoader: FloorAssetLoader;
@@ -51,12 +49,6 @@ export class DungeonRenderer {
 
   constructor(scene: Scene) {
     this.scene = scene;
-
-    // Fallback wall material — replaced by PBR from GLBs after loadAssets()
-    const fallback = new StandardMaterial("wallMat_fallback", scene);
-    fallback.diffuseColor = Color3.FromHexString("#7a6a60");
-    fallback.specularColor = new Color3(0.05, 0.05, 0.05);
-    this.wallMaterial = fallback;
 
     this.floorAssetLoader = new FloorAssetLoader(scene);
     this.wallAssetLoader = new WallAssetLoader(scene);
@@ -72,12 +64,6 @@ export class DungeonRenderer {
       this.floorAssetLoader.loadTileSets(floorSetNames),
       this.wallAssetLoader.loadTileSets(wallSetNames),
     ]);
-
-    // Sample edge color from wall GLB textures → PBR material for wall cubes
-    const pbrMat = await this.wallAssetLoader.getWallCubeMaterial();
-    if (pbrMat) {
-      this.wallMaterial = pbrMat;
-    }
   }
 
   /**
@@ -166,6 +152,12 @@ export class DungeonRenderer {
       mesh.dispose();
     }
     this.wallMeshes = [];
+
+    // Dispose shared fire texture
+    if (this.fireTexture) {
+      this.fireTexture.dispose();
+      this.fireTexture = null;
+    }
   }
 
   private createFloorTileGLB(
@@ -372,11 +364,14 @@ export class DungeonRenderer {
     ps.createPointEmitter(new Vector3(-0.05, 0, -0.05), new Vector3(0.05, 0.3, 0.05));
     ps.emitter = new Vector3(px, torchY, pz);
 
-    // Use default particle texture (built-in)
-    ps.particleTexture = new Texture(
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAKNJREFUWEft1DEKwDAMA1D5/0enQ4eQIZClxKR0syT+NjapzN1i5v4tAD8HZG4ROU7MfBb4x8gRwMzswF0AhxVPAPpMAO4GACIAMA3knIDtACIA0ACsAmDrAEIA0ADMAqDLAGIA0ABMAaDrAOIA0ABMA6DrABIA0ABsA6DLAFIAnwB+f4qPfwB3d/3+q/nqrxDy/0KyD2j/HNj+M2S7A/0OAN8JbtwgkzFIRwAAAABJRU5ErkJggg==",
-      this.scene,
-    );
+    // Share a single particle texture across all torches
+    if (!this.fireTexture) {
+      this.fireTexture = new Texture(
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAKNJREFUWEft1DEKwDAMA1D5/0enQ4eQIZClxKR0syT+NjapzN1i5v4tAD8HZG4ROU7MfBb4x8gRwMzswF0AhxVPAPpMAO4GACIAMA3knIDtACIA0ACsAmDrAEIA0ADMAqDLAGIA0ABMAaDrAOIA0ABMA6DrABIA0ABsA6DLAFIAnwB+f4qPfwB3d/3+q/nqrxDy/0KyD2j/HNj+M2S7A/0OAN8JbtwgkzFIRwAAAABJRU5ErkJggg==",
+        this.scene,
+      );
+    }
+    ps.particleTexture = this.fireTexture;
 
     ps.minSize = 0.1;
     ps.maxSize = 0.25;

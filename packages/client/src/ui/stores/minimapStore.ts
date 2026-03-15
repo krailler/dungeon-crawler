@@ -17,6 +17,8 @@ let localSessionId: string = "";
 let visible = false;
 let version = 0;
 let dirty = false;
+let lastRevealTileX = -999;
+let lastRevealTileY = -999;
 
 let cachedSnapshot: MinimapSnapshot = { visible: false, version: 0 };
 
@@ -73,6 +75,10 @@ export const minimapStore = {
 
   revealAround(tileX: number, tileY: number, radius: number): void {
     if (!tileMap) return;
+    // Skip if player hasn't moved to a different tile
+    if (tileX === lastRevealTileX && tileY === lastRevealTileY) return;
+    lastRevealTileX = tileX;
+    lastRevealTileY = tileY;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         const tx = tileX + dx;
@@ -137,6 +143,8 @@ export const minimapStore = {
     localSessionId = "";
     visible = false;
     version = 0;
+    lastRevealTileX = -999;
+    lastRevealTileY = -999;
     rebuildSnapshot();
     emit();
   },

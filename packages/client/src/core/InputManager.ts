@@ -78,15 +78,16 @@ export class InputManager {
 
   private trySendMove(): void {
     if (this.isPointerOverUi()) return;
-    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-    if (pick && pick.hit && pick.pickedPoint && pick.pickedMesh) {
-      if (this.floorMeshSet.has(pick.pickedMesh)) {
-        this.room.send(MessageType.MOVE, {
-          x: pick.pickedPoint.x,
-          z: pick.pickedPoint.z,
-        });
-        this.lastSendTime = performance.now();
-      }
+    // Use predicate to only raycast against floor meshes (skip walls, enemies, etc.)
+    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
+      this.floorMeshSet.has(mesh),
+    );
+    if (pick && pick.hit && pick.pickedPoint) {
+      this.room.send(MessageType.MOVE, {
+        x: pick.pickedPoint.x,
+        z: pick.pickedPoint.z,
+      });
+      this.lastSendTime = performance.now();
     }
   }
 
