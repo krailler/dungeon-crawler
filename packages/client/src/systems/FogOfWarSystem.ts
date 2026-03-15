@@ -3,7 +3,13 @@ import { Effect } from "@babylonjs/core/Materials/effect";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
-import { FOG_INNER_RADIUS, FOG_OUTER_RADIUS } from "@dungeon/shared";
+import {
+  FOG_INNER_RADIUS,
+  FOG_OUTER_RADIUS,
+  FOG_SPAWN_INNER_RADIUS,
+  FOG_SPAWN_OUTER_RADIUS,
+  FOG_SPAWN_TRANSITION,
+} from "@dungeon/shared";
 
 // Side-effect: depth renderer support
 import "@babylonjs/core/Rendering/depthRendererSceneComponent";
@@ -69,6 +75,14 @@ export class FogOfWarSystem {
   private camera: Camera;
   private enabled: boolean = true;
 
+  /** Spawn world position — used to expand fog radii near spawn */
+  private spawnX: number = -9999;
+  private spawnZ: number = -9999;
+
+  /** Current interpolated fog radii (updated each frame) */
+  private currentInner: number = FOG_INNER_RADIUS;
+  private currentOuter: number = FOG_OUTER_RADIUS;
+
   // Pre-allocated temporaries to avoid per-frame allocations
   private tempMatrix: Matrix = Matrix.Identity();
   private tempPlayerPos: Vector3 = Vector3.Zero();
@@ -96,16 +110,31 @@ export class FogOfWarSystem {
 
       this.tempPlayerPos.set(this.playerX, 0, this.playerZ);
       effect.setVector3("playerPos", this.tempPlayerPos);
-      effect.setFloat("innerRadius", FOG_INNER_RADIUS);
-      effect.setFloat("outerRadius", FOG_OUTER_RADIUS);
+      effect.setFloat("innerRadius", this.currentInner);
+      effect.setFloat("outerRadius", this.currentOuter);
 
       effect.setTexture("depthSampler", depthRenderer.getDepthMap());
     };
   }
 
+  /** Set the spawn room center — call once after dungeon render */
+  setSpawnPosition(x: number, z: number): void {
+    this.spawnX = x;
+    this.spawnZ = z;
+  }
+
   update(playerX: number, playerZ: number): void {
     this.playerX = playerX;
     this.playerZ = playerZ;
+
+    // Lerp fog radii based on distance to spawn
+    const dx = playerX - this.spawnX;
+    const dz = playerZ - this.spawnZ;
+    const distToSpawn = Math.sqrt(dx * dx + dz * dz);
+    // t=0 at spawn, t=1 when FOG_SPAWN_TRANSITION away
+    const t = Math.min(1, distToSpawn / FOG_SPAWN_TRANSITION);
+    this.currentInner = FOG_SPAWN_INNER_RADIUS + (FOG_INNER_RADIUS - FOG_SPAWN_INNER_RADIUS) * t;
+    this.currentOuter = FOG_SPAWN_OUTER_RADIUS + (FOG_OUTER_RADIUS - FOG_SPAWN_OUTER_RADIUS) * t;
   }
 
   setEnabled(on: boolean): void {

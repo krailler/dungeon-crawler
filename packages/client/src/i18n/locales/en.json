@@ -24,7 +24,9 @@
     "roleLeader": "Leader",
     "roleMember": "Member",
     "waiting": "Waiting for adventurers...",
-    "promoteLeader": "Promote to Leader"
+    "promoteLeader": "Promote to Leader",
+    "dead": "Dead",
+    "offline": "Offline"
   },
   "connection": {
     "connecting": "Connecting...",

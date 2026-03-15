@@ -421,6 +421,12 @@ export class ClientGame {
             this.dungeonRenderer.getWallDecoMap(),
           );
 
+          // Tell fog of war where spawn is (expanded visibility near spawn)
+          const spawnPos = this.dungeonRenderer.getSpawnWorldPosition(tileMap);
+          if (spawnPos) {
+            this.fogOfWar.setSpawnPosition(spawnPos.x, spawnPos.z);
+          }
+
           // Enable shadow receiving on floor meshes
           for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
             mesh.receiveShadows = true;

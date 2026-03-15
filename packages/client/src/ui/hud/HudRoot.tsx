@@ -41,7 +41,8 @@ const PartyRow = ({
   const { t } = useTranslation();
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
-  const barClass = healthColor(pct);
+  const isDead = member.health <= 0;
+  const barClass = isDead ? "from-red-900/60 via-red-900/40 to-red-950/50" : healthColor(pct);
 
   return (
     <div
@@ -52,6 +53,7 @@ const PartyRow = ({
         "bg-[color:var(--ui-panel)] border-[color:var(--ui-panel-border)]",
         member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10",
         !member.online && "opacity-40",
+        isDead && "saturate-[0.3]",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -59,21 +61,37 @@ const PartyRow = ({
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-slate-100">{member.name}</span>
+            <span
+              className={`text-sm font-semibold ${isDead ? "text-slate-400 line-through" : "text-slate-100"}`}
+            >
+              {member.name}
+            </span>
             <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
               {t("character.level", { level: member.level })}
             </span>
+            {isDead && (
+              <span className="rounded bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                {t("party.dead")}
+              </span>
+            )}
+            {!member.online && (
+              <span className="rounded bg-slate-700/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {t("party.offline")}
+              </span>
+            )}
           </div>
           <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
             {member.isLeader ? t("party.roleLeader") : t("party.roleMember")}
           </span>
         </div>
-        <span className="font-mono text-[11px] text-slate-300">{formatHealth(member)}</span>
+        <span className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : "text-slate-300"}`}>
+          {formatHealth(member)}
+        </span>
       </div>
       <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">
         <div
           className={`h-full rounded-full bg-gradient-to-r ${barClass} transition-[width] duration-300`}
-          style={{ width: `${pct}%` }}
+          style={{ width: isDead ? "100%" : `${pct}%` }}
         />
       </div>
     </div>

@@ -19,6 +19,8 @@ import {
   WALL_TORCH_INTENSITY,
   WALL_TORCH_RANGE,
   WALL_TORCH_CHANCE,
+  SPAWN_LIGHT_INTENSITY,
+  SPAWN_LIGHT_RANGE,
   unpackSetId,
   unpackVariant,
   tileSetNameFromId,
@@ -46,6 +48,9 @@ export class DungeonRenderer {
 
   /** Gate meshes keyed by gate id */
   private gates: Map<string, { mesh: Mesh; tileX: number; tileY: number }> = new Map();
+
+  /** Spawn room ambient light */
+  private spawnLight: PointLight | null = null;
 
   private scene: Scene;
   private floorAssetLoader: FloorAssetLoader;
@@ -94,6 +99,10 @@ export class DungeonRenderer {
             if (setName) {
               this.createFloorTileGLB(worldX, worldZ, x, y, setName, variant);
             }
+          }
+          // Place ambient light at the spawn tile
+          if (tile === TileType.SPAWN) {
+            this.createSpawnLight(worldX, worldZ);
           }
         } else if (tile === TileType.WALL && map.isAdjacentToFloor(x, y)) {
           const wallPacked = wallVariants[y * map.width + x];
@@ -197,6 +206,12 @@ export class DungeonRenderer {
   }
 
   dispose(): void {
+    // Dispose spawn light
+    if (this.spawnLight) {
+      this.spawnLight.dispose();
+      this.spawnLight = null;
+    }
+
     // Dispose gate mesh
     for (const [, entry] of this.gates) {
       entry.mesh.dispose(false, true);
@@ -490,6 +505,20 @@ export class DungeonRenderer {
     }
 
     this.gates.set(gateId, { mesh: gate, tileX, tileY });
+  }
+
+  /** Warm ambient light at the spawn room center so players are clearly visible */
+  private createSpawnLight(worldX: number, worldZ: number): void {
+    const light = new PointLight(
+      "spawnLight",
+      new Vector3(worldX, WALL_HEIGHT * 0.85, worldZ),
+      this.scene,
+    );
+    light.intensity = SPAWN_LIGHT_INTENSITY;
+    light.range = SPAWN_LIGHT_RANGE;
+    light.diffuse = new Color3(1.0, 0.85, 0.6);
+    light.specular = new Color3(0.3, 0.25, 0.15);
+    this.spawnLight = light;
   }
 
   private createWallTorch(x: number, z: number, dir: { x: number; z: number }): void {
