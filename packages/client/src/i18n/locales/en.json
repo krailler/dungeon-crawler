@@ -62,7 +62,8 @@
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",
     "fps": "{{value}} FPS",
-    "fpsEmpty": "-- FPS"
+    "fpsEmpty": "-- FPS",
+    "map": "Map"
   },
   "chat": {
     "placeholder": "Type a message or /command...",

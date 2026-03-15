@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { PartyMember } from "../stores/hudStore";
 import { hudStore } from "../stores/hudStore";
 import { authStore } from "../stores/authStore";
+import { minimapStore } from "../stores/minimapStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
@@ -63,7 +64,17 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
   );
 };
 
-/** Character sheet toggle button (bottom-right) */
+/** Shared button style for bottom-right HUD buttons */
+const hudButtonClass = (isOpen: boolean): string =>
+  [
+    "pointer-events-auto flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg shadow-black/30",
+    "backdrop-blur-md transition-all",
+    isOpen
+      ? "border-sky-400/50 bg-sky-900/40 text-sky-300"
+      : "border-slate-500/30 bg-slate-900/60 text-slate-300 hover:border-slate-400/40 hover:text-slate-200",
+  ].join(" ");
+
+/** Character sheet toggle button */
 const CharacterButton = ({
   isOpen,
   onClick,
@@ -73,17 +84,7 @@ const CharacterButton = ({
 }): JSX.Element => {
   const { t } = useTranslation();
   return (
-    <button
-      onClick={onClick}
-      className={[
-        "pointer-events-auto flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg shadow-black/30",
-        "backdrop-blur-md transition-all",
-        isOpen
-          ? "border-sky-400/50 bg-sky-900/40 text-sky-300"
-          : "border-slate-500/30 bg-slate-900/60 text-slate-300 hover:border-slate-400/40 hover:text-slate-200",
-      ].join(" ")}
-    >
-      {/* Simple person icon */}
+    <button onClick={onClick} className={hudButtonClass(isOpen)}>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         className="h-4 w-4"
@@ -104,11 +105,39 @@ const CharacterButton = ({
   );
 };
 
+/** Minimap toggle button */
+const MapButton = ({ isOpen, onClick }: { isOpen: boolean; onClick: () => void }): JSX.Element => {
+  const { t } = useTranslation();
+  return (
+    <button onClick={onClick} className={hudButtonClass(isOpen)}>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM14 5.586v12.828l2.293 2.293A1 1 0 0018 20V10a1 1 0 00-.293-.707L14 5.586z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span className="uppercase tracking-wider">{t("hud.map")}</span>
+      <kbd className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+        M
+      </kbd>
+    </button>
+  );
+};
+
 export const HudRoot = (): JSX.Element => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
   const members = useMemo(() => snapshot.members, [snapshot.members]);
+  const minimapSnapshot = useSyncExternalStore(minimapStore.subscribe, minimapStore.getSnapshot);
+  const minimapVisible = minimapSnapshot.visible;
+  const toggleMinimap = useCallback(() => minimapStore.toggle(), []);
   const isAdmin = authSnapshot.role === "admin";
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
@@ -180,8 +209,9 @@ export const HudRoot = (): JSX.Element => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
-      {/* Character panel toggle — bottom right */}
-      <div className="absolute bottom-5 right-5">
+      {/* HUD buttons — bottom right */}
+      <div className="absolute bottom-5 right-5 flex items-center gap-2">
+        <MapButton isOpen={minimapVisible} onClick={toggleMinimap} />
         <CharacterButton isOpen={characterOpen} onClick={toggleCharacter} />
       </div>
     </div>
