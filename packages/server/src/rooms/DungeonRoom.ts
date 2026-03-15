@@ -61,6 +61,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tickCount: number = 0;
   /** Sessions kicked via /kick — skip reconnection in onDrop */
   private kickedSessions: Set<string> = new Set();
+  // Pre-allocated maps reused each tick to avoid GC pressure
+  private tickPlayersMap: Map<string, PlayerState> = new Map();
+  private tickEnemiesMap: Map<string, EnemyState> = new Map();
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
@@ -449,14 +452,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
 
     // AI system: enemies chase and attack players
-    const playersMap = new Map<string, PlayerState>();
+    this.tickPlayersMap.clear();
     this.state.players.forEach((player: PlayerState, sessionId: string) => {
-      playersMap.set(sessionId, player);
+      this.tickPlayersMap.set(sessionId, player);
     });
 
     this.aiSystem.update(
       dtSec,
-      playersMap,
+      this.tickPlayersMap,
       (sessionId, damage) => {
         const player = this.state.players.get(sessionId);
         if (!player) return;
@@ -487,12 +490,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     );
 
     // Combat system: player auto-attack
-    const enemiesMap = new Map<string, EnemyState>();
+    this.tickEnemiesMap.clear();
     this.state.enemies.forEach((enemy: EnemyState, id: string) => {
-      enemiesMap.set(id, enemy);
+      this.tickEnemiesMap.set(id, enemy);
     });
 
-    this.combatSystem.update(dtSec, playersMap, enemiesMap, (event) => {
+    this.combatSystem.update(dtSec, this.tickPlayersMap, this.tickEnemiesMap, (event) => {
       // Player hit generates threat on the enemy
       this.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
 

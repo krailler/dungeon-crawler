@@ -75,6 +75,8 @@ export class ClientGame {
   private onResize: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
+  // Pre-allocated map reused each frame for minimap enemy positions
+  private activeEnemiesMap: Map<string, { x: number; z: number }> = new Map();
 
   constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
     this.engine = new Engine(canvas, true, {
@@ -555,14 +557,14 @@ export class ClientGame {
     }
 
     // Minimap: update active enemy positions (moving or attacking only)
-    const activeEnemies = new Map<string, { x: number; z: number }>();
+    this.activeEnemiesMap.clear();
     for (const [id, enemy] of this.enemies) {
       if (enemy.isActive) {
         const ep = enemy.getWorldPosition();
-        activeEnemies.set(id, { x: ep.x, z: ep.z });
+        this.activeEnemiesMap.set(id, { x: ep.x, z: ep.z });
       }
     }
-    minimapStore.setActiveEnemies(activeEnemies);
+    minimapStore.setActiveEnemies(this.activeEnemiesMap);
 
     // Single batched emit per frame (only when minimap is visible)
     minimapStore.flush();

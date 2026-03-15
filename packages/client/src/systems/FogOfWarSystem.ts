@@ -1,6 +1,6 @@
 import { PostProcess } from "@babylonjs/core/PostProcesses/postProcess";
 import { Effect } from "@babylonjs/core/Materials/effect";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import { FOG_INNER_RADIUS, FOG_OUTER_RADIUS } from "@dungeon/shared";
@@ -69,6 +69,10 @@ export class FogOfWarSystem {
   private camera: Camera;
   private enabled: boolean = true;
 
+  // Pre-allocated temporaries to avoid per-frame allocations
+  private tempMatrix: Matrix = Matrix.Identity();
+  private tempPlayerPos: Vector3 = Vector3.Zero();
+
   constructor(scene: Scene, camera: Camera) {
     this.scene = scene;
     this.camera = camera;
@@ -87,9 +91,11 @@ export class FogOfWarSystem {
 
     this.postProcess.onApply = (effect) => {
       const vp = this.scene.getTransformMatrix();
-      effect.setMatrix("invViewProj", vp.clone().invert());
+      vp.invertToRef(this.tempMatrix);
+      effect.setMatrix("invViewProj", this.tempMatrix);
 
-      effect.setVector3("playerPos", new Vector3(this.playerX, 0, this.playerZ));
+      this.tempPlayerPos.set(this.playerX, 0, this.playerZ);
+      effect.setVector3("playerPos", this.tempPlayerPos);
       effect.setFloat("innerRadius", FOG_INNER_RADIUS);
       effect.setFloat("outerRadius", FOG_OUTER_RADIUS);
 

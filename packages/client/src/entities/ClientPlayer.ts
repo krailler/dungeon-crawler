@@ -318,7 +318,7 @@ export class ClientPlayer {
   }
 
   getWorldPosition(): Vector3 {
-    return this.mesh.position.clone();
+    return this.mesh.position;
   }
 
   dispose(): void {
