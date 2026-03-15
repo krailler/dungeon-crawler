@@ -14,6 +14,9 @@ export class InputManager {
   private isHolding: boolean = false;
   private lastSendTime: number = 0;
 
+  /** Last raycast hit point on the floor while holding (world coords) */
+  private cursorWorldPoint: { x: number; z: number } | null = null;
+
   // Bound handlers for cleanup
   private handlePointerDown: (ev: PointerEvent) => void;
   private handlePointerUp: (ev: PointerEvent) => void;
@@ -37,19 +40,23 @@ export class InputManager {
     this.handlePointerUp = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
       this.isHolding = false;
+      this.cursorWorldPoint = null;
     };
 
     this.handlePointerLeave = () => {
       this.isHolding = false;
+      this.cursorWorldPoint = null;
     };
 
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerup", this.handlePointerUp);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
 
-    // While holding, continuously send move toward cursor
+    // While holding, update cursor position each frame and throttle MOVE sends
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
       if (!this.isHolding) return;
+      // Always update cursor world position for smooth facing
+      this.updateCursorPosition();
       const now = performance.now();
       if (now - this.lastSendTime < HOLD_SEND_INTERVAL) return;
       this.trySendMove();
@@ -76,19 +83,36 @@ export class InputManager {
     return !!el && el !== this.canvas;
   }
 
-  private trySendMove(): void {
+  /** Update cursor world position from raycast (called every frame while holding). */
+  private updateCursorPosition(): void {
     if (this.isPointerOverUi()) return;
-    // Use predicate to only raycast against floor meshes (skip walls, enemies, etc.)
     const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
       this.floorMeshSet.has(mesh),
     );
     if (pick && pick.hit && pick.pickedPoint) {
+      this.cursorWorldPoint = { x: pick.pickedPoint.x, z: pick.pickedPoint.z };
+    }
+  }
+
+  private trySendMove(): void {
+    if (this.isPointerOverUi()) return;
+    // Reuse cursor position if already updated this frame
+    if (this.cursorWorldPoint) {
       this.room.send(MessageType.MOVE, {
-        x: pick.pickedPoint.x,
-        z: pick.pickedPoint.z,
+        x: this.cursorWorldPoint.x,
+        z: this.cursorWorldPoint.z,
       });
       this.lastSendTime = performance.now();
     }
+  }
+
+  /**
+   * Returns the world position the cursor is pointing at while holding click.
+   * Returns null when not holding or cursor is not over the floor.
+   */
+  getHoldTarget(): { x: number; z: number } | null {
+    if (!this.isHolding) return null;
+    return this.cursorWorldPoint;
   }
 
   dispose(): void {

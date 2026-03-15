@@ -525,8 +525,18 @@ export class ClientGame {
       enemy.update(dt);
     }
 
-    // Camera follows local player
+    // Local player faces cursor while holding click
     const localPlayer = this.players.get(this.localSessionId);
+    if (localPlayer && this.inputManager) {
+      const holdTarget = this.inputManager.getHoldTarget();
+      if (holdTarget) {
+        localPlayer.setFacingTarget(holdTarget.x, holdTarget.z);
+      } else {
+        localPlayer.clearFacingTarget();
+      }
+    }
+
+    // Camera follows local player
     if (localPlayer) {
       const pos = localPlayer.getWorldPosition();
 

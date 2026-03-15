@@ -76,6 +76,9 @@ export class ClientPlayer {
   private targetZ: number = 0;
   private targetRotY: number = 0;
 
+  /** Client-side facing override — player looks toward this point while holding click */
+  private facingTarget: { x: number; z: number } | null = null;
+
   constructor(
     scene: Scene,
     isLocal: boolean,
@@ -237,9 +240,20 @@ export class ClientPlayer {
     const dz = this.targetZ - this.mesh.position.z;
     this.mesh.position.x += dx * t;
     this.mesh.position.z += dz * t;
+
+    // Compute target rotation — face cursor while holding, or use server rotation
+    let desiredRotY: number;
+    if (this.facingTarget) {
+      const fx = this.facingTarget.x - this.mesh.position.x;
+      const fz = this.facingTarget.z - this.mesh.position.z;
+      // atan2(x, z) gives rotation in Babylon's Y-axis convention + PI offset
+      desiredRotY = Math.atan2(fx, fz) + Math.PI;
+    } else {
+      desiredRotY = this.targetRotY + Math.PI;
+    }
+
     // Smooth rotation — lerp via shortest arc
-    const targetRot = this.targetRotY + Math.PI;
-    let delta = targetRot - this.mesh.rotation.y;
+    let delta = desiredRotY - this.mesh.rotation.y;
     // Wrap to [-PI, PI] for shortest-path interpolation
     delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
     if (delta < -Math.PI) delta += 2 * Math.PI;
@@ -319,6 +333,16 @@ export class ClientPlayer {
 
   getWorldPosition(): Vector3 {
     return this.mesh.position;
+  }
+
+  /** Set a client-side facing target — player will look toward this point. */
+  setFacingTarget(x: number, z: number): void {
+    this.facingTarget = { x, z };
+  }
+
+  /** Clear the facing override — player resumes using server rotation. */
+  clearFacingTarget(): void {
+    this.facingTarget = null;
   }
 
   dispose(): void {
