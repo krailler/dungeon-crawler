@@ -90,6 +90,22 @@ export class ChatSystem {
     });
   }
 
+  /** Broadcast a center-screen announcement with i18n key. */
+  broadcastAnnouncement(
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+  ): void {
+    this.broadcast({
+      id: this.nextId++,
+      category: ChatCategory.ANNOUNCEMENT,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
+    });
+  }
+
   /** Send a message to a single client. */
   sendToClient(
     client: Client,

@@ -36,6 +36,7 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
   GATE_INTERACT_RANGE,
+  ChatCategory,
 } from "@dungeon/shared";
 import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
@@ -48,6 +49,7 @@ import {
 import { authStore } from "../ui/stores/authStore";
 import { chatStore } from "../ui/stores/chatStore";
 import { gateStore } from "../ui/stores/gateStore";
+import { announcementStore } from "../ui/stores/announcementStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -198,12 +200,18 @@ export class ClientGame {
       // Register all message listeners FIRST (before state listeners)
       // to ensure we don't miss messages sent during onJoin
 
-      // Chat messages from server
+      // Chat messages from server — route by category
       room.onMessage(MessageType.CHAT_ENTRY, (entry: ChatEntry) => {
+        // Announcements go to center-screen overlay, not chat panel
+        if (entry.category === ChatCategory.ANNOUNCEMENT) {
+          announcementStore.push(entry);
+          return;
+        }
+
         chatStore.addMessage(entry);
 
         // Show chat bubble above player's head for player messages
-        if (entry.category === "player" && entry.sender) {
+        if (entry.category === ChatCategory.PLAYER && entry.sender) {
           for (const [sessionId, clientPlayer] of this.players) {
             const member = hudStore.getSnapshot().members.find((m) => m.id === sessionId);
             if (member && member.name === entry.sender) {
@@ -328,10 +336,11 @@ export class ClientGame {
       minimapStore.setGatePosition(gx, value);
     });
 
-    // Listen for tileMap data (sent once on join)
-    state$.listen("tileMapData", (value: string) => {
-      if (!value) return;
-      const flat = JSON.parse(value) as number[];
+    // Listen for dungeon version (fires on join and every restart, even same-seed)
+    state$.listen("dungeonVersion", () => {
+      const tileMapData = (room.state as any).tileMapData as string;
+      if (!tileMapData) return;
+      const flat = JSON.parse(tileMapData) as number[];
       const width = (room.state as any).mapWidth;
       const height = (room.state as any).mapHeight;
       const tileMap = TileMap.fromSerialized(width, height, flat);
@@ -759,6 +768,7 @@ export class ClientGame {
     clearChatSendFn();
     chatStore.reset();
     gateStore.reset();
+    announcementStore.reset();
     localStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);

@@ -11,6 +11,7 @@ import { PauseMenu } from "./PauseMenu";
 import { CharacterPanel } from "./CharacterPanel";
 import { ChatPanel } from "./ChatPanel";
 import { GatePrompt } from "./GatePrompt";
+import { AnnouncementOverlay } from "./AnnouncementOverlay";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -210,6 +211,7 @@ export const HudRoot = (): JSX.Element => {
       {isAdmin && <DebugPanel />}
       <PauseMenu />
       <GatePrompt />
+      <AnnouncementOverlay />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">

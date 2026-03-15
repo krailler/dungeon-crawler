@@ -58,6 +58,8 @@ export interface CombatLogMessage {
 export const ChatCategory = {
   PLAYER: "player",
   MESSAGE: "message",
+  /** Center-screen announcement (countdown, boss alerts, etc.) */
+  ANNOUNCEMENT: "announcement",
 } as const;
 
 /** Optional variant for MESSAGE category to change color/label */

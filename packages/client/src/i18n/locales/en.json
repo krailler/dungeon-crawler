@@ -95,6 +95,10 @@
     "promptAccept": "Enter the Dungeon",
     "promptCancel": "Not Yet"
   },
+  "announce": {
+    "gateCountdownStart": "{{name}} is opening the gate... {{seconds}}",
+    "gateOpened": "The gate opens... The dungeon awaits!"
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",

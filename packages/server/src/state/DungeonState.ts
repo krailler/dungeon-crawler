@@ -11,6 +11,8 @@ export class DungeonState extends Schema {
   @type("uint16") mapWidth: number = 0;
   @type("uint16") mapHeight: number = 0;
   @type("uint32") dungeonSeed: number = 0;
+  /** Incremented on each dungeon regeneration to force client re-render */
+  @type("uint32") dungeonVersion: number = 0;
   @type("float32") tickRate: number = 0;
   @type("boolean") gateOpen: boolean = false;
   @type("int16") gateX: number = -1;
