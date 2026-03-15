@@ -3,7 +3,6 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
@@ -13,8 +12,8 @@ import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
+import { AnimationController } from "./AnimationController";
 import type { SoundManager } from "../audio/SoundManager";
-import { ATTACK_ANIM_DURATION } from "@dungeon/shared";
 
 /** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
 const LERP_FACTOR = 12;
@@ -22,12 +21,6 @@ const HIT_FLASH_DURATION = 0.12;
 
 /** Distance threshold to consider the enemy "moving" */
 const MOVE_THRESHOLD = 0.05;
-
-/** Delay before playing attack sound (at punch peak) */
-const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
-
-/** Duration of crossfade between animations (seconds) */
-const CROSSFADE_DURATION = 0.1;
 
 export class ClientEnemy {
   /** Invisible anchor mesh used for positioning */
@@ -38,14 +31,7 @@ export class ClientEnemy {
   public modelMeshes: AbstractMesh[] = [];
   public isDead: boolean = false;
 
-  private animations: Map<AnimName, AnimationGroup> = new Map();
-  private currentAnim: AnimName | null = null;
-  private previousAnim: AnimName | null = null;
-  private crossfadeTimer: number = 0;
-  private isPlayingOneShot: boolean = false;
-  private soundManager: SoundManager | null = null;
-  private pendingSoundName: string | null = null;
-  private pendingSoundTimer: number = 0;
+  private animController: AnimationController;
 
   // Target state from server
   private targetX: number = 0;
@@ -72,9 +58,7 @@ export class ClientEnemy {
     guiTexture: AdvancedDynamicTexture,
     soundManager?: SoundManager,
   ) {
-    if (soundManager) {
-      this.soundManager = soundManager;
-    }
+    this.animController = new AnimationController(soundManager ?? null);
     this.previousHealth = initialHealth;
 
     // Invisible anchor for position/rotation
@@ -139,7 +123,7 @@ export class ClientEnemy {
   attachModel(instance: CharacterInstance): void {
     this.modelRoot = instance.root;
     this.modelMeshes = instance.meshes;
-    this.animations = instance.animations;
+    this.animController.setAnimations(instance.animations);
 
     // Parent to our invisible anchor and scale
     this.modelRoot.parent = this.mesh;
@@ -158,67 +142,7 @@ export class ClientEnemy {
     }
 
     // Start idle animation
-    this.playAnimation("idle");
-  }
-
-  private playAnimation(name: AnimName): void {
-    if (this.currentAnim === name) return;
-
-    const next = this.animations.get(name);
-    if (!next) return;
-
-    if (this.currentAnim) {
-      this.previousAnim = this.currentAnim;
-    }
-
-    next.setWeightForAllAnimatables(0);
-    next.start(true);
-    this.currentAnim = name;
-    this.crossfadeTimer = CROSSFADE_DURATION;
-  }
-
-  private updateCrossfade(dt: number): void {
-    if (this.crossfadeTimer <= 0) return;
-
-    this.crossfadeTimer -= dt;
-    const t = Math.max(0, this.crossfadeTimer / CROSSFADE_DURATION);
-
-    const current = this.currentAnim ? this.animations.get(this.currentAnim) : null;
-    const previous = this.previousAnim ? this.animations.get(this.previousAnim) : null;
-
-    if (current) current.setWeightForAllAnimatables(1 - t);
-    if (previous) previous.setWeightForAllAnimatables(t);
-
-    if (this.crossfadeTimer <= 0) {
-      if (previous) {
-        previous.stop();
-        previous.setWeightForAllAnimatables(1);
-      }
-      if (current) current.setWeightForAllAnimatables(1);
-      this.previousAnim = null;
-    }
-  }
-
-  private playOneShot(name: AnimName): void {
-    if (this.isPlayingOneShot) return;
-
-    if (this.currentAnim) {
-      const current = this.animations.get(this.currentAnim);
-      current?.stop();
-    }
-
-    const anim = this.animations.get(name);
-    if (anim) {
-      this.isPlayingOneShot = true;
-      anim.start(false);
-      // Schedule sound at animation peak (midpoint)
-      this.pendingSoundName = name;
-      this.pendingSoundTimer = ATTACK_SOUND_DELAY;
-      anim.onAnimationGroupEndObservable.addOnce(() => {
-        this.isPlayingOneShot = false;
-        this.currentAnim = null;
-      });
-    }
+    this.animController.startIdle();
   }
 
   /** Set enemy level (updates label) */
@@ -248,17 +172,15 @@ export class ClientEnemy {
     this.updateHealthBar(health, maxHealth);
 
     // Trigger one-shot animation if server says so
-    if (animState && !this.isPlayingOneShot && !isDead) {
-      this.playOneShot(animState as AnimName);
+    if (animState && !this.animController.isOneShotPlaying && !isDead) {
+      this.animController.playOneShot(animState as AnimName);
     }
 
     if (isDead && !this.isDead) {
       this.isDead = true;
       this.healthBarContainer.dispose();
       this.barAnchor.dispose();
-      for (const [, anim] of this.animations) {
-        anim.dispose();
-      }
+      this.animController.dispose();
       this.modelRoot?.dispose(false, false);
       this.mesh.dispose();
     }
@@ -269,7 +191,7 @@ export class ClientEnemy {
     if (this.isDead) return false;
     const dx = this.targetX - this.mesh.position.x;
     const dz = this.targetZ - this.mesh.position.z;
-    return Math.sqrt(dx * dx + dz * dz) > MOVE_THRESHOLD || this.isPlayingOneShot;
+    return Math.sqrt(dx * dx + dz * dz) > MOVE_THRESHOLD || this.animController.isOneShotPlaying;
   }
 
   getWorldPosition(): Vector3 {
@@ -288,17 +210,8 @@ export class ClientEnemy {
   update(dt: number): void {
     if (this.isDead) return;
 
-    // Update animation crossfade blending
-    this.updateCrossfade(dt);
-
-    // Tick pending attack sound timer
-    if (this.pendingSoundTimer > 0) {
-      this.pendingSoundTimer -= dt;
-      if (this.pendingSoundTimer <= 0 && this.pendingSoundName) {
-        this.soundManager?.playAnimSound(this.pendingSoundName);
-        this.pendingSoundName = null;
-      }
-    }
+    // Update animation system (crossfade + sound timing)
+    this.animController.update(dt);
 
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
     const dx = this.targetX - this.mesh.position.x;
@@ -314,12 +227,12 @@ export class ClientEnemy {
     this.mesh.rotation.y += delta * (1 - Math.exp(-LERP_FACTOR * dt));
 
     // Switch animation based on movement (only if not playing one-shot)
-    if (!this.isPlayingOneShot) {
+    if (!this.animController.isOneShotPlaying) {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
-        this.playAnimation("run");
+        this.animController.playLoop("run");
       } else {
-        this.playAnimation("idle");
+        this.animController.playLoop("idle");
       }
     }
 
@@ -364,9 +277,7 @@ export class ClientEnemy {
     this.healthBarContainer.dispose();
     this.barAnchor.dispose();
     if (!this.isDead) {
-      for (const [, anim] of this.animations) {
-        anim.dispose();
-      }
+      this.animController.dispose();
       this.modelRoot?.dispose(false, false);
       this.mesh.dispose();
     }

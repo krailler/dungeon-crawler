@@ -6,15 +6,16 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { AnimName } from "./CharacterAssetLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE, ATTACK_ANIM_DURATION } from "@dungeon/shared";
+import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
-import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
+import type { CharacterInstance } from "./CharacterAssetLoader";
+import { AnimationController } from "./AnimationController";
 import type { SoundManager } from "../audio/SoundManager";
 
 // Side-effect: shadow map support
@@ -31,12 +32,6 @@ const MOVE_THRESHOLD = 0.05;
 
 /** Interval between footstep sounds while running (seconds) */
 const FOOTSTEP_INTERVAL = 0.32;
-
-/** Duration of crossfade between animations (seconds) */
-const CROSSFADE_DURATION = 0.1;
-
-/** Delay before playing attack sound (at punch peak) */
-const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
 
 /** How long the chat bubble stays fully visible (seconds) */
 const BUBBLE_DURATION = 5;
@@ -58,17 +53,9 @@ export class ClientPlayer {
   public torchLight: SpotLight | null = null;
   public shadowGenerator: ShadowGenerator | null = null;
 
-  private animations: Map<AnimName, AnimationGroup> = new Map();
-  private currentAnim: AnimName | null = null;
-  private previousAnim: AnimName | null = null;
-  private crossfadeTimer: number = 0;
-  private isPlayingOneShot: boolean = false;
-
-  // Audio
+  private animController: AnimationController;
   private soundManager: SoundManager | null = null;
   private footstepTimer: number = 0;
-  private pendingSoundName: string | null = null;
-  private pendingSoundTimer: number = 0;
 
   // 3D anchor nodes for GUI elements (world-space, resolution-independent)
   private nameAnchor: TransformNode | null = null;
@@ -152,6 +139,7 @@ export class ClientPlayer {
       this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     }
 
+    this.animController = new AnimationController(soundManager ?? null);
     if (soundManager) {
       this.soundManager = soundManager;
     }
@@ -161,7 +149,7 @@ export class ClientPlayer {
   attachModel(instance: CharacterInstance): void {
     this.modelRoot = instance.root;
     this.modelMeshes = instance.meshes;
-    this.animations = instance.animations;
+    this.animController.setAnimations(instance.animations);
 
     // Parent to our invisible anchor and scale to fit dungeon proportions
     this.modelRoot.parent = this.mesh;
@@ -186,72 +174,7 @@ export class ClientPlayer {
     }
 
     // Start idle animation
-    this.playAnimation("idle");
-  }
-
-  private playAnimation(name: AnimName): void {
-    if (this.currentAnim === name) return;
-
-    const next = this.animations.get(name);
-    if (!next) return;
-
-    // Start crossfade: previous anim fades out, new anim fades in
-    if (this.currentAnim) {
-      this.previousAnim = this.currentAnim;
-    }
-
-    next.setWeightForAllAnimatables(0);
-    next.start(true); // loop
-    this.currentAnim = name;
-    this.crossfadeTimer = CROSSFADE_DURATION;
-  }
-
-  private updateCrossfade(dt: number): void {
-    if (this.crossfadeTimer <= 0) return;
-
-    this.crossfadeTimer -= dt;
-    const t = Math.max(0, this.crossfadeTimer / CROSSFADE_DURATION);
-    const inWeight = 1 - t;
-    const outWeight = t;
-
-    const current = this.currentAnim ? this.animations.get(this.currentAnim) : null;
-    const previous = this.previousAnim ? this.animations.get(this.previousAnim) : null;
-
-    if (current) current.setWeightForAllAnimatables(inWeight);
-    if (previous) previous.setWeightForAllAnimatables(outWeight);
-
-    // Crossfade complete — stop the old animation
-    if (this.crossfadeTimer <= 0) {
-      if (previous) {
-        previous.stop();
-        previous.setWeightForAllAnimatables(1);
-      }
-      if (current) current.setWeightForAllAnimatables(1);
-      this.previousAnim = null;
-    }
-  }
-
-  private playOneShot(name: AnimName): void {
-    if (this.isPlayingOneShot) return;
-
-    // Stop current looping animation
-    if (this.currentAnim) {
-      const current = this.animations.get(this.currentAnim);
-      current?.stop();
-    }
-
-    const anim = this.animations.get(name);
-    if (anim) {
-      this.isPlayingOneShot = true;
-      anim.start(false); // no loop
-      // Schedule sound at animation peak (midpoint)
-      this.pendingSoundName = name;
-      this.pendingSoundTimer = ATTACK_SOUND_DELAY;
-      anim.onAnimationGroupEndObservable.addOnce(() => {
-        this.isPlayingOneShot = false;
-        this.currentAnim = null; // force re-evaluation in update()
-      });
-    }
+    this.animController.startIdle();
   }
 
   /** Called when server state changes */
@@ -261,8 +184,8 @@ export class ClientPlayer {
     this.targetRotY = rotY;
 
     // Trigger one-shot animation if server says so
-    if (animState && !this.isPlayingOneShot) {
-      this.playOneShot(animState as AnimName);
+    if (animState && !this.animController.isOneShotPlaying) {
+      this.animController.playOneShot(animState as AnimName);
     }
   }
 
@@ -276,17 +199,8 @@ export class ClientPlayer {
 
   /** Interpolate toward server state each frame */
   update(dt: number): void {
-    // Update animation crossfade blending
-    this.updateCrossfade(dt);
-
-    // Tick pending attack sound timer
-    if (this.pendingSoundTimer > 0) {
-      this.pendingSoundTimer -= dt;
-      if (this.pendingSoundTimer <= 0 && this.pendingSoundName) {
-        this.soundManager?.playAnimSound(this.pendingSoundName);
-        this.pendingSoundName = null;
-      }
-    }
+    // Update animation system (crossfade + sound timing)
+    this.animController.update(dt);
 
     // Tick chat bubble timer
     if (this.bubbleTimer > 0 && this.bubbleContainer) {
@@ -324,10 +238,10 @@ export class ClientPlayer {
     this.mesh.rotation.y += delta * (1 - Math.exp(-ROT_LERP_FACTOR * dt));
 
     // Switch animation based on movement (only if not playing one-shot)
-    if (!this.isPlayingOneShot) {
+    if (!this.animController.isOneShotPlaying) {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
-        this.playAnimation("run");
+        this.animController.playLoop("run");
 
         // Footstep sound at regular intervals (local player only)
         if (this.soundManager) {
@@ -338,7 +252,7 @@ export class ClientPlayer {
           }
         }
       } else {
-        this.playAnimation("idle");
+        this.animController.playLoop("idle");
         this.footstepTimer = 0;
       }
     }
@@ -409,9 +323,7 @@ export class ClientPlayer {
   }
 
   dispose(): void {
-    for (const [, anim] of this.animations) {
-      anim.dispose();
-    }
+    this.animController.dispose();
     if (this.nameLabel) {
       this.guiTexture?.removeControl(this.nameLabel);
       this.nameLabel.dispose();
