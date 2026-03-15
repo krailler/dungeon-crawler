@@ -1,8 +1,10 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { SpotLight } from "@babylonjs/core/Lights/spotLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -42,6 +44,9 @@ const BUBBLE_FADE = 1;
 /** Max width of the bubble in pixels */
 const BUBBLE_MAX_WIDTH = 220;
 
+/** Duration of the level-up particle effect (seconds) */
+const LEVEL_UP_DURATION = 2.5;
+
 export class ClientPlayer {
   /** Invisible anchor mesh used for positioning and torch parenting */
   public mesh: Mesh;
@@ -53,6 +58,7 @@ export class ClientPlayer {
   public torchLight: SpotLight | null = null;
   public shadowGenerator: ShadowGenerator | null = null;
 
+  private scene: Scene;
   private animController: AnimationController;
   private soundManager: SoundManager | null = null;
   private footstepTimer: number = 0;
@@ -87,6 +93,7 @@ export class ClientPlayer {
     soundManager?: SoundManager,
   ) {
     this.isLocal = isLocal;
+    this.scene = scene;
     this.guiTexture = guiTexture;
 
     // Invisible anchor for position/rotation
@@ -320,6 +327,60 @@ export class ClientPlayer {
   /** Clear the facing override — player resumes using server rotation. */
   clearFacingTarget(): void {
     this.facingTarget = null;
+  }
+
+  /** Play a golden aura particle effect around the character (level-up). */
+  playLevelUpEffect(): void {
+    const ps = new ParticleSystem(`levelUp_${this.mesh.name}`, 200, this.scene);
+
+    // Use default particle texture (white circle)
+    ps.particleTexture = new Texture("/textures/flare.png", this.scene);
+
+    // Emit from a cylinder around the player
+    ps.emitter = this.mesh;
+    ps.minEmitBox = new Vector3(-0.5, 0, -0.5);
+    ps.maxEmitBox = new Vector3(0.5, 0, 0.5);
+
+    // Particles rise upward
+    ps.direction1 = new Vector3(-0.3, 3, -0.3);
+    ps.direction2 = new Vector3(0.3, 5, 0.3);
+    ps.gravity = new Vector3(0, -0.5, 0);
+
+    // Golden color gradient: bright gold → amber → fade out
+    ps.color1 = new Color4(1.0, 0.85, 0.2, 1.0);
+    ps.color2 = new Color4(1.0, 0.7, 0.1, 1.0);
+    ps.colorDead = new Color4(1.0, 0.5, 0.0, 0.0);
+
+    // Size
+    ps.minSize = 0.05;
+    ps.maxSize = 0.15;
+
+    // Lifetime
+    ps.minLifeTime = 0.6;
+    ps.maxLifeTime = 1.2;
+
+    // Emit rate — burst of particles
+    ps.emitRate = 120;
+
+    // Speed
+    ps.minEmitPower = 1;
+    ps.maxEmitPower = 2.5;
+
+    // Blend mode for glow effect
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+
+    ps.start();
+
+    // Stop emitting after a short burst, then dispose after particles die
+    setTimeout(() => {
+      ps.stop();
+    }, LEVEL_UP_DURATION * 1000);
+    setTimeout(
+      () => {
+        ps.dispose();
+      },
+      (LEVEL_UP_DURATION + 1.5) * 1000,
+    );
   }
 
   dispose(): void {

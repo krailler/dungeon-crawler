@@ -271,7 +271,7 @@ export class StateSync {
         stats: localStats,
       });
 
-      // Track gold and level for local player to detect increases
+      // Track gold and level to detect increases
       let prevGold = player.gold as number;
       let prevLevel = player.level as number;
 
@@ -285,9 +285,12 @@ export class StateSync {
         }
         prevGold = player.gold;
 
-        // Play level-up sound when local player levels up
-        if (isLocal && player.level > prevLevel) {
-          this.deps.soundManager.playSfx("level_up");
+        // Level-up: sound (local only) + particle aura (all players)
+        if (player.level > prevLevel) {
+          if (isLocal) {
+            this.deps.soundManager.playSfx("level_up");
+          }
+          clientPlayer.playLevelUpEffect();
         }
         prevLevel = player.level;
 
