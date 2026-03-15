@@ -62,5 +62,19 @@
     "pingEmpty": "-- ms",
     "fps": "{{value}} FPS",
     "fpsEmpty": "-- FPS"
+  },
+  "chat": {
+    "placeholder": "Type a message or /command...",
+    "hintOpen": "Press Enter to chat",
+    "joined": "{{name}} joined the dungeon.",
+    "left": "{{name}} left the dungeon.",
+    "disconnected": "{{name}} disconnected.",
+    "reconnected": "{{name}} reconnected.",
+    "slain": "{{name}} has been slain!",
+    "dungeonReshape": "The dungeon reshapes itself...",
+    "rateLimited": "You are sending messages too fast.",
+    "messageTooLong": "Message too long (max {{max}} characters).",
+    "unknownCommand": "Unknown command: /{{name}}",
+    "adminRequired": "This command requires admin privileges."
   }
 }

@@ -37,10 +37,23 @@ export {
   FOG_INNER_RADIUS,
   FOG_OUTER_RADIUS,
   MINIMAP_DISCOVERY_RADIUS,
+  CHAT_MAX_LENGTH,
+  CHAT_MAX_HISTORY,
+  CHAT_FADE_MS,
+  CHAT_RATE_LIMIT_BURST,
+  CHAT_RATE_LIMIT_WINDOW,
 } from "./Constants.js";
 
-export { MessageType, CloseCode } from "./protocol.js";
-export type { MoveMessage, AdminRestartMessage, CombatLogMessage } from "./protocol.js";
+export { MessageType, CloseCode, ChatCategory } from "./protocol.js";
+export type {
+  MoveMessage,
+  AdminRestartMessage,
+  CombatLogMessage,
+  ChatSendPayload,
+  ChatEntry,
+  ChatCategoryValue,
+  CommandInfo,
+} from "./protocol.js";
 
 export {
   generateFloorVariants,

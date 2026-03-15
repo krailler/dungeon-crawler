@@ -1,8 +1,11 @@
-/** Client → Server message types */
+/** Message types for client ↔ server communication */
 export const MessageType = {
   MOVE: "move",
   ADMIN_RESTART: "admin:restart",
   COMBAT_LOG: "combat:log",
+  CHAT_SEND: "chat:send",
+  CHAT_ENTRY: "chat:entry",
+  CHAT_COMMANDS: "chat:commands",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -43,4 +46,39 @@ export interface CombatLogMessage {
   maxHp: number;
   /** Target died from this hit */
   kill: boolean;
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+/** Chat message categories for visual formatting */
+export const ChatCategory = {
+  PLAYER: "player",
+  SYSTEM: "system",
+  COMMAND: "command",
+  ERROR: "error",
+} as const;
+
+export type ChatCategoryValue = (typeof ChatCategory)[keyof typeof ChatCategory];
+
+/** Client → Server: player sends chat text or slash command */
+export interface ChatSendPayload {
+  text: string;
+}
+
+/** Server → Client: a formatted chat entry to display */
+export interface ChatEntry {
+  id: number;
+  category: ChatCategoryValue;
+  timestamp: number;
+  sender?: string;
+  senderRole?: string;
+  text: string;
+}
+
+/** Command info sent to client on join for help overlay */
+export interface CommandInfo {
+  name: string;
+  usage: string;
+  description: string;
+  adminOnly: boolean;
 }

@@ -7,6 +7,7 @@ import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
 import { CharacterPanel } from "./CharacterPanel";
+import { ChatPanel } from "./ChatPanel";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -177,6 +178,8 @@ export const HudRoot = (): JSX.Element => {
           {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
         </div>
       </div>
+      {/* Chat panel — bottom left */}
+      <ChatPanel />
       {/* Character panel toggle — bottom right */}
       <div className="absolute bottom-5 right-5">
         <CharacterButton isOpen={characterOpen} onClick={toggleCharacter} />

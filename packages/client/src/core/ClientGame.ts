@@ -34,7 +34,7 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
 } from "@dungeon/shared";
-import type { CombatLogMessage } from "@dungeon/shared";
+import type { CombatLogMessage, ChatEntry, CommandInfo } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
   loadingStore,
@@ -43,6 +43,8 @@ import {
   disposeLoading,
 } from "../ui/stores/loadingStore";
 import { authStore } from "../ui/stores/authStore";
+import { chatStore } from "../ui/stores/chatStore";
+import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
 export class ClientGame {
@@ -171,6 +173,43 @@ export class ClientGame {
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
+      // Register all message listeners FIRST (before state listeners)
+      // to ensure we don't miss messages sent during onJoin
+
+      // Chat messages from server
+      room.onMessage(MessageType.CHAT_ENTRY, (entry: ChatEntry) => {
+        chatStore.addMessage(entry);
+      });
+
+      // Chat commands list from server
+      room.onMessage(MessageType.CHAT_COMMANDS, (cmds: CommandInfo[]) => {
+        chatStore.setCommands(cmds);
+      });
+
+      // Request command list now that listener is ready
+      room.send(MessageType.CHAT_COMMANDS);
+
+      // Wire send function so ChatPanel can send messages
+      setChatSendFn((text: string) => {
+        room.send(MessageType.CHAT_SEND, { text });
+      });
+
+      // Combat log — admin-only messages, logged when debug toggle is on
+      room.onMessage(MessageType.COMBAT_LOG, (msg: CombatLogMessage) => {
+        if (!debugStore.getSnapshot().combatLog) return;
+        const arrow = msg.dir === "p2e" ? "⚔️→" : "💀→";
+        const hpBar = `${msg.hp}/${msg.maxHp} HP`;
+        const killTag = msg.kill ? " 💀 KILL" : "";
+        console.log(
+          `%c[Combat] ${arrow} ${msg.src} hit ${msg.tgt} for ${msg.dmg} dmg (${msg.atk} atk - ${msg.def} def) → ${hpBar}${killTag}`,
+          msg.kill
+            ? "color: #f87171; font-weight: bold"
+            : msg.dir === "p2e"
+              ? "color: #60a5fa"
+              : "color: #fbbf24",
+        );
+      });
+
       hudStore.setConnection(
         "connected",
         t("connection.info", {
@@ -211,22 +250,6 @@ export class ClientGame {
         } else {
           hudStore.setConnection("error", t("connection.lost"));
         }
-      });
-
-      // Combat log — admin-only messages, logged when debug toggle is on
-      room.onMessage(MessageType.COMBAT_LOG, (msg: CombatLogMessage) => {
-        if (!debugStore.getSnapshot().combatLog) return;
-        const arrow = msg.dir === "p2e" ? "⚔️→" : "💀→";
-        const hpBar = `${msg.hp}/${msg.maxHp} HP`;
-        const killTag = msg.kill ? " 💀 KILL" : "";
-        console.log(
-          `%c[Combat] ${arrow} ${msg.src} hit ${msg.tgt} for ${msg.dmg} dmg (${msg.atk} atk - ${msg.def} def) → ${hpBar}${killTag}`,
-          msg.kill
-            ? "color: #f87171; font-weight: bold"
-            : msg.dir === "p2e"
-              ? "color: #60a5fa"
-              : "color: #fbbf24",
-        );
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -562,6 +585,8 @@ export class ClientGame {
 
   dispose(): void {
     adminStore.clearRoom();
+    clearChatSendFn();
+    chatStore.reset();
     sessionStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);

@@ -13,6 +13,9 @@ import type { Room as DungeonRoomDef } from "../dungeon/DungeonGenerator";
 import { Pathfinder } from "../navigation/Pathfinder";
 import { AISystem } from "../systems/AISystem";
 import { CombatSystem } from "../systems/CombatSystem";
+import { ChatSystem } from "../chat/ChatSystem";
+import type { ChatRoomBridge } from "../chat/ChatSystem";
+import { registerCommands } from "../chat/commands";
 import {
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
@@ -28,7 +31,12 @@ import {
   ENEMY_TYPES,
   computeEnemyDerivedStats,
 } from "@dungeon/shared";
-import type { MoveMessage, AdminRestartMessage, CombatLogMessage } from "@dungeon/shared";
+import type {
+  MoveMessage,
+  AdminRestartMessage,
+  CombatLogMessage,
+  ChatSendPayload,
+} from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 import {
   registerSession,
@@ -45,6 +53,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
   private aiSystem!: AISystem;
   private combatSystem!: CombatSystem;
+  private chatSystem!: ChatSystem;
   private tileMap!: TileMap;
   private log!: Logger;
   private lastTickTime: number = 0;
@@ -62,9 +71,46 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const seed = DUNGEON_SEED ?? Date.now();
     this.generateDungeon(seed);
 
+    // Setup chat system
+    const chatBridge: ChatRoomBridge = {
+      getClients: () => this.clients,
+      getPlayer: (sid) => this.state.players.get(sid),
+      getPlayerRole: (c) => (c.auth as { role: string })?.role ?? "user",
+      getPlayerName: (c) => {
+        const p = this.state.players.get(c.sessionId);
+        return p?.characterName || c.sessionId.slice(0, 6);
+      },
+      findPlayerByName: (name) => {
+        const lower = name.toLowerCase();
+        let result: { sessionId: string; player: PlayerState } | null = null;
+        this.state.players.forEach((p: PlayerState, sid: string) => {
+          if (p.characterName.toLowerCase() === lower) {
+            result = { sessionId: sid, player: p };
+          }
+        });
+        return result;
+      },
+      getAllPlayers: () => {
+        const map = new Map<string, PlayerState>();
+        this.state.players.forEach((p: PlayerState, sid: string) => map.set(sid, p));
+        return map;
+      },
+    };
+    this.chatSystem = new ChatSystem(chatBridge);
+    registerCommands(this.chatSystem, chatBridge);
+
     // Register message handlers
     this.onMessage(MessageType.MOVE, this.handleMove.bind(this));
     this.onMessage(MessageType.ADMIN_RESTART, this.handleAdminRestart.bind(this));
+    this.onMessage(MessageType.CHAT_SEND, (client: Client, data: ChatSendPayload) => {
+      this.chatSystem.handleMessage(client, data.text);
+    });
+    // Client requests command list after setting up listeners
+    this.onMessage(MessageType.CHAT_COMMANDS, (client: Client) => {
+      const role = (client.auth as { role: string })?.role ?? "user";
+      const commands = this.chatSystem.getCommandsForRole(role);
+      client.send(MessageType.CHAT_COMMANDS, commands);
+    });
 
     // Game loop
     this.setSimulationInterval(this.update.bind(this), TICK_RATE);
@@ -138,6 +184,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.players.forEach((_player: PlayerState, sessionId: string) => {
       this.combatSystem.registerPlayer(sessionId);
     });
+
+    this.chatSystem.broadcastSystem("The dungeon reshapes itself...");
   }
 
   async onAuth(
@@ -244,6 +292,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.players.set(client.sessionId, player);
     this.combatSystem.registerPlayer(client.sessionId);
     this.reassignLeader();
+
+    // Chat: broadcast join event
+    this.chatSystem.broadcastSystem(`${characterName} joined the dungeon.`);
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -271,6 +322,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.online = false;
       player.path = [];
       player.currentPathIndex = 0;
+      this.chatSystem.broadcastSystem(`${player.characterName} disconnected.`);
     }
 
     // Allow reconnection for 120 seconds
@@ -292,16 +344,21 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.online = true;
+      this.chatSystem.broadcastSystem(`${player.characterName} reconnected.`);
     }
   }
 
   onLeave(client: Client): void {
+    const player = this.state.players.get(client.sessionId);
+    const name = player?.characterName || client.sessionId.slice(0, 6);
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
     this.aiSystem.removePlayer(client.sessionId);
+    this.chatSystem.removePlayer(client.sessionId);
     this.unregisterClient(client);
     this.reassignLeader();
+    this.chatSystem.broadcastSystem(`${name} left the dungeon.`);
   }
 
   private unregisterClient(client: Client): void {
@@ -368,6 +425,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         if (!player) return;
         player.health -= damage;
         if (player.health < 0) player.health = 0;
+        if (player.health <= 0) {
+          this.chatSystem.broadcastSystem(
+            `${player.characterName || sessionId.slice(0, 6)} has been slain!`,
+          );
+        }
       },
       (event) => {
         const enemy = this.state.enemies.get(event.enemyId);
