@@ -111,10 +111,15 @@
   "skills": {
     "basicAttack": "Basic Attack",
     "basicAttackDesc": "Automatically attacks the nearest enemy",
+    "heavyStrike": "Heavy Strike",
+    "heavyStrikeDesc": "A powerful blow that deals {{multiplier}}× damage",
     "passive": "Passive",
     "disabled": "Disabled",
     "locked": "Locked",
-    "clickToToggle": "Click or press key to toggle"
+    "clickToToggle": "Click or press key to toggle",
+    "clickToUse": "Click or press key to use",
+    "cooldown": "Cooldown: {{seconds}}s",
+    "damage": "Damage: {{multiplier}}×"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

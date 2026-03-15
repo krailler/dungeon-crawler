@@ -6,6 +6,7 @@ import type {
   PromoteLeaderMessage,
   PartyKickMessage,
   SkillToggleMessage,
+  SkillUseMessage,
   SkillIdValue,
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
@@ -37,6 +38,13 @@ export type PartyMember = {
 
 export type ConnectionStatus = "connecting" | "connected" | "error";
 
+export type SkillCooldownState = {
+  /** Total cooldown duration in seconds */
+  duration: number;
+  /** Timestamp (ms) when the cooldown started */
+  startedAt: number;
+};
+
 export type HudSnapshot = {
   members: PartyMember[];
   fps: number;
@@ -44,6 +52,8 @@ export type HudSnapshot = {
   connectionStatus: ConnectionStatus;
   connectionInfo: string;
   localCoords: { x: number; z: number } | null;
+  /** Active skill cooldowns, keyed by skill ID */
+  skillCooldowns: Map<string, SkillCooldownState>;
 };
 
 type Listener = () => void;
@@ -62,6 +72,7 @@ let fpsFrames = 0;
 let connectionStatus: ConnectionStatus = "connecting";
 let connectionInfo: string = "";
 let localCoords: { x: number; z: number } | null = null;
+const skillCooldowns: Map<string, SkillCooldownState> = new Map();
 
 let cachedSnapshot: HudSnapshot = {
   members: [],
@@ -70,6 +81,7 @@ let cachedSnapshot: HudSnapshot = {
   connectionStatus: "connecting",
   connectionInfo: "",
   localCoords: null,
+  skillCooldowns: new Map(),
 };
 
 const rebuildSnapshot = (): void => {
@@ -80,6 +92,7 @@ const rebuildSnapshot = (): void => {
     connectionStatus,
     connectionInfo,
     localCoords,
+    skillCooldowns: new Map(skillCooldowns),
   };
 };
 
@@ -175,6 +188,7 @@ export const hudStore = {
     connectionInfo = "";
     localCoords = null;
     room = null;
+    skillCooldowns.clear();
     rebuildSnapshot();
     emit();
   },
@@ -200,6 +214,16 @@ export const hudStore = {
     if (!room) return;
     const msg: SkillToggleMessage = { skillId };
     room.send(MessageType.SKILL_TOGGLE, msg);
+  },
+  useSkill(skillId: SkillIdValue): void {
+    if (!room) return;
+    const msg: SkillUseMessage = { skillId };
+    room.send(MessageType.SKILL_USE, msg);
+  },
+  setSkillCooldown(skillId: string, duration: number): void {
+    skillCooldowns.set(skillId, { duration, startedAt: Date.now() });
+    rebuildSnapshot();
+    emit();
   },
 };
 

@@ -20,7 +20,8 @@ import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { minimapStore } from "../ui/stores/minimapStore";
 import { loadingStore, LoadingPhase } from "../ui/stores/loadingStore";
-import { TileMap, unpackSetId, tileSetNameFromId } from "@dungeon/shared";
+import { TileMap, unpackSetId, tileSetNameFromId, MessageType } from "@dungeon/shared";
+import type { SkillCooldownMessage } from "@dungeon/shared";
 
 export interface StateSyncDeps {
   readonly scene: Scene;
@@ -54,6 +55,11 @@ export class StateSync {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const $ = getStateCallbacks(room as any) as any;
     const state$ = $(room.state);
+
+    // Listen for skill cooldown messages from server
+    room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {
+      hudStore.setSkillCooldown(data.skillId, data.duration);
+    });
 
     // Track dungeon seed + tick rate for admin panel
     state$.listen("dungeonSeed", (value: number) => {

@@ -19,6 +19,8 @@ export type {
   DebugPathsMessage,
   GateInteractMessage,
   SkillToggleMessage,
+  SkillUseMessage,
+  SkillCooldownMessage,
 } from "./protocol.js";
 
 export {

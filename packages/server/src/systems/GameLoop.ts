@@ -3,7 +3,7 @@ import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { EnemyState } from "../state/EnemyState";
 import type { AISystem } from "./AISystem";
-import type { CombatSystem } from "./CombatSystem";
+import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
 import { MessageType, computeGoldDrop, computeXpDrop, MAX_LEVEL } from "@dungeon/shared";
 import type { CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
@@ -106,85 +106,90 @@ export class GameLoop {
     });
 
     this.bridge.combatSystem.update(dtSec, this.tickPlayersMap, this.tickEnemiesMap, (event) => {
-      // Player hit generates threat on the enemy
-      this.bridge.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
-
-      const player = this.bridge.state.players.get(event.sessionId);
-      const msg: CombatLogMessage = {
-        dir: "p2e",
-        src: player?.characterName || event.sessionId.slice(0, 6),
-        tgt: `zombie[${event.enemyId}]`,
-        atk: event.attackDamage,
-        def: event.targetDefense,
-        dmg: event.finalDamage,
-        hp: event.targetHealth,
-        maxHp: event.targetMaxHealth,
-        kill: event.killed,
-      };
-      this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
-
-      // Remove dead enemy from state after a short delay so clients see the death
-      if (event.killed) {
-        // Distribute gold to alive party members
-        const killedEnemy = this.bridge.state.enemies.get(event.enemyId);
-        if (killedEnemy) {
-          let aliveCount = 0;
-          let levelSum = 0;
-          this.bridge.state.players.forEach((p: PlayerState) => {
-            if (p.health > 0) {
-              aliveCount++;
-              levelSum += p.level;
-            }
-          });
-          const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
-          const goldPerPlayer = computeGoldDrop(killedEnemy.level, avgPartyLevel, aliveCount);
-
-          this.bridge.state.players.forEach((p: PlayerState) => {
-            if (p.health > 0) {
-              p.gold += goldPerPlayer;
-            }
-          });
-
-          // Broadcast gold earned in chat
-          this.bridge.chatSystem.broadcastSystemI18n(
-            "chat.goldGained",
-            { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
-            `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
-          );
-
-          // Distribute XP to alive players (not split — each player gets full XP)
-          this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
-            if (p.health <= 0 || p.level >= MAX_LEVEL) return;
-
-            const xpGain = computeXpDrop(killedEnemy.level, p.level);
-            const levelUps = p.addXp(xpGain);
-
-            for (const { level, dhp, datk, ddef } of levelUps) {
-              this.bridge.chatSystem.broadcastSystemI18n(
-                "chat.levelUp",
-                { name: p.characterName, level },
-                `${p.characterName} reached level ${level}!`,
-              );
-              this.bridge.chatSystem.sendSystemI18nTo(
-                sessionId,
-                "chat.levelUpStats",
-                { dhp, datk, ddef },
-                `+${dhp} Health\n+${datk} Attack\n+${ddef} Defense`,
-              );
-            }
-          });
-        }
-
-        this.bridge.clock.setTimeout(() => {
-          this.bridge.state.enemies.delete(event.enemyId);
-          this.bridge.aiSystem.unregister(event.enemyId);
-        }, 1000);
-      }
+      this.handleCombatHit(event);
     });
 
     // Debug: send path data to subscribed admin clients
     if (this.debugPathClients.size > 0) {
       this.sendDebugPaths();
+    }
+  }
+
+  /** Handle a combat hit event — shared between auto-attack and active skills. */
+  handleCombatHit(event: CombatHitEvent): void {
+    // Player hit generates threat on the enemy
+    this.bridge.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
+
+    const player = this.bridge.state.players.get(event.sessionId);
+    const msg: CombatLogMessage = {
+      dir: "p2e",
+      src: player?.characterName || event.sessionId.slice(0, 6),
+      tgt: `zombie[${event.enemyId}]`,
+      atk: event.attackDamage,
+      def: event.targetDefense,
+      dmg: event.finalDamage,
+      hp: event.targetHealth,
+      maxHp: event.targetMaxHealth,
+      kill: event.killed,
+    };
+    this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+    // Remove dead enemy from state after a short delay so clients see the death
+    if (event.killed) {
+      // Distribute gold to alive party members
+      const killedEnemy = this.bridge.state.enemies.get(event.enemyId);
+      if (killedEnemy) {
+        let aliveCount = 0;
+        let levelSum = 0;
+        this.bridge.state.players.forEach((p: PlayerState) => {
+          if (p.health > 0) {
+            aliveCount++;
+            levelSum += p.level;
+          }
+        });
+        const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
+        const goldPerPlayer = computeGoldDrop(killedEnemy.level, avgPartyLevel, aliveCount);
+
+        this.bridge.state.players.forEach((p: PlayerState) => {
+          if (p.health > 0) {
+            p.gold += goldPerPlayer;
+          }
+        });
+
+        // Broadcast gold earned in chat
+        this.bridge.chatSystem.broadcastSystemI18n(
+          "chat.goldGained",
+          { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
+          `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
+        );
+
+        // Distribute XP to alive players (not split — each player gets full XP)
+        this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
+          if (p.health <= 0 || p.level >= MAX_LEVEL) return;
+
+          const xpGain = computeXpDrop(killedEnemy.level, p.level);
+          const levelUps = p.addXp(xpGain);
+
+          for (const { level, dhp, datk, ddef } of levelUps) {
+            this.bridge.chatSystem.broadcastSystemI18n(
+              "chat.levelUp",
+              { name: p.characterName, level },
+              `${p.characterName} reached level ${level}!`,
+            );
+            this.bridge.chatSystem.sendSystemI18nTo(
+              sessionId,
+              "chat.levelUpStats",
+              { dhp, datk, ddef },
+              `+${dhp} Health\n+${datk} Attack\n+${ddef} Defense`,
+            );
+          }
+        });
+      }
+
+      this.bridge.clock.setTimeout(() => {
+        this.bridge.state.enemies.delete(event.enemyId);
+        this.bridge.aiSystem.unregister(event.enemyId);
+      }, 1000);
     }
   }
 

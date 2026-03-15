@@ -230,6 +230,27 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         player.autoAttackEnabled = !player.autoAttackEnabled;
       }
     });
+    // Skill use: activate an active skill (e.g. heavy strike)
+    this.onMessage(MessageType.SKILL_USE, (client: Client, data: { skillId: string }) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      // Build enemies map for combat system
+      const enemiesMap = new Map<string, EnemyState>();
+      this.state.enemies.forEach((e: EnemyState, id: string) => enemiesMap.set(id, e));
+      const result = this.combatSystem.useSkill(
+        client.sessionId,
+        data.skillId as import("@dungeon/shared").SkillIdValue,
+        player,
+        enemiesMap,
+      );
+      if (result) {
+        client.send(MessageType.SKILL_COOLDOWN, {
+          skillId: result.skillId,
+          duration: result.duration,
+          remaining: result.remaining,
+        });
+      }
+    });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? "user";
