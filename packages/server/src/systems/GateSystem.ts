@@ -43,7 +43,7 @@ export class GateSystem {
   /** Handle a GATE_INTERACT message from a client. */
   handleInteract(client: Client, player: PlayerState, data: GateInteractMessage): void {
     const gate = this.state.gates.get(data.gateId);
-    if (!gate || gate.open || this.gateCountdowns.has(data.gateId)) return;
+    if (!gate || gate.open) return;
 
     // Lobby gates require leader
     if (gate.gateType === "lobby" && !player.isLeader) {
@@ -58,6 +58,9 @@ export class GateSystem {
       return;
     }
 
+    // If any lobby gate countdown is already running, ignore
+    if (gate.gateType === "lobby" && this.gateCountdowns.size > 0) return;
+
     // Check proximity
     const gateWX = gate.tileX * TILE_SIZE;
     const gateWZ = gate.tileY * TILE_SIZE;
@@ -67,7 +70,11 @@ export class GateSystem {
 
     // Lobby gates use countdown; other types open immediately
     if (gate.gateType === "lobby") {
-      this.gateCountdowns.add(data.gateId);
+      // Mark ALL lobby gates as counting down
+      this.state.gates.forEach((g: any, id: string) => {
+        if (g.gateType === "lobby") this.gateCountdowns.add(id);
+      });
+
       const leaderName = player.characterName || client.sessionId.slice(0, 6);
       this.chatSystem.broadcastAnnouncement(
         "announce.gateCountdownStart",
@@ -91,21 +98,14 @@ export class GateSystem {
 
       this.clock.setTimeout(() => {
         if (gate.open) return;
-        gate.open = true;
-        this.gateCountdowns.delete(data.gateId);
-        this.pathfinder.unblockTile(gate.tileX, gate.tileY);
+        // Open ALL lobby gates simultaneously
+        this.openAllLobbyGates();
 
-        // Count party members
         let partySize = 0;
         this.state.players.forEach(() => partySize++);
         this.log.info(
-          {
-            gate: data.gateId,
-            leader: leaderName,
-            partySize,
-            dungeonLevel: this.state.dungeonLevel,
-          },
-          "Dungeon started — gate opened",
+          { leader: leaderName, partySize, dungeonLevel: this.state.dungeonLevel },
+          "Dungeon started — gates opened",
         );
 
         this.chatSystem.broadcastAnnouncement(
@@ -119,5 +119,16 @@ export class GateSystem {
       gate.open = true;
       this.pathfinder.unblockTile(gate.tileX, gate.tileY);
     }
+  }
+
+  /** Open all lobby gates and unblock their tiles. */
+  private openAllLobbyGates(): void {
+    this.state.gates.forEach((g: any, id: string) => {
+      if (g.gateType === "lobby" && !g.open) {
+        g.open = true;
+        this.pathfinder.unblockTile(g.tileX, g.tileY);
+        this.gateCountdowns.delete(id);
+      }
+    });
   }
 }

@@ -288,18 +288,21 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Clear existing gates
     this.state.gates.clear();
 
-    // Create lobby gate from dungeon generator
-    const gatePos = generator.getGatePosition();
-    if (gatePos) {
+    // Create lobby gates — one per corridor exit from the spawn room.
+    // Opening any of them opens all (handled by GateSystem).
+    const gatePositions = generator.getGatePositions();
+    for (let i = 0; i < gatePositions.length; i++) {
+      const pos = gatePositions[i];
       const gate = new GateState();
-      gate.id = "lobby";
+      const gateId = `lobby_${i}`;
+      gate.id = gateId;
       gate.gateType = "lobby";
-      gate.tileX = gatePos.x;
-      gate.tileY = gatePos.y;
-      gate.isNS = gatePos.isNS;
-      gate.dir = gatePos.dir;
+      gate.tileX = pos.x;
+      gate.tileY = pos.y;
+      gate.isNS = pos.isNS;
+      gate.dir = pos.dir;
       gate.open = false;
-      this.state.gates.set("lobby", gate);
+      this.state.gates.set(gateId, gate);
     }
 
     // Serialize map for clients
@@ -564,10 +567,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
   }
 
-  /** Returns true if the lobby gate has been opened (dungeon expedition active) */
+  /** Returns true if any lobby gate has been opened (dungeon expedition active) */
   private isDungeonStarted(): boolean {
-    const lobbyGate = this.state.gates.get("lobby");
-    return lobbyGate ? lobbyGate.open : false;
+    let started = false;
+    this.state.gates.forEach((gate: GateState) => {
+      if (gate.gateType === "lobby" && gate.open) started = true;
+    });
+    return started;
   }
 
   /** Send a message only to clients with admin role */
