@@ -141,11 +141,11 @@ export class AISystem {
 
       // ── Leash check ──────────────────────────────────────────────────────
       if (entry.state !== AIState.LEASH) {
-        const distToSpawn = this.distance(entry.enemy, {
+        const distSqToSpawn = this.distanceSq(entry.enemy, {
           x: entry.spawnX,
           z: entry.spawnZ,
         });
-        if (distToSpawn > entry.leashRange) {
+        if (distSqToSpawn > entry.leashRange * entry.leashRange) {
           this.startLeash(entry);
           continue;
         }
@@ -170,12 +170,13 @@ export class AISystem {
       }
 
       const { sessionId: targetSessionId, player: targetPlayer } = target;
-      const distToTarget = this.distance(entry.enemy, targetPlayer);
+      const distSqToTarget = this.distanceSq(entry.enemy, targetPlayer);
+      const attackRangeSq = entry.enemy.attackRange * entry.enemy.attackRange;
 
       entry.repathTimer -= dt;
       entry.attackTimer -= dt;
 
-      if (distToTarget <= entry.enemy.attackRange) {
+      if (distSqToTarget <= attackRangeSq) {
         // ── Attack ─────────────────────────────────────────────────────
         entry.state = AIState.ATTACK;
         entry.enemy.isMoving = false;
@@ -242,9 +243,10 @@ export class AISystem {
         continue;
       }
 
-      const dist = this.distance(entry.enemy, player);
+      const distSq = this.distanceSq(entry.enemy, player);
+      const detectionRangeSq = entry.enemy.detectionRange * entry.enemy.detectionRange;
 
-      if (dist <= entry.enemy.detectionRange) {
+      if (distSq <= detectionRangeSq) {
         const current = entry.threatTable.get(sessionId);
         if (current === undefined) {
           // First time in range — initial aggro burst
@@ -325,13 +327,13 @@ export class AISystem {
   private updateLeash(entry: EnemyAI, dt: number): void {
     this.moveEnemy(entry.enemy, dt);
 
-    const distToSpawn = this.distance(entry.enemy, {
+    const distSqToSpawn = this.distanceSq(entry.enemy, {
       x: entry.spawnX,
       z: entry.spawnZ,
     });
 
-    // Arrived back at spawn — return to idle
-    if (distToSpawn < 0.5 || !entry.enemy.isMoving) {
+    // Arrived back at spawn — return to idle (0.5^2 = 0.25)
+    if (distSqToSpawn < 0.25 || !entry.enemy.isMoving) {
       entry.state = AIState.IDLE;
       entry.enemy.isMoving = false;
       entry.enemy.path = [];
@@ -371,9 +373,10 @@ export class AISystem {
     enemy.rotY = Math.atan2(ndx, ndz);
   }
 
-  private distance(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  /** Squared distance — use for range comparisons to avoid sqrt */
+  private distanceSq(a: { x: number; z: number }, b: { x: number; z: number }): number {
     const dx = a.x - b.x;
     const dz = a.z - b.z;
-    return Math.sqrt(dx * dx + dz * dz);
+    return dx * dx + dz * dz;
   }
 }

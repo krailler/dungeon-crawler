@@ -16,9 +16,11 @@ export interface WorldPos {
 
 export class Pathfinder {
   private map: TileMap;
+  private mapWidth: number;
 
   constructor(map: TileMap) {
     this.map = map;
+    this.mapWidth = map.width;
   }
 
   findPath(start: WorldPos, end: WorldPos): WorldPos[] {
@@ -41,11 +43,16 @@ export class Pathfinder {
     return path;
   }
 
+  /** Numeric key for tile coordinates — avoids string allocation */
+  private tileKey(x: number, y: number): number {
+    return y * this.mapWidth + x;
+  }
+
   private astar(sx: number, sy: number, ex: number, ey: number): { x: number; y: number }[] {
     const open: Node[] = [];
-    const closed = new Set<string>();
-
-    const key = (x: number, y: number) => `${x},${y}`;
+    const closed = new Set<number>();
+    // Track best g-score per open node by numeric key for O(1) lookup
+    const openMap = new Map<number, Node>();
 
     const startNode: Node = {
       x: sx,
@@ -57,6 +64,7 @@ export class Pathfinder {
     };
     startNode.f = startNode.g + startNode.h;
     open.push(startNode);
+    openMap.set(this.tileKey(sx, sy), startNode);
 
     const directions = [
       [0, -1],
@@ -70,23 +78,31 @@ export class Pathfinder {
     ];
 
     while (open.length > 0) {
+      // Find node with lowest f score
       let bestIdx = 0;
       for (let i = 1; i < open.length; i++) {
         if (open[i].f < open[bestIdx].f) bestIdx = i;
       }
-      const current = open.splice(bestIdx, 1)[0];
+      const current = open[bestIdx];
+      // Swap-remove: move last element into bestIdx slot (O(1) removal)
+      open[bestIdx] = open[open.length - 1];
+      open.pop();
+
+      const currentKey = this.tileKey(current.x, current.y);
+      openMap.delete(currentKey);
 
       if (current.x === ex && current.y === ey) {
         return this.reconstructPath(current);
       }
 
-      closed.add(key(current.x, current.y));
+      closed.add(currentKey);
 
       for (const [dx, dy] of directions) {
         const nx = current.x + dx;
         const ny = current.y + dy;
+        const nKey = this.tileKey(nx, ny);
 
-        if (closed.has(key(nx, ny))) continue;
+        if (closed.has(nKey)) continue;
         if (!this.map.isFloor(nx, ny)) continue;
 
         // Prevent diagonal movement through walls
@@ -101,19 +117,21 @@ export class Pathfinder {
 
         const moveCost = dx !== 0 && dy !== 0 ? 1.414 : 1;
         const g = current.g + moveCost;
-        const h = this.heuristic(nx, ny, ex, ey);
 
-        const existingIdx = open.findIndex((n) => n.x === nx && n.y === ny);
-        if (existingIdx !== -1) {
-          if (g < open[existingIdx].g) {
-            open[existingIdx].g = g;
-            open[existingIdx].f = g + h;
-            open[existingIdx].parent = current;
+        const existing = openMap.get(nKey);
+        if (existing) {
+          if (g < existing.g) {
+            existing.g = g;
+            existing.f = g + existing.h;
+            existing.parent = current;
           }
           continue;
         }
 
-        open.push({ x: nx, y: ny, g, h, f: g + h, parent: current });
+        const h = this.heuristic(nx, ny, ex, ey);
+        const node: Node = { x: nx, y: ny, g, h, f: g + h, parent: current };
+        open.push(node);
+        openMap.set(nKey, node);
       }
     }
 
@@ -130,9 +148,10 @@ export class Pathfinder {
     const path: { x: number; y: number }[] = [];
     let current: Node | null = node;
     while (current) {
-      path.unshift({ x: current.x, y: current.y });
+      path.push({ x: current.x, y: current.y });
       current = current.parent;
     }
+    path.reverse();
     // Skip starting position
     if (path.length > 1) path.shift();
     return path;
