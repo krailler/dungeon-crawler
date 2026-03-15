@@ -87,6 +87,13 @@ export class AISystem {
     this.entryById.set(enemyId, entry);
   }
 
+  /** Remove an enemy from the AI system (e.g. after death cleanup). */
+  unregister(enemyId: string): void {
+    const idx = this.entries.findIndex((e) => e.enemyId === enemyId);
+    if (idx !== -1) this.entries.splice(idx, 1);
+    this.entryById.delete(enemyId);
+  }
+
   /** Add threat from an external source (e.g. player dealing damage). */
   addThreat(enemyId: string, sessionId: string, amount: number): void {
     const entry = this.entryById.get(enemyId);

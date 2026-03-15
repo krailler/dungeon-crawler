@@ -610,6 +610,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         kill: event.killed,
       };
       this.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+      // Remove dead enemy from state after a short delay so clients see the death
+      if (event.killed) {
+        this.clock.setTimeout(() => {
+          this.state.enemies.delete(event.enemyId);
+          this.aiSystem.unregister(event.enemyId);
+        }, 1000);
+      }
     });
   }
 
