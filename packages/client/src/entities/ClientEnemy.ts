@@ -4,7 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -54,6 +54,7 @@ export class ClientEnemy {
   private hitFlashTimer: number = 0;
 
   // Floating health bar + level label
+  private barAnchor: TransformNode;
   private healthBarContainer: Rectangle;
   private healthBarBg: Rectangle;
   private healthBarFill: Rectangle;
@@ -83,6 +84,11 @@ export class ClientEnemy {
     this.hitMaterial.metallic = 0;
     this.hitMaterial.roughness = 1;
 
+    // Anchor node at head height (matches player name anchor)
+    this.barAnchor = new TransformNode(`enemyBarAnchor_${id}`, scene);
+    this.barAnchor.parent = this.mesh;
+    this.barAnchor.position.y = 2.2;
+
     // --- Floating health bar + level label ---
     // Container for both label and health bar
     this.healthBarContainer = new Rectangle(`enemyHpContainer_${id}`);
@@ -90,7 +96,7 @@ export class ClientEnemy {
     this.healthBarContainer.heightInPixels = 24;
     this.healthBarContainer.thickness = 0;
     this.healthBarContainer.background = "transparent";
-    this.healthBarContainer.linkOffsetY = -140;
+    this.healthBarContainer.linkOffsetY = 0;
     this.healthBarContainer.isVisible = false;
 
     // Level label above the bar
@@ -121,7 +127,7 @@ export class ClientEnemy {
     this.healthBarBg.addControl(this.healthBarFill);
     this.healthBarContainer.addControl(this.healthBarBg);
     guiTexture.addControl(this.healthBarContainer);
-    this.healthBarContainer.linkWithMesh(this.mesh);
+    this.healthBarContainer.linkWithMesh(this.barAnchor);
   }
 
   /** Attach the loaded GLB character instance. */
@@ -221,6 +227,7 @@ export class ClientEnemy {
     if (isDead && !this.isDead) {
       this.isDead = true;
       this.healthBarContainer.dispose();
+      this.barAnchor.dispose();
       for (const [, anim] of this.animations) {
         anim.dispose();
       }
@@ -324,6 +331,7 @@ export class ClientEnemy {
 
   dispose(): void {
     this.healthBarContainer.dispose();
+    this.barAnchor.dispose();
     if (!this.isDead) {
       for (const [, anim] of this.animations) {
         anim.dispose();
