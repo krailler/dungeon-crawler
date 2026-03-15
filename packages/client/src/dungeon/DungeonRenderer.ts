@@ -1,6 +1,8 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Animation } from "@babylonjs/core/Animations/animation";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -42,6 +44,12 @@ export class DungeonRenderer {
   private torchParticles: ParticleSystem[] = [];
   /** Shared particle texture for all torches (created once, reused) */
   private fireTexture: Texture | null = null;
+
+  /** Gate mesh (portcullis) */
+  private gateMesh: Mesh | null = null;
+  /** Gate world position (tile coords) */
+  private gateTileX: number = -1;
+  private gateTileY: number = -1;
 
   private scene: Scene;
   private floorAssetLoader: FloorAssetLoader;
@@ -99,6 +107,37 @@ export class DungeonRenderer {
     }
   }
 
+  /**
+   * Place the gate mesh at the boundary between the spawn room and the corridor.
+   * The gate tile is the corridor tile just outside the room — the mesh is offset
+   * by half a tile toward the room so it visually sits at the wall edge.
+   * @param dir 0=N 1=S 2=W 3=E — direction the corridor exits from the room
+   */
+  placeGate(tileX: number, tileY: number, isNS: boolean, dir: number): void {
+    if (tileX < 0 || tileY < 0) return;
+    let worldX = tileX * TILE_SIZE;
+    let worldZ = tileY * TILE_SIZE;
+
+    // Offset half a tile toward the room (opposite to corridor direction)
+    const offset = TILE_SIZE / 2;
+    switch (dir) {
+      case 0: // N — corridor above room → shift south toward room
+        worldZ += offset;
+        break;
+      case 1: // S — corridor below room → shift north toward room
+        worldZ -= offset;
+        break;
+      case 2: // W — corridor left of room → shift east toward room
+        worldX += offset;
+        break;
+      case 3: // E — corridor right of room → shift west toward room
+        worldX -= offset;
+        break;
+    }
+
+    this.createGateMesh(worldX, worldZ, tileX, tileY, isNS);
+  }
+
   getFloorMeshes(): AbstractMesh[] {
     return this.floorMeshes;
   }
@@ -123,6 +162,14 @@ export class DungeonRenderer {
   }
 
   dispose(): void {
+    // Dispose gate mesh
+    if (this.gateMesh) {
+      this.gateMesh.dispose(false, true);
+      this.gateMesh = null;
+    }
+    this.gateTileX = -1;
+    this.gateTileY = -1;
+
     // Dispose wall decoration instances (keep shared AssetContainer materials)
     for (const root of this.wallDecoRoots) {
       root.dispose(false, false);
@@ -340,6 +387,108 @@ export class DungeonRenderer {
     if ((hash % 1000) / 1000 < WALL_TORCH_CHANCE) {
       this.createWallTorch(frontX, frontZ, dir);
     }
+  }
+
+  /** Create a portcullis-style gate mesh at the given tile */
+  private createGateMesh(
+    worldX: number,
+    worldZ: number,
+    tileX: number,
+    tileY: number,
+    isNS: boolean,
+  ): void {
+    this.gateTileX = tileX;
+    this.gateTileY = tileY;
+
+    // Gate material — dark iron with emissive glow
+    const mat = new StandardMaterial("gateMat", this.scene);
+    mat.diffuseColor = new Color3(0.3, 0.25, 0.2);
+    mat.specularColor = new Color3(0.4, 0.35, 0.3);
+    mat.emissiveColor = new Color3(0.1, 0.06, 0.02);
+
+    // Create a single box representing the gate (portcullis)
+    const barCount = 5;
+    const barRadius = 0.06;
+    const gateWidth = TILE_SIZE * 0.9;
+    const gateHeight = WALL_HEIGHT * 0.95;
+
+    // Parent mesh for the whole gate
+    const gate = MeshBuilder.CreateBox(
+      "gate",
+      { width: 0.01, height: 0.01, depth: 0.01 },
+      this.scene,
+    );
+    gate.position.set(worldX, 0, worldZ);
+    gate.isPickable = false;
+    gate.visibility = 0;
+
+    // Vertical bars
+    for (let i = 0; i < barCount; i++) {
+      const t = i / (barCount - 1) - 0.5; // -0.5 to 0.5
+      const bar = MeshBuilder.CreateCylinder(
+        `gateBar_v${i}`,
+        { height: gateHeight, diameter: barRadius * 2, tessellation: 6 },
+        this.scene,
+      );
+      bar.material = mat;
+      bar.parent = gate;
+      bar.position.y = gateHeight / 2;
+      if (isNS) {
+        bar.position.x = t * gateWidth;
+      } else {
+        bar.position.z = t * gateWidth;
+      }
+    }
+
+    // Horizontal crossbars
+    for (let i = 0; i < 3; i++) {
+      const yPos = (gateHeight * (i + 1)) / 4;
+      const crossbar = MeshBuilder.CreateCylinder(
+        `gateBar_h${i}`,
+        { height: gateWidth, diameter: barRadius * 1.5, tessellation: 6 },
+        this.scene,
+      );
+      crossbar.material = mat;
+      crossbar.parent = gate;
+      crossbar.position.y = yPos;
+      if (isNS) {
+        crossbar.rotation.z = Math.PI / 2;
+      } else {
+        crossbar.rotation.x = Math.PI / 2;
+      }
+    }
+
+    this.gateMesh = gate;
+  }
+
+  /** Animate the gate opening (slides upward) */
+  openGate(): void {
+    if (!this.gateMesh) return;
+    const gate = this.gateMesh;
+
+    const anim = new Animation(
+      "gateOpen",
+      "position.y",
+      30,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CONSTANT,
+    );
+    anim.setKeys([
+      { frame: 0, value: gate.position.y },
+      { frame: 45, value: gate.position.y + WALL_HEIGHT },
+    ]);
+    gate.animations = [anim];
+    this.scene.beginAnimation(gate, 0, 45, false, 1, () => {
+      // Dispose gate after animation
+      gate.dispose(false, true);
+      this.gateMesh = null;
+    });
+  }
+
+  /** Get the gate world position for proximity checks */
+  getGateWorldPosition(): Vector3 | null {
+    if (this.gateTileX < 0) return null;
+    return new Vector3(this.gateTileX * TILE_SIZE, 0, this.gateTileY * TILE_SIZE);
   }
 
   private createWallTorch(x: number, z: number, dir: { x: number; z: number }): void {

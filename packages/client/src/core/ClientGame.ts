@@ -35,6 +35,7 @@ import {
   AMBIENT_INTENSITY,
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
+  GATE_INTERACT_RANGE,
 } from "@dungeon/shared";
 import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
@@ -46,6 +47,7 @@ import {
 } from "../ui/stores/loadingStore";
 import { authStore } from "../ui/stores/authStore";
 import { chatStore } from "../ui/stores/chatStore";
+import { gateStore } from "../ui/stores/gateStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -123,6 +125,15 @@ export class ClientGame {
       if (ev.key === "m" || ev.key === "M") {
         minimapStore.toggle();
       }
+      if (ev.key === "f" || ev.key === "F") {
+        // Don't trigger if typing in an input
+        if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement)
+          return;
+        const gate = gateStore.getSnapshot();
+        if (gate.showInteractHint && !gate.isOpen) {
+          gateStore.showPrompt();
+        }
+      }
     };
     window.addEventListener("keydown", this.onKeyDown);
 
@@ -179,6 +190,7 @@ export class ClientGame {
       this.room = room;
       adminStore.setRoom(room);
       hudStore.setRoom(room);
+      gateStore.setRoom(room);
       this.localSessionId = room.sessionId;
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
@@ -300,6 +312,22 @@ export class ClientGame {
       adminStore.setTickRate(value);
     });
 
+    // Gate state listeners
+    state$.listen("gateOpen", (value: boolean) => {
+      gateStore.setOpen(value);
+      if (value) {
+        this.dungeonRenderer.openGate();
+      }
+    });
+    state$.listen("gateX", (value: number) => {
+      const gy = (room.state as any).gateY as number;
+      minimapStore.setGatePosition(value, gy);
+    });
+    state$.listen("gateY", (value: number) => {
+      const gx = (room.state as any).gateX as number;
+      minimapStore.setGatePosition(gx, value);
+    });
+
     // Listen for tileMap data (sent once on join)
     state$.listen("tileMapData", (value: string) => {
       if (!value) return;
@@ -344,6 +372,15 @@ export class ClientGame {
         loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
         console.log("[Client] Assets loaded, rendering dungeon");
         this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
+
+        // Place gate if position is set and gate is not yet open
+        const gateX = (room.state as any).gateX as number;
+        const gateY = (room.state as any).gateY as number;
+        const gateNS = (room.state as any).gateNS as boolean;
+        const gateDir = (room.state as any).gateDir as number;
+        if (gateX >= 0 && gateY >= 0 && !(room.state as any).gateOpen) {
+          this.dungeonRenderer.placeGate(gateX, gateY, gateNS, gateDir);
+        }
 
         // Setup input after dungeon renders (sends move commands to server)
         this.inputManager = new InputManager(
@@ -548,6 +585,34 @@ export class ClientGame {
       }
     }
 
+    // Gate proximity check — show interaction hint for leader
+    if (localPlayer) {
+      const gate = gateStore.getSnapshot();
+      if (!gate.isOpen && !gate.showPrompt) {
+        const gatePos = this.dungeonRenderer.getGateWorldPosition();
+        if (gatePos) {
+          const pPos = localPlayer.getWorldPosition();
+          const gdx = pPos.x - gatePos.x;
+          const gdz = pPos.z - gatePos.z;
+          const distSq = gdx * gdx + gdz * gdz;
+          // Check if local player is leader
+          const localMember = hudStore.getSnapshot().members.find((m) => m.isLocal);
+          const isLeader = localMember?.isLeader ?? false;
+          gateStore.setInteractHint(
+            isLeader && distSq <= GATE_INTERACT_RANGE * GATE_INTERACT_RANGE,
+          );
+        } else {
+          gateStore.setInteractHint(false);
+        }
+      }
+    }
+
+    // Update debug coords
+    if (localPlayer && debugStore.getSnapshot().showCoords) {
+      const cp = localPlayer.getWorldPosition();
+      hudStore.setLocalCoords(cp.x, cp.z);
+    }
+
     // Camera follows local player
     if (localPlayer) {
       const pos = localPlayer.getWorldPosition();
@@ -693,6 +758,7 @@ export class ClientGame {
     adminStore.clearRoom();
     clearChatSendFn();
     chatStore.reset();
+    gateStore.reset();
     localStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);

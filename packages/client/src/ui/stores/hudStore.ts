@@ -33,6 +33,7 @@ export type HudSnapshot = {
   ping: number;
   connectionStatus: ConnectionStatus;
   connectionInfo: string;
+  localCoords: { x: number; z: number } | null;
 };
 
 type Listener = () => void;
@@ -50,6 +51,7 @@ let fpsAccum = 0;
 let fpsFrames = 0;
 let connectionStatus: ConnectionStatus = "connecting";
 let connectionInfo: string = "";
+let localCoords: { x: number; z: number } | null = null;
 
 let cachedSnapshot: HudSnapshot = {
   members: [],
@@ -57,6 +59,7 @@ let cachedSnapshot: HudSnapshot = {
   ping: 0,
   connectionStatus: "connecting",
   connectionInfo: "",
+  localCoords: null,
 };
 
 const rebuildSnapshot = (): void => {
@@ -66,6 +69,7 @@ const rebuildSnapshot = (): void => {
     ping,
     connectionStatus,
     connectionInfo,
+    localCoords,
   };
 };
 
@@ -159,7 +163,16 @@ export const hudStore = {
     fpsFrames = 0;
     connectionStatus = "connecting";
     connectionInfo = "";
+    localCoords = null;
     room = null;
+    rebuildSnapshot();
+    emit();
+  },
+  setLocalCoords(x: number, z: number): void {
+    const rx = Math.round(x * 100) / 100;
+    const rz = Math.round(z * 100) / 100;
+    if (localCoords && localCoords.x === rx && localCoords.z === rz) return;
+    localCoords = { x: rx, z: rz };
     rebuildSnapshot();
     emit();
   },

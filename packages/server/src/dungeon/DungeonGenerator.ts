@@ -12,6 +12,8 @@ export class DungeonGenerator {
   /** Grid tracking which room (index) owns each tile. -1 = unowned. */
   private roomOwnership: number[][] = [];
   private rng: () => number = Math.random;
+  /** Gate info: dir = 0(N) 1(S) 2(W) 3(E) — which direction the corridor exits */
+  private gatePosition: { x: number; y: number; isNS: boolean; dir: number } | null = null;
 
   generate(width: number, height: number, roomCount: number, seed?: number): TileMap {
     this.rng = seed != null ? mulberry32(seed) : Math.random;
@@ -53,6 +55,10 @@ export class DungeonGenerator {
       map.set(cx, cy, TileType.EXIT);
     }
 
+    // Find gate position (first corridor tile leaving the spawn room)
+    // The tile stays as FLOOR — the gate is an object, not a tile type.
+    this.gatePosition = this.findGatePosition(map);
+
     return map;
   }
 
@@ -63,6 +69,11 @@ export class DungeonGenerator {
   /** Get the room ownership grid. Each cell is a room index or -1. */
   getRoomOwnership(): number[][] {
     return this.roomOwnership;
+  }
+
+  /** Get the gate tile position, orientation, and exit direction. */
+  getGatePosition(): { x: number; y: number; isNS: boolean; dir: number } | null {
+    return this.gatePosition;
   }
 
   private randomRoom(mapWidth: number, mapHeight: number): Room {
@@ -152,5 +163,47 @@ export class DungeonGenerator {
         this.roomOwnership[y][x] = sourceRoomIndex;
       }
     }
+  }
+
+  /**
+   * Find the first corridor tile just outside the spawn room.
+   * The gate blocks this tile and is rendered at the boundary between room and corridor.
+   */
+  private findGatePosition(
+    map: TileMap,
+  ): { x: number; y: number; isNS: boolean; dir: number } | null {
+    if (this.rooms.length < 2) return null;
+    const spawn = this.rooms[0];
+
+    // Scan tiles just outside each edge of room 0 for a corridor floor tile.
+    // Top edge — corridor tile above room (dir=0: North)
+    for (let x = spawn.x; x < spawn.x + spawn.w; x++) {
+      const outside = spawn.y - 1;
+      if (outside >= 0 && map.isFloor(x, outside)) {
+        return { x, y: outside, isNS: true, dir: 0 };
+      }
+    }
+    // Bottom edge — corridor tile below room (dir=1: South)
+    for (let x = spawn.x; x < spawn.x + spawn.w; x++) {
+      const outside = spawn.y + spawn.h;
+      if (outside < map.height && map.isFloor(x, outside)) {
+        return { x, y: outside, isNS: true, dir: 1 };
+      }
+    }
+    // Left edge — corridor tile left of room (dir=2: West)
+    for (let y = spawn.y; y < spawn.y + spawn.h; y++) {
+      const outside = spawn.x - 1;
+      if (outside >= 0 && map.isFloor(outside, y)) {
+        return { x: outside, y, isNS: false, dir: 2 };
+      }
+    }
+    // Right edge — corridor tile right of room (dir=3: East)
+    for (let y = spawn.y; y < spawn.y + spawn.h; y++) {
+      const outside = spawn.x + spawn.w;
+      if (outside < map.width && map.isFloor(outside, y)) {
+        return { x: outside, y, isNS: false, dir: 3 };
+      }
+    }
+    return null;
   }
 }

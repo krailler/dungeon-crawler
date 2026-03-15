@@ -84,7 +84,16 @@
     "adminRequired": "This command requires admin privileges.",
     "killedByAdmin": "{{name}} has been slain by divine intervention!",
     "kicked": "{{name}} has been kicked.",
-    "leaderChanged": "{{name}} is now the party leader."
+    "leaderChanged": "{{name}} is now the party leader.",
+    "gateLeaderOnly": "Only the party leader can open the gate.",
+    "gateOpened": "The gate opens... The dungeon awaits!"
+  },
+  "gate": {
+    "interactHint": "Open the gate",
+    "promptTitle": "Ready to Begin?",
+    "promptMessage": "Opening the gate will start the dungeon expedition for all players.",
+    "promptAccept": "Enter the Dungeon",
+    "promptCancel": "Not Yet"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

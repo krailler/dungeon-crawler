@@ -17,10 +17,27 @@ export interface WorldPos {
 export class Pathfinder {
   private map: TileMap;
   private mapWidth: number;
+  /** Set of tile keys (y * width + x) that are blocked by objects (e.g. gate) */
+  private blockedTiles: Set<number> = new Set();
 
   constructor(map: TileMap) {
     this.map = map;
     this.mapWidth = map.width;
+  }
+
+  /** Block a tile position (e.g. closed gate). Pathfinder will treat it as a wall. */
+  blockTile(x: number, y: number): void {
+    this.blockedTiles.add(this.tileKey(x, y));
+  }
+
+  /** Unblock a tile position (e.g. gate opened). */
+  unblockTile(x: number, y: number): void {
+    this.blockedTiles.delete(this.tileKey(x, y));
+  }
+
+  /** Check if a tile is walkable (floor and not blocked) */
+  private isWalkable(x: number, y: number): boolean {
+    return this.map.isFloor(x, y) && !this.blockedTiles.has(this.tileKey(x, y));
   }
 
   findPath(start: WorldPos, end: WorldPos): WorldPos[] {
@@ -29,7 +46,7 @@ export class Pathfinder {
     const ex = Math.round(end.x / TILE_SIZE);
     const ey = Math.round(end.z / TILE_SIZE);
 
-    if (!this.map.isFloor(ex, ey)) return [];
+    if (!this.isWalkable(ex, ey)) return [];
 
     const tilePath = this.astar(sx, sy, ex, ey);
     if (tilePath.length === 0) return [];
@@ -103,13 +120,13 @@ export class Pathfinder {
         const nKey = this.tileKey(nx, ny);
 
         if (closed.has(nKey)) continue;
-        if (!this.map.isFloor(nx, ny)) continue;
+        if (!this.isWalkable(nx, ny)) continue;
 
         // Prevent diagonal movement through walls
         if (dx !== 0 && dy !== 0) {
           if (
-            !this.map.isFloor(current.x + dx, current.y) ||
-            !this.map.isFloor(current.x, current.y + dy)
+            !this.isWalkable(current.x + dx, current.y) ||
+            !this.isWalkable(current.x, current.y + dy)
           ) {
             continue;
           }

@@ -16,6 +16,7 @@ let enemyPositions: Map<string, { x: number; z: number }> = new Map();
 let localSessionId: string = "";
 let visible = false;
 let version = 0;
+let gatePosition: { x: number; y: number } | null = null;
 let dirty = false;
 let lastRevealTileX = -999;
 let lastRevealTileY = -999;
@@ -50,6 +51,15 @@ export const minimapStore = {
 
   setTileMap(map: TileMap): void {
     tileMap = map;
+  },
+
+  setGatePosition(x: number, y: number): void {
+    gatePosition = x >= 0 && y >= 0 ? { x, y } : null;
+    dirty = true;
+  },
+
+  getGatePosition(): { x: number; y: number } | null {
+    return gatePosition;
   },
 
   setLocalSessionId(id: string): void {
@@ -137,6 +147,7 @@ export const minimapStore = {
 
   reset(): void {
     tileMap = null;
+    gatePosition = null;
     discovered = new Set();
     playerPositions = new Map();
     enemyPositions = new Map();

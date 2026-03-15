@@ -8,6 +8,7 @@ export const MessageType = {
   CHAT_COMMANDS: "chat:commands",
   DEBUG_PATHS: "debug:paths",
   PROMOTE_LEADER: "party:promote",
+  GATE_INTERACT: "gate:interact",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */

@@ -3,12 +3,14 @@ import { useTranslation } from "react-i18next";
 import type { PartyMember } from "../stores/hudStore";
 import { hudStore } from "../stores/hudStore";
 import { authStore } from "../stores/authStore";
+import { debugStore } from "../stores/debugStore";
 import { minimapStore } from "../stores/minimapStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
 import { CharacterPanel } from "./CharacterPanel";
 import { ChatPanel } from "./ChatPanel";
+import { GatePrompt } from "./GatePrompt";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -152,6 +154,7 @@ export const HudRoot = (): JSX.Element => {
   const minimapSnapshot = useSyncExternalStore(minimapStore.subscribe, minimapStore.getSnapshot);
   const minimapVisible = minimapSnapshot.visible;
   const toggleMinimap = useCallback(() => minimapStore.toggle(), []);
+  const debugSnapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
@@ -206,6 +209,7 @@ export const HudRoot = (): JSX.Element => {
     <div className="pointer-events-none absolute inset-0 text-slate-100">
       {isAdmin && <DebugPanel />}
       <PauseMenu />
+      <GatePrompt />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
@@ -283,6 +287,11 @@ export const HudRoot = (): JSX.Element => {
         </div>
       )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
+        {debugSnapshot.showCoords && snapshot.localCoords && (
+          <div className="rounded-full border border-amber-500/30 bg-slate-900/60 px-3 py-1 font-mono text-[11px] text-amber-300 backdrop-blur">
+            X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}
+          </div>
+        )}
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
           {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}
         </div>

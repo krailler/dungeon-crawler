@@ -11,6 +11,7 @@ const ROTATION = Math.PI / 4; // 45°
 const COLOR_WALL = "#2a2a2a";
 const COLOR_FLOOR = "#555";
 const COLOR_DOOR = "#887744";
+const COLOR_GATE = "#cc5544";
 const COLOR_LOCAL_PLAYER = "#38bdf8";
 const COLOR_OTHER_PLAYER = "#4ade80";
 const COLOR_ENEMY = "#f87171";
@@ -75,6 +76,16 @@ export const MinimapOverlay = (): JSX.Element | null => {
         }
 
         ctx.fillRect(x * PX, y * PX, PX, PX);
+      }
+    }
+
+    // Draw gate marker (if discovered)
+    const gate = minimapStore.getGatePosition();
+    if (gate) {
+      const gateKey = gate.y * w + gate.x;
+      if (discovered.has(gateKey)) {
+        ctx.fillStyle = COLOR_GATE;
+        ctx.fillRect(gate.x * PX, gate.y * PX, PX, PX);
       }
     }
 

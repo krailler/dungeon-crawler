@@ -6,6 +6,7 @@ export type DebugSnapshot = {
   ambient: boolean;
   combatLog: boolean;
   showPaths: boolean;
+  showCoords: boolean;
 };
 
 type DebugKey = keyof DebugSnapshot;
@@ -21,6 +22,7 @@ const DEFAULTS: DebugSnapshot = {
   ambient: true,
   combatLog: false,
   showPaths: false,
+  showCoords: false,
 };
 
 const listeners = new Set<Listener>();

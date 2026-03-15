@@ -30,6 +30,7 @@ import {
   computeDerivedStats,
   ENEMY_TYPES,
   computeEnemyDerivedStats,
+  GATE_INTERACT_RANGE,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -72,6 +73,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private accountToSession: Map<string, string> = new Map();
   /** Clients subscribed to debug path visualization */
   private debugPathClients: Set<string> = new Set();
+  /** Gate tile position (corridor exit from spawn room) */
+  private gateTileX: number = -1;
+  private gateTileY: number = -1;
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
@@ -158,6 +162,38 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         `${target.characterName} is now the party leader.`,
       );
     });
+    // Gate: leader opens the lobby gate
+    this.onMessage(MessageType.GATE_INTERACT, (client: Client) => {
+      if (this.state.gateOpen) return;
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (!player.isLeader) {
+        this.chatSystem.sendToClientI18n(
+          client,
+          "message",
+          "chat.gateLeaderOnly",
+          {},
+          "Only the party leader can open the gate.",
+          "error",
+        );
+        return;
+      }
+      // Check proximity
+      if (this.gateTileX < 0) return;
+      const gateWX = this.gateTileX * TILE_SIZE;
+      const gateWZ = this.gateTileY * TILE_SIZE;
+      const dx = player.x - gateWX;
+      const dz = player.z - gateWZ;
+      if (dx * dx + dz * dz > GATE_INTERACT_RANGE * GATE_INTERACT_RANGE) return;
+      // Open the gate — unblock the tile so pathfinding works
+      this.state.gateOpen = true;
+      this.pathfinder.unblockTile(this.gateTileX, this.gateTileY);
+      this.chatSystem.broadcastSystemI18n(
+        "chat.gateOpened",
+        {},
+        "The gate opens... The dungeon awaits!",
+      );
+    });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? "user";
@@ -178,6 +214,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
 
+    // Store gate position as synced state (object on the map, not a tile type)
+    const gatePos = generator.getGatePosition();
+    if (gatePos) {
+      this.gateTileX = gatePos.x;
+      this.gateTileY = gatePos.y;
+      this.state.gateX = gatePos.x;
+      this.state.gateY = gatePos.y;
+      this.state.gateNS = gatePos.isNS;
+      this.state.gateDir = gatePos.dir;
+    } else {
+      this.gateTileX = -1;
+      this.gateTileY = -1;
+      this.state.gateX = -1;
+      this.state.gateY = -1;
+    }
+    this.state.gateOpen = false;
+
     // Serialize map for clients
     this.state.tileMapData = JSON.stringify(this.tileMap.serializeGrid());
     this.state.mapWidth = this.tileMap.width;
@@ -193,8 +246,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const wallVariants = generateWallVariants(this.tileMap, seed, roomOwnership, roomSets);
     this.state.wallVariantData = JSON.stringify(wallVariants);
 
-    // Setup pathfinding
+    // Setup pathfinding — block gate tile when gate is closed
     this.pathfinder = new Pathfinder(this.tileMap);
+    if (this.gateTileX >= 0) {
+      this.pathfinder.blockTile(this.gateTileX, this.gateTileY);
+    }
 
     // Setup AI + combat systems
     this.aiSystem = new AISystem(this.pathfinder);

@@ -62,6 +62,9 @@ export const CAMERA_RADIUS_MIN = 15;
 export const CAMERA_RADIUS_MAX = 15;
 export const CAMERA_FOLLOW_SPEED = 0.1;
 
+// Gate (lobby door)
+export const GATE_INTERACT_RANGE = 4;
+
 // Chat
 export const CHAT_MAX_LENGTH = 200;
 export const CHAT_MAX_HISTORY = 100;
