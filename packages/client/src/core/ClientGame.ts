@@ -207,13 +207,16 @@ export class ClientGame {
 
         // Show chat bubble above player's head for player messages
         if (entry.category === ChatCategory.PLAYER && entry.sender) {
+          let isLocalMessage = false;
           for (const [sessionId, clientPlayer] of this.stateSync.players) {
             const member = hudStore.getSnapshot().members.find((m) => m.id === sessionId);
             if (member && member.name === entry.sender) {
               clientPlayer.showChatBubble(entry.text);
+              if (sessionId === this.stateSync.localSessionId) isLocalMessage = true;
               break;
             }
           }
+          this.soundManager.playSfx(isLocalMessage ? "chat_send" : "chat_receive");
         }
       });
 
