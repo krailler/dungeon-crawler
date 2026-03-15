@@ -371,6 +371,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.x = spawnPos.x;
       player.z = spawnPos.z;
     }
+    player.rotY = Math.PI;
 
     this.state.players.set(client.sessionId, player);
     this.combatSystem.registerPlayer(client.sessionId);
@@ -776,13 +777,63 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   private findSpawnPosition(): { x: number; z: number } | null {
+    // Find the SPAWN tile as base position
+    let spawnTileX = -1;
+    let spawnTileY = -1;
     for (let y = 0; y < this.tileMap.height; y++) {
       for (let x = 0; x < this.tileMap.width; x++) {
         if (this.tileMap.get(x, y) === TileType.SPAWN) {
-          return { x: x * TILE_SIZE, z: y * TILE_SIZE };
+          spawnTileX = x;
+          spawnTileY = y;
+          break;
+        }
+      }
+      if (spawnTileX >= 0) break;
+    }
+    if (spawnTileX < 0) return null;
+
+    const minDist = 1.2; // minimum distance between players (world units)
+
+    // BFS outward from spawn tile to find a free walkable position
+    const visited = new Set<string>();
+    const queue: { tx: number; tz: number }[] = [{ tx: spawnTileX, tz: spawnTileY }];
+    visited.add(`${spawnTileX},${spawnTileY}`);
+
+    while (queue.length > 0) {
+      const { tx, tz } = queue.shift()!;
+      const wx = tx * TILE_SIZE;
+      const wz = tz * TILE_SIZE;
+
+      // Check if any existing player is too close to this position
+      let occupied = false;
+      this.state.players.forEach((p) => {
+        const dx = p.x - wx;
+        const dz = p.z - wz;
+        if (dx * dx + dz * dz < minDist * minDist) {
+          occupied = true;
+        }
+      });
+
+      if (!occupied) {
+        return { x: wx, z: wz };
+      }
+
+      // Expand to neighboring walkable tiles
+      for (const [nx, nz] of [
+        [tx - 1, tz],
+        [tx + 1, tz],
+        [tx, tz - 1],
+        [tx, tz + 1],
+      ]) {
+        const key = `${nx},${nz}`;
+        if (!visited.has(key) && this.tileMap.isFloor(nx, nz)) {
+          visited.add(key);
+          queue.push({ tx: nx, tz: nz });
         }
       }
     }
-    return null;
+
+    // Fallback: all nearby tiles occupied, return spawn anyway
+    return { x: spawnTileX * TILE_SIZE, z: spawnTileY * TILE_SIZE };
   }
 }
