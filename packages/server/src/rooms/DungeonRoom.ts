@@ -1,5 +1,6 @@
 import { Room, JWT } from "colyseus";
 import type { Client, AuthContext } from "colyseus";
+import { StateView } from "@colyseus/schema";
 import type { Logger } from "pino";
 import { eq } from "drizzle-orm";
 import { createRoomLogger, pid } from "../logger";
@@ -454,9 +455,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onJoin(client: Client): void {
     this.sessionManager.handleJoin(client);
-    // Add this player's secret state to the client's view so only they see it
+    // Create a StateView for this client and add their secret state
     const player = this.state.players.get(client.sessionId);
-    if (player && client.view) {
+    if (player) {
+      if (!client.view) {
+        client.view = new StateView();
+      }
       client.view.add(player.secret);
     }
   }
@@ -467,9 +471,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onReconnect(client: Client): void {
     this.sessionManager.handleReconnect(client);
-    // Re-add secret to the new client view after reconnect
+    // Re-create the view and add secret state after reconnect
     const player = this.state.players.get(client.sessionId);
-    if (player && client.view) {
+    if (player) {
+      if (!client.view) {
+        client.view = new StateView();
+      }
       client.view.add(player.secret);
     }
   }
