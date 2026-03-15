@@ -8,6 +8,7 @@
 const UI_SOUNDS = {
   ui_click: "/audio/ui/click.ogg",
   ui_rollover: "/audio/ui/rollover.ogg",
+  ui_announcement: "/audio/ui/announcement.ogg",
 } as const;
 
 type UiSoundName = keyof typeof UI_SOUNDS;

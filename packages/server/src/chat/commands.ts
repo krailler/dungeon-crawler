@@ -122,6 +122,44 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   });
 
   registry.register({
+    name: "leader",
+    usage: "/leader <player>",
+    description: "Transfer party leadership to a player",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /leader <player_name>", "cmd.usageLeader");
+        return;
+      }
+      const target = bridge.findPlayerByName(ctx.args[0]);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
+      if (target.player.isLeader) {
+        ctx.replyError(
+          `${target.player.characterName} is already the leader.`,
+          "cmd.alreadyLeader",
+          { name: target.player.characterName },
+        );
+        return;
+      }
+      const players = bridge.getAllPlayers();
+      players.forEach((p) => {
+        p.isLeader = false;
+      });
+      target.player.isLeader = true;
+      chat.broadcastSystemI18n(
+        "chat.leaderChanged",
+        { name: target.player.characterName },
+        `${target.player.characterName} is now the party leader.`,
+      );
+    },
+  });
+
+  registry.register({
     name: "kick",
     usage: "/kick <player>",
     description: "Kick a player from the room",

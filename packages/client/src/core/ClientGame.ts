@@ -15,7 +15,7 @@ import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
-import { preloadUiSounds } from "../audio/uiSfx";
+import { preloadUiSounds, playUiSfx } from "../audio/uiSfx";
 import { StateSync } from "./StateSync";
 import { ClientUpdateLoop } from "./ClientUpdateLoop";
 import { hudStore, mountHud, disposeHud } from "../ui/stores/hudStore";
@@ -200,6 +200,7 @@ export class ClientGame {
         // Announcements go to center-screen overlay, not chat panel
         if (entry.category === ChatCategory.ANNOUNCEMENT) {
           announcementStore.push(entry);
+          playUiSfx("ui_announcement");
           return;
         }
 
