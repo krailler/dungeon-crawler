@@ -340,86 +340,110 @@ export class ClientGame {
     state$.listen("dungeonVersion", () => {
       const tileMapData = (room.state as any).tileMapData as string;
       if (!tileMapData) return;
-      const flat = JSON.parse(tileMapData) as number[];
-      const width = (room.state as any).mapWidth;
-      const height = (room.state as any).mapHeight;
-      const tileMap = TileMap.fromSerialized(width, height, flat);
-      minimapStore.setTileMap(tileMap);
 
-      // Parse packed floor variant data from server
-      const variantRaw = (room.state as any).floorVariantData;
-      const floorVariants: number[] = variantRaw ? JSON.parse(variantRaw) : [];
-
-      // Parse packed wall variant data from server
-      const wallVariantRaw = (room.state as any).wallVariantData;
-      const wallVariants: number[] = wallVariantRaw ? JSON.parse(wallVariantRaw) : [];
-
-      // Scan packed values to find which tile sets are actually used (floors)
-      const usedFloorSets = new Set<string>();
-      for (const packed of floorVariants) {
-        if (packed === 0) continue;
-        const setId = unpackSetId(packed);
-        const name = tileSetNameFromId(setId);
-        if (name) usedFloorSets.add(name);
+      // If loading screen already dismissed, this is a restart — re-show it
+      const isRestart = !loadingStore.getSnapshot().visible;
+      if (isRestart) {
+        loadingStore.reset();
+        loadingStore.setPhase(LoadingPhase.DUNGEON_ASSETS);
+        // Dispose subsystems that will be recreated after render
+        this.inputManager?.dispose();
+        this.inputManager = null;
+        this.wallOcclusion?.dispose();
+        this.wallOcclusion = null;
       }
 
-      // Scan packed values to find which wall tile sets are used
-      const usedWallSets = new Set<string>();
-      for (const packed of wallVariants) {
-        if (packed === 0) continue;
-        const setId = unpackSetId(packed);
-        const name = tileSetNameFromId(setId);
-        if (name) usedWallSets.add(name);
+      // Rebuild dungeon — wrapped in a function so we can defer it on restart
+      // to let React paint the loading screen before the heavy work blocks the thread
+      const rebuildDungeon = (): void => {
+        const flat = JSON.parse(tileMapData) as number[];
+        const width = (room.state as any).mapWidth;
+        const height = (room.state as any).mapHeight;
+        const tileMap = TileMap.fromSerialized(width, height, flat);
+        minimapStore.setTileMap(tileMap);
+
+        // Parse packed floor variant data from server
+        const variantRaw = (room.state as any).floorVariantData;
+        const floorVariants: number[] = variantRaw ? JSON.parse(variantRaw) : [];
+
+        // Parse packed wall variant data from server
+        const wallVariantRaw = (room.state as any).wallVariantData;
+        const wallVariants: number[] = wallVariantRaw ? JSON.parse(wallVariantRaw) : [];
+
+        // Scan packed values to find which tile sets are actually used (floors)
+        const usedFloorSets = new Set<string>();
+        for (const packed of floorVariants) {
+          if (packed === 0) continue;
+          const setId = unpackSetId(packed);
+          const name = tileSetNameFromId(setId);
+          if (name) usedFloorSets.add(name);
+        }
+
+        // Scan packed values to find which wall tile sets are used
+        const usedWallSets = new Set<string>();
+        for (const packed of wallVariants) {
+          if (packed === 0) continue;
+          const setId = unpackSetId(packed);
+          const name = tileSetNameFromId(setId);
+          if (name) usedWallSets.add(name);
+        }
+
+        // Load only the sets this dungeon needs, then render
+        const floorSetNames = Array.from(usedFloorSets);
+        const wallSetNames = Array.from(usedWallSets);
+        console.log("[Client] Loading floor tile sets:", floorSetNames);
+        console.log("[Client] Loading wall tile sets:", wallSetNames);
+        this.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
+          loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
+          console.log("[Client] Assets loaded, rendering dungeon");
+          this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
+
+          // Place gate if position is set and gate is not yet open
+          const gateX = (room.state as any).gateX as number;
+          const gateY = (room.state as any).gateY as number;
+          const gateNS = (room.state as any).gateNS as boolean;
+          const gateDir = (room.state as any).gateDir as number;
+          if (gateX >= 0 && gateY >= 0 && !(room.state as any).gateOpen) {
+            this.dungeonRenderer.placeGate(gateX, gateY, gateNS, gateDir);
+          }
+
+          // Setup input after dungeon renders (sends move commands to server)
+          this.inputManager = new InputManager(
+            this.scene,
+            this.dungeonRenderer.getFloorMeshes(),
+            room,
+          );
+
+          // Setup wall occlusion (with wall decoration map for toggling)
+          this.wallOcclusion = new WallOcclusionSystem(
+            this.scene,
+            this.isoCamera.camera,
+            this.dungeonRenderer.getWallMeshes(),
+            this.dungeonRenderer.getWallDecoMap(),
+          );
+
+          // Enable shadow receiving on floor meshes
+          for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
+            mesh.receiveShadows = true;
+          }
+
+          // Loading complete — fade out loading screen
+          loadingStore.setPhase(LoadingPhase.COMPLETE);
+          loadingStore.startFadeOut();
+
+          // Mark ambient as ready — actual playback starts on first user click
+          // (AudioContext requires a user gesture to unlock)
+          this.ambientReady = true;
+          this.tryStartAmbient();
+        });
+      };
+
+      if (isRestart) {
+        // Yield two frames so React can paint the loading screen before heavy work
+        requestAnimationFrame(() => requestAnimationFrame(rebuildDungeon));
+      } else {
+        rebuildDungeon();
       }
-
-      // Load only the sets this dungeon needs, then render
-      const floorSetNames = Array.from(usedFloorSets);
-      const wallSetNames = Array.from(usedWallSets);
-      console.log("[Client] Loading floor tile sets:", floorSetNames);
-      console.log("[Client] Loading wall tile sets:", wallSetNames);
-      this.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
-        loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
-        console.log("[Client] Assets loaded, rendering dungeon");
-        this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
-
-        // Place gate if position is set and gate is not yet open
-        const gateX = (room.state as any).gateX as number;
-        const gateY = (room.state as any).gateY as number;
-        const gateNS = (room.state as any).gateNS as boolean;
-        const gateDir = (room.state as any).gateDir as number;
-        if (gateX >= 0 && gateY >= 0 && !(room.state as any).gateOpen) {
-          this.dungeonRenderer.placeGate(gateX, gateY, gateNS, gateDir);
-        }
-
-        // Setup input after dungeon renders (sends move commands to server)
-        this.inputManager = new InputManager(
-          this.scene,
-          this.dungeonRenderer.getFloorMeshes(),
-          room,
-        );
-
-        // Setup wall occlusion (with wall decoration map for toggling)
-        this.wallOcclusion = new WallOcclusionSystem(
-          this.scene,
-          this.isoCamera.camera,
-          this.dungeonRenderer.getWallMeshes(),
-          this.dungeonRenderer.getWallDecoMap(),
-        );
-
-        // Enable shadow receiving on floor meshes
-        for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
-          mesh.receiveShadows = true;
-        }
-
-        // Loading complete — fade out loading screen
-        loadingStore.setPhase(LoadingPhase.COMPLETE);
-        loadingStore.startFadeOut();
-
-        // Mark ambient as ready — actual playback starts on first user click
-        // (AudioContext requires a user gesture to unlock)
-        this.ambientReady = true;
-        this.tryStartAmbient();
-      });
     });
 
     // Players added

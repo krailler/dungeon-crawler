@@ -96,7 +96,7 @@
     "promptCancel": "Not Yet"
   },
   "announce": {
-    "gateCountdownStart": "{{name}} is opening the gate... {{seconds}}",
+    "gateCountdownStart": "{{name}} is opening the gate in {{seconds}} seconds...",
     "gateOpened": "The gate opens... The dungeon awaits!"
   },
   "cmd": {
