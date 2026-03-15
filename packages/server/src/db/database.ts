@@ -13,7 +13,10 @@ let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 export async function initDatabase(): Promise<ReturnType<typeof drizzle<typeof schema>>> {
   if (db) return db;
 
-  const sql = postgres(DATABASE_URL, { max: 10 });
+  const sql = postgres(DATABASE_URL, {
+    max: 10,
+    connection: { client_min_messages: "warning" },
+  });
   db = drizzle(sql, { schema });
 
   // Run migrations

@@ -46,6 +46,13 @@ export class PlayerSessionManager {
     this.log = log;
   }
 
+  /** Readable player identifier for logs: "CharName (ABC123)" or just "ABC123". */
+  private who(client: Client): string {
+    const player = this.bridge.state.players.get(client.sessionId);
+    const short = pid(client.sessionId);
+    return player ? `${player.characterName} (${short})` : short;
+  }
+
   handleJoin(client: Client): void {
     const {
       accountId,
@@ -78,15 +85,12 @@ export class PlayerSessionManager {
     const oldSessionId = this.accountToSession.get(accountId);
     const existingPlayer = oldSessionId ? this.bridge.state.players.get(oldSessionId) : undefined;
 
-    this.log.info(
-      { player: pid(client.sessionId), accountId, characterName, role },
-      "Player joined",
-    );
+    this.log.info({ player: characterName, accountId, role }, "Player joined");
 
     if (existingPlayer && oldSessionId && oldSessionId !== client.sessionId) {
       // Migrate existing player state to the new session
       this.log.info(
-        { player: pid(client.sessionId), oldSession: pid(oldSessionId) },
+        { player: characterName, oldSession: pid(oldSessionId) },
         "Migrating player state from old session",
       );
 
@@ -163,10 +167,7 @@ export class PlayerSessionManager {
     // If this client was kicked via /kick or party kick, state already cleaned up — just unregister
     // Don't delete from kickedSessions here; onLeave will consume it to skip the "left" broadcast
     if (this.kickedSessions.has(client.sessionId)) {
-      this.log.info(
-        { player: pid(client.sessionId) },
-        "Kicked player dropped — skipping reconnect",
-      );
+      this.log.info({ player: this.who(client) }, "Kicked player dropped — skipping reconnect");
       this.unregisterClient(client);
       return;
     }
@@ -178,7 +179,7 @@ export class PlayerSessionManager {
     this.processingDisconnect.add(client.sessionId);
 
     this.log.warn(
-      { player: pid(client.sessionId) },
+      { player: this.who(client) },
       `Player dropped — waiting ${RECONNECT_TIMEOUT}s for reconnect`,
     );
 
@@ -221,7 +222,7 @@ export class PlayerSessionManager {
     this.processingDisconnect.add(client.sessionId);
 
     this.log.warn(
-      { player: pid(client.sessionId) },
+      { player: this.who(client) },
       `Player left during dungeon — waiting ${RECONNECT_TIMEOUT}s for rejoin`,
     );
 
@@ -230,7 +231,7 @@ export class PlayerSessionManager {
   }
 
   handleReconnect(client: Client): void {
-    this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
+    this.log.info({ player: this.who(client) }, "Player reconnected");
     this.processingDisconnect.delete(client.sessionId);
     this.clearReconnectTimers(client.sessionId);
 
@@ -290,7 +291,7 @@ export class PlayerSessionManager {
   private handleReplacedSession(client: Client): boolean {
     const auth = client.auth as { accountId?: string } | undefined;
     if (auth?.accountId && !isActiveSession(auth.accountId, client)) {
-      this.log.info({ player: pid(client.sessionId) }, "Replaced session — removing immediately");
+      this.log.info({ player: this.who(client) }, "Replaced session — removing immediately");
       this.clearReconnectTimers(client.sessionId);
       this.removePlayerFromAllSystems(client.sessionId);
       this.processingDisconnect.delete(client.sessionId);
@@ -319,7 +320,7 @@ export class PlayerSessionManager {
 
   /** Remove the player after reconnect/rejoin timeout expired. */
   private expirePlayer(client: Client, playerName: string): void {
-    this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
+    this.log.info({ player: this.who(client) }, "Reconnection timed out — player removed");
     this.clearReconnectTimers(client.sessionId);
     const player = this.bridge.state.players.get(client.sessionId);
     if (player) {
@@ -360,7 +361,7 @@ export class PlayerSessionManager {
 
     const name = player.characterName;
     this.savePlayerProgress(player);
-    this.log.info({ player: pid(client.sessionId) }, "Player left");
+    this.log.info({ player: this.who(client) }, "Player left");
     this.removePlayerFromAllSystems(client.sessionId);
     this.removeAccountMapping(client);
     this.unregisterClient(client);

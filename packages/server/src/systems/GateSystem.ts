@@ -1,5 +1,6 @@
 import type { Client } from "colyseus";
 import type { ClockTimer } from "@colyseus/timer";
+import type { Logger } from "pino";
 import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder } from "../navigation/Pathfinder";
@@ -12,6 +13,7 @@ export interface GateSystemDeps {
   pathfinder: Pathfinder;
   chatSystem: ChatSystem;
   clock: ClockTimer;
+  log: Logger;
 }
 
 export class GateSystem {
@@ -19,6 +21,7 @@ export class GateSystem {
   private pathfinder: Pathfinder;
   private chatSystem: ChatSystem;
   private clock: ClockTimer;
+  private log: Logger;
   private gateCountdowns: Set<string> = new Set();
 
   constructor(deps: GateSystemDeps) {
@@ -26,10 +29,11 @@ export class GateSystem {
     this.pathfinder = deps.pathfinder;
     this.chatSystem = deps.chatSystem;
     this.clock = deps.clock;
+    this.log = deps.log;
   }
 
   /** Reset countdowns (called on dungeon regeneration). */
-  reset(deps: Omit<GateSystemDeps, "clock">): void {
+  reset(deps: Omit<GateSystemDeps, "clock" | "log">): void {
     this.gateCountdowns.clear();
     this.state = deps.state;
     this.pathfinder = deps.pathfinder;
@@ -90,6 +94,20 @@ export class GateSystem {
         gate.open = true;
         this.gateCountdowns.delete(data.gateId);
         this.pathfinder.unblockTile(gate.tileX, gate.tileY);
+
+        // Count party members
+        let partySize = 0;
+        this.state.players.forEach(() => partySize++);
+        this.log.info(
+          {
+            gate: data.gateId,
+            leader: leaderName,
+            partySize,
+            dungeonLevel: this.state.dungeonLevel,
+          },
+          "Dungeon started — gate opened",
+        );
+
         this.chatSystem.broadcastAnnouncement(
           "announce.gateOpened",
           {},

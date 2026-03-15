@@ -114,6 +114,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       pathfinder: this.pathfinder,
       chatSystem: this.chatSystem,
       clock: this.clock,
+      log: this.log,
     });
 
     // Setup session manager
