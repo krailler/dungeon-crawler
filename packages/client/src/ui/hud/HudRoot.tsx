@@ -131,7 +131,7 @@ export const HudRoot = (): JSX.Element => {
       <PauseMenu />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
-      <div className="absolute left-5 top-1/2 w-60 -translate-y-1/2">
+      <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">
             <div className="h-full w-full animate-glow-pulse rounded-full bg-sky-400/40" />
@@ -169,7 +169,7 @@ export const HudRoot = (): JSX.Element => {
           ))}
         </div>
       </div>
-      <div className="absolute right-5 top-4 flex items-center gap-2">
+      <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
           {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}
         </div>

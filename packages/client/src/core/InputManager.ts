@@ -10,6 +10,7 @@ export class InputManager {
   private scene: Scene;
   private floorMeshSet: Set<AbstractMesh>;
   private room: Room;
+  private canvas: HTMLCanvasElement;
   private isHolding: boolean = false;
   private lastSendTime: number = 0;
 
@@ -18,20 +19,21 @@ export class InputManager {
     this.floorMeshSet = new Set(floorMeshes);
     this.room = room;
 
-    const canvas = this.scene.getEngine().getRenderingCanvas()!;
+    this.canvas = this.scene.getEngine().getRenderingCanvas()!;
 
-    canvas.addEventListener("pointerdown", (ev) => {
+    this.canvas.addEventListener("pointerdown", (ev) => {
       if (ev.button !== 0) return;
+      if (this.isOverUi(ev)) return;
       this.isHolding = true;
       this.trySendMove();
     });
 
-    canvas.addEventListener("pointerup", (ev) => {
+    this.canvas.addEventListener("pointerup", (ev) => {
       if (ev.button !== 0) return;
       this.isHolding = false;
     });
 
-    canvas.addEventListener("pointerleave", () => {
+    this.canvas.addEventListener("pointerleave", () => {
       this.isHolding = false;
     });
 
@@ -44,7 +46,28 @@ export class InputManager {
     });
   }
 
+  /**
+   * Returns true when the pointer is over a UI overlay element.
+   * Uses elementFromPoint to check the topmost element under the cursor;
+   * if it's anything other than the canvas, the UI is consuming the event.
+   */
+  private isOverUi(ev: PointerEvent): boolean {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    return !!el && el !== this.canvas;
+  }
+
+  /** Check if the current Babylon pointer position is over UI (for hold-and-drag). */
+  private isPointerOverUi(): boolean {
+    const engine = this.scene.getEngine();
+    const rect = this.canvas.getBoundingClientRect();
+    const clientX = rect.left + this.scene.pointerX / engine.getHardwareScalingLevel();
+    const clientY = rect.top + this.scene.pointerY / engine.getHardwareScalingLevel();
+    const el = document.elementFromPoint(clientX, clientY);
+    return !!el && el !== this.canvas;
+  }
+
   private trySendMove(): void {
+    if (this.isPointerOverUi()) return;
     const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
     if (pick && pick.hit && pick.pickedPoint && pick.pickedMesh) {
       if (this.floorMeshSet.has(pick.pickedMesh)) {
