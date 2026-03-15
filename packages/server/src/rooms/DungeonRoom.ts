@@ -36,6 +36,7 @@ import type {
   AdminRestartMessage,
   CombatLogMessage,
   ChatSendPayload,
+  PromoteLeaderMessage,
   DebugPathEntry,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
@@ -139,6 +140,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const role = (client.auth as { role: string })?.role ?? "user";
       const commands = this.chatSystem.getCommandsForRole(role);
       client.send(MessageType.CHAT_COMMANDS, commands);
+    });
+    // Party: promote another player to leader (only current leader can do this)
+    this.onMessage(MessageType.PROMOTE_LEADER, (client: Client, data: PromoteLeaderMessage) => {
+      const sender = this.state.players.get(client.sessionId);
+      if (!sender?.isLeader) return; // only leader can promote
+      const target = this.state.players.get(data.targetSessionId);
+      if (!target || data.targetSessionId === client.sessionId) return;
+      // Transfer leadership
+      this.state.players.forEach((p: PlayerState) => {
+        p.isLeader = false;
+      });
+      target.isLeader = true;
+      this.chatSystem.broadcastSystemI18n(
+        "chat.leaderChanged",
+        { name: target.characterName },
+        `${target.characterName} is now the party leader.`,
+      );
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {

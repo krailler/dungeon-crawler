@@ -1,5 +1,8 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import type { Room } from "@colyseus/sdk";
+import { MessageType } from "@dungeon/shared";
+import type { PromoteLeaderMessage } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
 export type CharacterStats = {
@@ -39,6 +42,7 @@ type MemberMap = Map<string, PartyMember>;
 const listeners = new Set<Listener>();
 const members: MemberMap = new Map();
 const order: string[] = [];
+let room: Room | null = null;
 
 let fps = 0;
 let ping = 0;
@@ -82,6 +86,12 @@ const sortedMembers = (): PartyMember[] => {
 };
 
 export const hudStore = {
+  setRoom(r: Room): void {
+    room = r;
+  },
+  clearRoom(): void {
+    room = null;
+  },
   subscribe(listener: Listener): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
@@ -149,8 +159,14 @@ export const hudStore = {
     fpsFrames = 0;
     connectionStatus = "connecting";
     connectionInfo = "";
+    room = null;
     rebuildSnapshot();
     emit();
+  },
+  promoteLeader(targetSessionId: string): void {
+    if (!room) return;
+    const msg: PromoteLeaderMessage = { targetSessionId };
+    room.send(MessageType.PROMOTE_LEADER, msg);
   },
 };
 

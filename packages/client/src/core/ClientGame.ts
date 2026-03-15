@@ -178,6 +178,7 @@ export class ClientGame {
 
       this.room = room;
       adminStore.setRoom(room);
+      hudStore.setRoom(room);
       this.localSessionId = room.sessionId;
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);

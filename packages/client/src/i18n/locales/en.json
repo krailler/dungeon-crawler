@@ -23,7 +23,8 @@
     "subtitle": "Expedition",
     "roleLeader": "Leader",
     "roleMember": "Member",
-    "waiting": "Waiting for adventurers..."
+    "waiting": "Waiting for adventurers...",
+    "promoteLeader": "Promote to Leader"
   },
   "connection": {
     "connecting": "Connecting...",
@@ -82,7 +83,8 @@
     "unknownCommand": "Unknown command: /{{name}}",
     "adminRequired": "This command requires admin privileges.",
     "killedByAdmin": "{{name}} has been slain by divine intervention!",
-    "kicked": "{{name}} has been kicked."
+    "kicked": "{{name}} has been kicked.",
+    "leaderChanged": "{{name}} is now the party leader."
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

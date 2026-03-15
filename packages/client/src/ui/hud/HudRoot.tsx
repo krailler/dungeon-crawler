@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "../stores/hudStore";
 import { hudStore } from "../stores/hudStore";
@@ -22,7 +22,13 @@ const formatHealth = (member: PartyMember): string => {
   return `${current}/${max}`;
 };
 
-const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
+const PartyRow = ({
+  member,
+  onContextMenu,
+}: {
+  member: PartyMember;
+  onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
+}): JSX.Element => {
   const { t } = useTranslation();
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
@@ -30,6 +36,7 @@ const PartyRow = ({ member }: { member: PartyMember }): JSX.Element => {
 
   return (
     <div
+      onContextMenu={(e) => onContextMenu(e, member)}
       className={[
         "animate-rise-in rounded-2xl border px-3 py-2 shadow-lg shadow-black/30",
         "backdrop-blur-md transition-all",
@@ -130,6 +137,13 @@ const MapButton = ({ isOpen, onClick }: { isOpen: boolean; onClick: () => void }
   );
 };
 
+/** Context menu state */
+type ContextMenuState = {
+  x: number;
+  y: number;
+  member: PartyMember;
+} | null;
+
 export const HudRoot = (): JSX.Element => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
@@ -142,6 +156,39 @@ export const HudRoot = (): JSX.Element => {
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
   const closeCharacter = useCallback(() => setCharacterOpen(false), []);
+
+  // Context menu for party members
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
+  const localMember = useMemo(() => members.find((m) => m.isLocal), [members]);
+
+  const handlePartyContextMenu = useCallback((e: React.MouseEvent, member: PartyMember) => {
+    e.preventDefault();
+    // Don't show context menu on yourself
+    if (member.isLocal) return;
+    setCtxMenu({ x: e.clientX, y: e.clientY, member });
+  }, []);
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  // Close context menu on click outside or Escape
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
+        setCtxMenu(null);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCtxMenu(null);
+    };
+    window.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [ctxMenu]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -195,10 +242,46 @@ export const HudRoot = (): JSX.Element => {
             </div>
           )}
           {members.map((member) => (
-            <PartyRow key={member.id} member={member} />
+            <PartyRow key={member.id} member={member} onContextMenu={handlePartyContextMenu} />
           ))}
         </div>
       </div>
+
+      {/* Party context menu */}
+      {ctxMenu && (
+        <div
+          ref={ctxMenuRef}
+          className="pointer-events-auto fixed z-[100] min-w-[160px] rounded-lg border border-slate-600/50 bg-slate-900/95 py-1 shadow-xl shadow-black/40 backdrop-blur"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+        >
+          <div className="border-b border-slate-700/50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            {ctxMenu.member.name}
+          </div>
+          <button
+            onClick={() => {
+              hudStore.promoteLeader(ctxMenu.member.id);
+              closeCtxMenu();
+            }}
+            disabled={!localMember?.isLeader}
+            className={[
+              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
+              localMember?.isLeader
+                ? "text-slate-200 hover:bg-slate-700/50"
+                : "cursor-default text-slate-200 opacity-40",
+            ].join(" ")}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3.5 w-3.5 text-amber-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            {t("party.promoteLeader")}
+          </button>
+        </div>
+      )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
         <div className="rounded-full border border-slate-500/30 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-300 backdrop-blur">
           {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}

@@ -49,6 +49,7 @@ export type {
   MoveMessage,
   AdminRestartMessage,
   CombatLogMessage,
+  PromoteLeaderMessage,
   ChatSendPayload,
   ChatEntry,
   ChatCategoryValue,

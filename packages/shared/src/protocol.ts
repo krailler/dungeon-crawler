@@ -7,6 +7,7 @@ export const MessageType = {
   CHAT_ENTRY: "chat:entry",
   CHAT_COMMANDS: "chat:commands",
   DEBUG_PATHS: "debug:paths",
+  PROMOTE_LEADER: "party:promote",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -106,6 +107,13 @@ export interface DebugPathEntry {
 /** Payload for DEBUG_PATHS message (Server → Client) */
 export interface DebugPathsMessage {
   paths: DebugPathEntry[];
+}
+
+// ── Party ─────────────────────────────────────────────────────────────────────
+
+/** Client → Server: promote a player to leader */
+export interface PromoteLeaderMessage {
+  targetSessionId: string;
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
