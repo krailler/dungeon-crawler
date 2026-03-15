@@ -285,8 +285,12 @@ export class ClientGame {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[Client] Failed to connect:", err);
-      hudStore.setConnection("error", msg);
-      loadingStore.setPhase(LoadingPhase.ERROR);
+      if (msg.includes("DUNGEON_STARTED")) {
+        authStore.kick(t("kick.dungeonStarted"));
+      } else {
+        hudStore.setConnection("error", msg);
+        loadingStore.setPhase(LoadingPhase.ERROR);
+      }
     }
   }
 

@@ -53,7 +53,7 @@ import {
 } from "../sessions/activeSessionRegistry";
 
 const TICK_RATE = 64; // ms between simulation ticks
-const RECONNECT_TIMEOUT = 120; // seconds
+const RECONNECT_TIMEOUT = 60 * 5; // seconds - default: 5 minutes
 /** Remaining seconds at which to send reconnection warnings */
 const RECONNECT_WARNINGS = [30, 10];
 
@@ -416,6 +416,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       .where(eq(characters.accountId, account.id))
       .limit(1);
     if (!character) throw new Error("No character found");
+
+    // Block new players if the dungeon has already started (lobby gate open)
+    // Allow returning players (account already has a disconnected player in the room)
+    if (this.isDungeonStarted()) {
+      const oldSessionId = this.accountToSession.get(account.id);
+      const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
+      if (!existingPlayer) {
+        throw new Error("DUNGEON_STARTED");
+      }
+    }
 
     return {
       accountId: account.id,
@@ -902,6 +912,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.aiSystem.register(enemy, id, typeDef.leashRange);
       }
     }
+  }
+
+  /** Returns true if the lobby gate has been opened (dungeon expedition active) */
+  private isDungeonStarted(): boolean {
+    const lobbyGate = this.state.gates.get("lobby");
+    return lobbyGate ? lobbyGate.open : false;
   }
 
   private reassignLeader(): void {
