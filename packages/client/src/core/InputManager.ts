@@ -14,6 +14,12 @@ export class InputManager {
   private isHolding: boolean = false;
   private lastSendTime: number = 0;
 
+  // Bound handlers for cleanup
+  private handlePointerDown: (ev: PointerEvent) => void;
+  private handlePointerUp: (ev: PointerEvent) => void;
+  private handlePointerLeave: () => void;
+  private renderObserver: import("@babylonjs/core/Misc/observable").Observer<Scene> | null = null;
+
   constructor(scene: Scene, floorMeshes: AbstractMesh[], room: Room) {
     this.scene = scene;
     this.floorMeshSet = new Set(floorMeshes);
@@ -21,24 +27,28 @@ export class InputManager {
 
     this.canvas = this.scene.getEngine().getRenderingCanvas()!;
 
-    this.canvas.addEventListener("pointerdown", (ev) => {
+    this.handlePointerDown = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
       if (this.isOverUi(ev)) return;
       this.isHolding = true;
       this.trySendMove();
-    });
+    };
 
-    this.canvas.addEventListener("pointerup", (ev) => {
+    this.handlePointerUp = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
       this.isHolding = false;
-    });
+    };
 
-    this.canvas.addEventListener("pointerleave", () => {
+    this.handlePointerLeave = () => {
       this.isHolding = false;
-    });
+    };
+
+    this.canvas.addEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.addEventListener("pointerup", this.handlePointerUp);
+    this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
 
     // While holding, continuously send move toward cursor
-    this.scene.onBeforeRenderObservable.add(() => {
+    this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
       if (!this.isHolding) return;
       const now = performance.now();
       if (now - this.lastSendTime < HOLD_SEND_INTERVAL) return;
@@ -77,6 +87,16 @@ export class InputManager {
         });
         this.lastSendTime = performance.now();
       }
+    }
+  }
+
+  dispose(): void {
+    this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+    this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
+    if (this.renderObserver) {
+      this.scene.onBeforeRenderObservable.remove(this.renderObserver);
+      this.renderObserver = null;
     }
   }
 }

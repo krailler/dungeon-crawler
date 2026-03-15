@@ -69,8 +69,10 @@ export class ClientGame {
   private enemies: Map<string, ClientEnemy> = new Map();
   private localSessionId: string = "";
   private pingInterval: number = 0;
+  private inputManager: InputManager | null = null;
   private lastDebug: DebugSnapshot = debugStore.getSnapshot();
   private onKeyDown: (ev: KeyboardEvent) => void;
+  private onResize: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
 
@@ -105,9 +107,10 @@ export class ClientGame {
       this.scene.render();
     });
 
-    window.addEventListener("resize", () => {
+    this.onResize = () => {
       this.engine.resize();
-    });
+    };
+    window.addEventListener("resize", this.onResize);
 
     // Keyboard shortcuts
     this.onKeyDown = (ev: KeyboardEvent) => {
@@ -331,7 +334,11 @@ export class ClientGame {
         this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
 
         // Setup input after dungeon renders (sends move commands to server)
-        new InputManager(this.scene, this.dungeonRenderer.getFloorMeshes(), room);
+        this.inputManager = new InputManager(
+          this.scene,
+          this.dungeonRenderer.getFloorMeshes(),
+          room,
+        );
 
         // Setup wall occlusion (with wall decoration map for toggling)
         this.wallOcclusion = new WallOcclusionSystem(
@@ -610,15 +617,34 @@ export class ClientGame {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("resize", this.onResize);
     if (this.onPointerDown) {
       window.removeEventListener("pointerdown", this.onPointerDown);
     }
+
+    // Dispose all entity instances
+    for (const [, player] of this.players) {
+      player.dispose();
+    }
+    this.players.clear();
+    for (const [, enemy] of this.enemies) {
+      enemy.dispose();
+    }
+    this.enemies.clear();
+
+    // Dispose subsystems
+    this.inputManager?.dispose();
+    this.wallOcclusion?.dispose();
+
     disposeLoading();
     disposeHud();
     minimapStore.reset();
     this.soundManager.dispose();
+    this.playerLoader.dispose();
+    this.enemyLoader.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();
+    this.guiTexture.dispose();
     this.engine.dispose();
   }
 }

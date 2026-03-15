@@ -120,4 +120,28 @@ export class WallOcclusionSystem {
       }
     }
   }
+
+  dispose(): void {
+    // Restore all faded walls to original materials before disposing
+    for (const wall of this.fadedWalls) {
+      const decos = this.wallDecoMap.get(wall);
+      if (decos) {
+        for (const root of decos) {
+          for (const child of root.getChildMeshes(false)) {
+            const cached = this.decoMaterialCache.get(child);
+            if (cached) {
+              child.material = cached.original;
+            }
+          }
+        }
+      }
+    }
+    this.fadedWalls.clear();
+
+    // Dispose cloned faded materials
+    for (const [, { faded }] of this.decoMaterialCache) {
+      faded.dispose();
+    }
+    this.decoMaterialCache.clear();
+  }
 }
