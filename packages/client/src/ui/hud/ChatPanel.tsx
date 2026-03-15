@@ -236,6 +236,9 @@ const PlayerSuggestOverlay = ({
 
 // ── ChatPanel ───────────────────────────────────────────────────────────────
 
+/** Max number of sent messages to remember */
+const HISTORY_MAX = 50;
+
 export const ChatPanel = (): JSX.Element => {
   const snapshot = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
@@ -246,6 +249,11 @@ export const ChatPanel = (): JSX.Element => {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
+
+  // Chat history (arrow up/down navigation)
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const draftRef = useRef("");
 
   // Player names from HUD store
   const playerNames = useMemo(() => hudSnapshot.members.map((m) => m.name), [hudSnapshot.members]);
@@ -312,7 +320,15 @@ export const ChatPanel = (): JSX.Element => {
     const text = inputValue.trim();
     if (text && sendChatFn) {
       sendChatFn(text);
+      // Push to history (avoid duplicating the last entry)
+      const history = historyRef.current;
+      if (history.length === 0 || history[history.length - 1] !== text) {
+        history.push(text);
+        if (history.length > HISTORY_MAX) history.shift();
+      }
     }
+    historyIndexRef.current = -1;
+    draftRef.current = "";
     setInputValue("");
     chatStore.setInputOpen(false);
   }, [inputValue]);
@@ -326,6 +342,30 @@ export const ChatPanel = (): JSX.Element => {
       } else if (e.key === "Escape") {
         setInputValue("");
         chatStore.setInputOpen(false);
+      } else if (e.key === "ArrowUp") {
+        const history = historyRef.current;
+        if (history.length === 0) return;
+        e.preventDefault();
+        if (historyIndexRef.current === -1) {
+          // Save current draft before navigating
+          draftRef.current = inputValue;
+          historyIndexRef.current = history.length - 1;
+        } else if (historyIndexRef.current > 0) {
+          historyIndexRef.current--;
+        }
+        setInputValue(history[historyIndexRef.current]);
+      } else if (e.key === "ArrowDown") {
+        if (historyIndexRef.current === -1) return;
+        e.preventDefault();
+        const history = historyRef.current;
+        if (historyIndexRef.current < history.length - 1) {
+          historyIndexRef.current++;
+          setInputValue(history[historyIndexRef.current]);
+        } else {
+          // Past the end — restore draft
+          historyIndexRef.current = -1;
+          setInputValue(draftRef.current);
+        }
       } else if (e.key === "Tab") {
         e.preventDefault();
 
