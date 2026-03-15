@@ -11,11 +11,13 @@ export const GatePrompt = (): JSX.Element | null => {
     if (!gate.showPrompt) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.stopImmediatePropagation();
         gateStore.hidePrompt();
       }
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    // Use capture phase so this runs BEFORE any bubble-phase listeners (PauseMenu, etc.)
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
   }, [gate.showPrompt]);
 
   // "Press F" hint
