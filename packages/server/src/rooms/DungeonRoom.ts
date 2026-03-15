@@ -45,6 +45,9 @@ import {
 } from "../sessions/activeSessionRegistry";
 
 const TICK_RATE = 64; // ms between simulation ticks
+const RECONNECT_TIMEOUT = 120; // seconds
+/** Remaining seconds at which to send reconnection warnings */
+const RECONNECT_WARNINGS = [30, 10];
 
 /** Fixed seed for deterministic dungeon generation (set to null for random). */
 const DUNGEON_SEED: number | null = 42;
@@ -61,6 +64,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tickCount: number = 0;
   /** Sessions kicked via /kick — skip reconnection in onDrop */
   private kickedSessions: Set<string> = new Set();
+  /** Pending reconnection warning timers — cancelled on reconnect */
+  private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
@@ -355,18 +360,41 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.path = [];
       player.currentPathIndex = 0;
       this.chatSystem.broadcastSystemI18n(
-        "chat.disconnected",
-        { name: player.characterName },
-        `${player.characterName} disconnected.`,
+        "chat.disconnectedWithTime",
+        { name: player.characterName, seconds: RECONNECT_TIMEOUT },
+        `${player.characterName} disconnected. ${RECONNECT_TIMEOUT}s to reconnect.`,
       );
     }
 
-    // Allow reconnection for 120 seconds
+    // Schedule warning timers
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const playerName = player?.characterName || client.sessionId.slice(0, 6);
+    for (const remaining of RECONNECT_WARNINGS) {
+      const delay = (RECONNECT_TIMEOUT - remaining) * 1000;
+      timers.push(
+        setTimeout(() => {
+          this.chatSystem.broadcastSystemI18n(
+            "chat.reconnectWarning",
+            { name: playerName, seconds: remaining },
+            `${playerName} has ${remaining}s to reconnect.`,
+          );
+        }, delay),
+      );
+    }
+    this.reconnectTimers.set(client.sessionId, timers);
+
+    // Allow reconnection
     try {
-      await this.allowReconnection(client, 120);
+      await this.allowReconnection(client, RECONNECT_TIMEOUT);
     } catch {
       // Reconnection timed out — remove player
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
+      this.clearReconnectTimers(client.sessionId);
+      this.chatSystem.broadcastSystemI18n(
+        "chat.reconnectExpired",
+        { name: playerName },
+        `${playerName} failed to reconnect and has been removed.`,
+      );
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
       this.aiSystem.removePlayer(client.sessionId);
@@ -377,6 +405,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onReconnect(client: Client): void {
     this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
+    this.clearReconnectTimers(client.sessionId);
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.online = true;
@@ -399,6 +428,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.unregisterClient(client);
     this.reassignLeader();
     this.chatSystem.broadcastSystemI18n("chat.left", { name }, `${name} left the dungeon.`);
+  }
+
+  private clearReconnectTimers(sessionId: string): void {
+    const timers = this.reconnectTimers.get(sessionId);
+    if (timers) {
+      for (const t of timers) clearTimeout(t);
+      this.reconnectTimers.delete(sessionId);
+    }
   }
 
   private unregisterClient(client: Client): void {
