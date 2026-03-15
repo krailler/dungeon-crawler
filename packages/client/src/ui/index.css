@@ -79,7 +79,7 @@ body {
 
 @layer utilities {
   .animate-rise-in {
-    animation: rise-in 0.35s ease-out both;
+    animation: rise-in 0.35s ease-out backwards;
   }
 
   .animate-glow-pulse {
