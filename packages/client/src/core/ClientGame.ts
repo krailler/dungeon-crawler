@@ -78,7 +78,6 @@ export class ClientGame {
   private pingInterval: number = 0;
   private inputManager: InputManager | null = null;
   private lastDebug: DebugSnapshot = debugStore.getSnapshot();
-  private onKeyDown: (ev: KeyboardEvent) => void;
   private onResize: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
@@ -122,26 +121,6 @@ export class ClientGame {
       this.engine.resize();
     };
     window.addEventListener("resize", this.onResize);
-
-    // Keyboard shortcuts
-    this.onKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key === "f" || ev.key === "F") {
-        // Don't trigger if typing in an input
-        if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement)
-          return;
-        const gate = gateStore.getSnapshot();
-        if (gate.showInteractHint && !gate.isOpen) {
-          promptStore.show({
-            title: t("gate.promptTitle"),
-            message: t("gate.promptMessage"),
-            confirmLabel: t("gate.promptAccept"),
-            cancelLabel: t("gate.promptCancel"),
-            onConfirm: () => gateStore.confirmOpen(),
-          });
-        }
-      }
-    };
-    window.addEventListener("keydown", this.onKeyDown);
 
     // Load assets then connect to server
     this.init();
@@ -324,20 +303,33 @@ export class ClientGame {
       adminStore.setTickRate(value);
     });
 
-    // Gate state listeners
-    state$.listen("gateOpen", (value: boolean) => {
-      gateStore.setOpen(value);
-      if (value) {
-        this.dungeonRenderer.openGate();
-      }
+    // Gate state listeners (MapSchema<GateState>)
+    // NOTE: onAdd fires for initial state BEFORE the async dungeon render completes,
+    // so we only track data in stores here. Mesh placement happens after render()
+    // inside the dungeonVersion listener, which iterates room.state.gates explicitly.
+    state$.gates.onAdd((gate: any, gateId: string) => {
+      const tileX = gate.tileX as number;
+      const tileY = gate.tileY as number;
+      const open = gate.open as boolean;
+      const gateType = (gate.gateType as string) || "lobby";
+
+      gateStore.addGate(gateId, gateType, tileX, tileY, open);
+      minimapStore.addGatePosition(gateId, tileX, tileY);
+
+      // Listen for changes on this gate (open/close)
+      $(gate).onChange(() => {
+        const nowOpen = gate.open as boolean;
+        gateStore.setGateOpen(gateId, nowOpen);
+        if (nowOpen) {
+          this.dungeonRenderer.openGateById(gateId);
+        }
+      });
     });
-    state$.listen("gateX", (value: number) => {
-      const gy = (room.state as any).gateY as number;
-      minimapStore.setGatePosition(value, gy);
-    });
-    state$.listen("gateY", (value: number) => {
-      const gx = (room.state as any).gateX as number;
-      minimapStore.setGatePosition(gx, value);
+
+    state$.gates.onRemove((_gate: any, gateId: string) => {
+      gateStore.removeGate(gateId);
+      minimapStore.removeGatePosition(gateId);
+      this.dungeonRenderer.removeGate(gateId);
     });
 
     // Listen for dungeon version (fires on join and every restart, even same-seed)
@@ -402,13 +394,16 @@ export class ClientGame {
           console.log("[Client] Assets loaded, rendering dungeon");
           this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
 
-          // Place gate if position is set and gate is not yet open
-          const gateX = (room.state as any).gateX as number;
-          const gateY = (room.state as any).gateY as number;
-          const gateNS = (room.state as any).gateNS as boolean;
-          const gateDir = (room.state as any).gateDir as number;
-          if (gateX >= 0 && gateY >= 0 && !(room.state as any).gateOpen) {
-            this.dungeonRenderer.placeGate(gateX, gateY, gateNS, gateDir);
+          // Place gate meshes from current state (onAdd already tracked data in stores,
+          // but mesh placement must happen after render since render() disposes everything)
+          const gates = (room.state as any).gates;
+          if (gates) {
+            gates.forEach((gate: any, gateId: string) => {
+              const open = gate.open as boolean;
+              if (!open && gate.tileX >= 0 && gate.tileY >= 0) {
+                this.dungeonRenderer.placeGate(gateId, gate.tileX, gate.tileY, gate.isNS, gate.dir);
+              }
+            });
           }
 
           // Setup input after dungeon renders (sends move commands to server)
@@ -622,26 +617,35 @@ export class ClientGame {
       }
     }
 
-    // Gate proximity check — show interaction hint for leader
-    if (localPlayer) {
-      const gate = gateStore.getSnapshot();
-      if (!gate.isOpen && !promptStore.getSnapshot().current) {
-        const gatePos = this.dungeonRenderer.getGateWorldPosition();
-        if (gatePos) {
-          const pPos = localPlayer.getWorldPosition();
-          const gdx = pPos.x - gatePos.x;
-          const gdz = pPos.z - gatePos.z;
-          const distSq = gdx * gdx + gdz * gdz;
-          // Check if local player is leader
-          const localMember = hudStore.getSnapshot().members.find((m) => m.isLocal);
-          const isLeader = localMember?.isLeader ?? false;
-          gateStore.setInteractHint(
-            isLeader && distSq <= GATE_INTERACT_RANGE * GATE_INTERACT_RANGE,
-          );
-        } else {
-          gateStore.setInteractHint(false);
+    // Gate proximity check — find nearest interactable gate for "Press F" hint
+    if (localPlayer && !promptStore.getSnapshot().current) {
+      const gateWorldPositions = this.dungeonRenderer.getGateWorldPositions();
+      const gateSnap = gateStore.getSnapshot();
+      const pPos = localPlayer.getWorldPosition();
+      const localMember = hudStore.getSnapshot().members.find((m) => m.isLocal);
+      const isLeader = localMember?.isLeader ?? false;
+      const rangeSq = GATE_INTERACT_RANGE * GATE_INTERACT_RANGE;
+
+      let nearestId: string | null = null;
+      let nearestDistSq = Infinity;
+
+      for (const [id, wpos] of gateWorldPositions) {
+        // Skip gates that are already open
+        const info = gateSnap.gates.get(id);
+        if (!info || info.isOpen) continue;
+        // Lobby gates require leader
+        if (info.gateType === "lobby" && !isLeader) continue;
+
+        const dx = pPos.x - wpos.x;
+        const dz = pPos.z - wpos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq <= rangeSq && distSq < nearestDistSq) {
+          nearestDistSq = distSq;
+          nearestId = id;
         }
       }
+
+      gateStore.setNearestInteractable(nearestId);
     }
 
     // Update debug coords
@@ -801,7 +805,6 @@ export class ClientGame {
     localStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);
-    window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("resize", this.onResize);
     if (this.onPointerDown) {
       window.removeEventListener("pointerdown", this.onPointerDown);

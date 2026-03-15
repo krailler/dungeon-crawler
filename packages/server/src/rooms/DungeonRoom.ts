@@ -8,6 +8,7 @@ import { accounts, characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { EnemyState } from "../state/EnemyState";
+import { GateState } from "../state/GateState";
 import { DungeonGenerator } from "../dungeon/DungeonGenerator";
 import type { Room as DungeonRoomDef } from "../dungeon/DungeonGenerator";
 import { Pathfinder } from "../navigation/Pathfinder";
@@ -39,6 +40,7 @@ import type {
   CombatLogMessage,
   ChatSendPayload,
   PromoteLeaderMessage,
+  GateInteractMessage,
   DebugPathEntry,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
@@ -74,11 +76,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private accountToSession: Map<string, string> = new Map();
   /** Clients subscribed to debug path visualization */
   private debugPathClients: Set<string> = new Set();
-  /** Gate tile position (corridor exit from spawn room) */
-  private gateTileX: number = -1;
-  private gateTileY: number = -1;
-  /** Whether a gate countdown is currently in progress */
-  private gateCountdownActive: boolean = false;
+  /** Gate ids with an active countdown in progress */
+  private gateCountdowns: Set<string> = new Set();
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
@@ -165,12 +164,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         `${target.characterName} is now the party leader.`,
       );
     });
-    // Gate: leader opens the lobby gate (with countdown)
-    this.onMessage(MessageType.GATE_INTERACT, (client: Client) => {
-      if (this.state.gateOpen || this.gateCountdownActive) return;
+    // Gate: leader opens a gate (with countdown for lobby type)
+    this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: GateInteractMessage) => {
+      const gate = this.state.gates.get(data.gateId);
+      if (!gate || gate.open || this.gateCountdowns.has(data.gateId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
-      if (!player.isLeader) {
+
+      // Lobby gates require leader
+      if (gate.gateType === "lobby" && !player.isLeader) {
         this.chatSystem.sendToClientI18n(
           client,
           "message",
@@ -181,50 +183,54 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         );
         return;
       }
+
       // Check proximity
-      if (this.gateTileX < 0) return;
-      const gateWX = this.gateTileX * TILE_SIZE;
-      const gateWZ = this.gateTileY * TILE_SIZE;
+      const gateWX = gate.tileX * TILE_SIZE;
+      const gateWZ = gate.tileY * TILE_SIZE;
       const dx = player.x - gateWX;
       const dz = player.z - gateWZ;
       if (dx * dx + dz * dz > GATE_INTERACT_RANGE * GATE_INTERACT_RANGE) return;
 
-      // Start countdown
-      this.gateCountdownActive = true;
-      const leaderName = player.characterName || client.sessionId.slice(0, 6);
-      this.chatSystem.broadcastAnnouncement(
-        "announce.gateCountdownStart",
-        { name: leaderName, seconds: GATE_COUNTDOWN_SECONDS },
-        `${leaderName} is opening the gate... ${GATE_COUNTDOWN_SECONDS}`,
-      );
-
-      // Countdown ticks (reuse same key with updated seconds)
-      for (let s = GATE_COUNTDOWN_SECONDS - 1; s >= 1; s--) {
-        this.clock.setTimeout(
-          () => {
-            if (this.state.gateOpen) return; // safety
-            this.chatSystem.broadcastAnnouncement(
-              "announce.gateCountdownStart",
-              { name: leaderName, seconds: s },
-              `${leaderName} is opening the gate... ${s}`,
-            );
-          },
-          (GATE_COUNTDOWN_SECONDS - s) * 1000,
-        );
-      }
-
-      // Open gate after countdown
-      this.clock.setTimeout(() => {
-        if (this.state.gateOpen) return;
-        this.state.gateOpen = true;
-        this.gateCountdownActive = false;
-        this.pathfinder.unblockTile(this.gateTileX, this.gateTileY);
+      // Lobby gates use countdown; other types open immediately
+      if (gate.gateType === "lobby") {
+        this.gateCountdowns.add(data.gateId);
+        const leaderName = player.characterName || client.sessionId.slice(0, 6);
         this.chatSystem.broadcastAnnouncement(
-          "announce.gateOpened",
-          {},
-          "The gate opens... The dungeon awaits!",
+          "announce.gateCountdownStart",
+          { name: leaderName, seconds: GATE_COUNTDOWN_SECONDS },
+          `${leaderName} is opening the gate... ${GATE_COUNTDOWN_SECONDS}`,
         );
-      }, GATE_COUNTDOWN_SECONDS * 1000);
+
+        for (let s = GATE_COUNTDOWN_SECONDS - 1; s >= 1; s--) {
+          this.clock.setTimeout(
+            () => {
+              if (gate.open) return;
+              this.chatSystem.broadcastAnnouncement(
+                "announce.gateCountdownStart",
+                { name: leaderName, seconds: s },
+                `${leaderName} is opening the gate... ${s}`,
+              );
+            },
+            (GATE_COUNTDOWN_SECONDS - s) * 1000,
+          );
+        }
+
+        this.clock.setTimeout(() => {
+          if (gate.open) return;
+          gate.open = true;
+          this.gateCountdowns.delete(data.gateId);
+          this.pathfinder.unblockTile(gate.tileX, gate.tileY);
+          this.chatSystem.broadcastAnnouncement(
+            "announce.gateOpened",
+            {},
+            "The gate opens... The dungeon awaits!",
+          );
+        }, GATE_COUNTDOWN_SECONDS * 1000);
+      } else {
+        // Non-lobby gates open immediately
+        gate.open = true;
+        this.pathfinder.unblockTile(gate.tileX, gate.tileY);
+      }
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
@@ -247,23 +253,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
 
-    // Store gate position as synced state (object on the map, not a tile type)
+    // Clear existing gates
+    this.state.gates.clear();
+    this.gateCountdowns.clear();
+
+    // Create lobby gate from dungeon generator
     const gatePos = generator.getGatePosition();
     if (gatePos) {
-      this.gateTileX = gatePos.x;
-      this.gateTileY = gatePos.y;
-      this.state.gateX = gatePos.x;
-      this.state.gateY = gatePos.y;
-      this.state.gateNS = gatePos.isNS;
-      this.state.gateDir = gatePos.dir;
-    } else {
-      this.gateTileX = -1;
-      this.gateTileY = -1;
-      this.state.gateX = -1;
-      this.state.gateY = -1;
+      const gate = new GateState();
+      gate.id = "lobby";
+      gate.gateType = "lobby";
+      gate.tileX = gatePos.x;
+      gate.tileY = gatePos.y;
+      gate.isNS = gatePos.isNS;
+      gate.dir = gatePos.dir;
+      gate.open = false;
+      this.state.gates.set("lobby", gate);
     }
-    this.state.gateOpen = false;
-    this.gateCountdownActive = false;
 
     // Serialize map for clients
     this.state.tileMapData = JSON.stringify(this.tileMap.serializeGrid());
@@ -280,11 +286,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const wallVariants = generateWallVariants(this.tileMap, seed, roomOwnership, roomSets);
     this.state.wallVariantData = JSON.stringify(wallVariants);
 
-    // Setup pathfinding — block gate tile when gate is closed
+    // Setup pathfinding — block all closed gate tiles
     this.pathfinder = new Pathfinder(this.tileMap);
-    if (this.gateTileX >= 0) {
-      this.pathfinder.blockTile(this.gateTileX, this.gateTileY);
-    }
+    this.state.gates.forEach((gate: GateState) => {
+      if (!gate.open) this.pathfinder.blockTile(gate.tileX, gate.tileY);
+    });
 
     // Setup AI + combat systems
     this.aiSystem = new AISystem(this.pathfinder);

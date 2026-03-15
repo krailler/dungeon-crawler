@@ -79,9 +79,9 @@ export const MinimapOverlay = (): JSX.Element | null => {
       }
     }
 
-    // Draw gate marker (if discovered)
-    const gate = minimapStore.getGatePosition();
-    if (gate) {
+    // Draw gate markers (if discovered)
+    const gatePositions = minimapStore.getGatePositions();
+    for (const [, gate] of gatePositions) {
       const gateKey = gate.y * w + gate.x;
       if (discovered.has(gateKey)) {
         ctx.fillStyle = COLOR_GATE;

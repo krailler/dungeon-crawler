@@ -119,6 +119,13 @@ export interface PromoteLeaderMessage {
   targetSessionId: string;
 }
 
+// ── Gate ──────────────────────────────────────────────────────────────────────
+
+/** Client → Server: interact with a specific gate */
+export interface GateInteractMessage {
+  gateId: string;
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 /** Command info sent to client on join for help overlay */

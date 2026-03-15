@@ -1,10 +1,23 @@
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
+import type { GateInteractMessage } from "@dungeon/shared";
+
+type GateInfo = {
+  id: string;
+  gateType: string;
+  tileX: number;
+  tileY: number;
+  isOpen: boolean;
+};
 
 type GateSnapshot = {
-  /** Whether the gate is open (synced from server) */
-  isOpen: boolean;
-  /** Show "Press F" hint when leader is near the gate */
+  /** All tracked gates keyed by id */
+  gates: Map<string, GateInfo>;
+  /** True when every gate in the map is open */
+  allOpen: boolean;
+  /** The id of the nearest interactable gate (within range, closed), or null */
+  nearestInteractableId: string | null;
+  /** Show "Press F" hint when leader is near a closed gate */
   showInteractHint: boolean;
 };
 
@@ -13,12 +26,26 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let room: Room | null = null;
 
-let snapshot: GateSnapshot = {
-  isOpen: false,
-  showInteractHint: false,
-};
+let gates: Map<string, GateInfo> = new Map();
+let nearestInteractableId: string | null = null;
+let showInteractHint = false;
+/** Gate ids with a pending countdown — suppress hint while active */
+let pendingGates: Set<string> = new Set();
+
+let snapshot: GateSnapshot = buildSnapshot();
+
+function buildSnapshot(): GateSnapshot {
+  const allOpen = gates.size > 0 && [...gates.values()].every((g) => g.isOpen);
+  return {
+    gates,
+    allOpen,
+    nearestInteractableId,
+    showInteractHint,
+  };
+}
 
 const emit = (): void => {
+  snapshot = buildSnapshot();
   for (const listener of listeners) {
     listener();
   }
@@ -28,32 +55,74 @@ export const gateStore = {
   setRoom(r: Room): void {
     room = r;
   },
+
   subscribe(listener: Listener): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
+
   getSnapshot(): GateSnapshot {
     return snapshot;
   },
-  setOpen(value: boolean): void {
-    if (snapshot.isOpen === value) return;
-    snapshot = { ...snapshot, isOpen: value, showInteractHint: false };
+
+  /** Add or update a gate from server state */
+  addGate(id: string, gateType: string, tileX: number, tileY: number, isOpen: boolean): void {
+    gates.set(id, { id, gateType, tileX, tileY, isOpen });
     emit();
   },
-  setInteractHint(visible: boolean): void {
-    if (snapshot.showInteractHint === visible) return;
-    snapshot = { ...snapshot, showInteractHint: visible };
+
+  /** Remove a gate (e.g. on dungeon rebuild) */
+  removeGate(id: string): void {
+    gates.delete(id);
+    if (nearestInteractableId === id) {
+      nearestInteractableId = null;
+      showInteractHint = false;
+    }
     emit();
   },
-  /** Send gate interaction to server */
-  confirmOpen(): void {
-    if (!room) return;
-    room.send(MessageType.GATE_INTERACT);
+
+  /** Mark a gate as open */
+  setGateOpen(id: string, value: boolean): void {
+    const gate = gates.get(id);
+    if (!gate || gate.isOpen === value) return;
+    gate.isOpen = value;
+    if (value) {
+      pendingGates.delete(id);
+      if (nearestInteractableId === id) {
+        nearestInteractableId = null;
+        showInteractHint = false;
+      }
+    }
     emit();
   },
+
+  /** Called each frame from proximity check — sets which gate is interactable */
+  setNearestInteractable(id: string | null): void {
+    // Suppress hint if this gate already has a pending countdown
+    const hint = id !== null && !pendingGates.has(id);
+    if (nearestInteractableId === id && showInteractHint === hint) return;
+    nearestInteractableId = id;
+    showInteractHint = hint;
+    emit();
+  },
+
+  /** Send gate interaction to server for the nearest interactable gate */
+  confirmOpenNearest(): void {
+    if (!room || !nearestInteractableId) return;
+    const msg: GateInteractMessage = { gateId: nearestInteractableId };
+    room.send(MessageType.GATE_INTERACT, msg);
+    // Suppress hint while countdown is active
+    pendingGates.add(nearestInteractableId);
+    showInteractHint = false;
+    emit();
+  },
+
   reset(): void {
     room = null;
-    snapshot = { isOpen: false, showInteractHint: false };
+    gates = new Map();
+    nearestInteractableId = null;
+    showInteractHint = false;
+    pendingGates = new Set();
     emit();
   },
 };

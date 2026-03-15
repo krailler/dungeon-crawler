@@ -16,6 +16,7 @@ export type {
   CommandInfo,
   DebugPathEntry,
   DebugPathsMessage,
+  GateInteractMessage,
 } from "./protocol.js";
 
 export {
