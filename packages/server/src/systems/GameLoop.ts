@@ -5,14 +5,22 @@ import type { EnemyState } from "../state/EnemyState";
 import type { AISystem } from "./AISystem";
 import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
-import { MessageType, computeGoldDrop, computeXpDrop, MAX_LEVEL } from "@dungeon/shared";
-import type { CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
+import {
+  MessageType,
+  computeGoldDrop,
+  computeXpDrop,
+  MAX_LEVEL,
+  TILE_SIZE,
+  ENTITY_COLLISION_RADIUS,
+} from "@dungeon/shared";
+import type { TileMap, CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
 
 export interface GameLoopBridge {
   readonly state: DungeonState;
   readonly aiSystem: AISystem;
   readonly combatSystem: CombatSystem;
   readonly chatSystem: ChatSystem;
+  readonly tileMap: TileMap;
   broadcastToAdmins(type: string, message: unknown): void;
   sendToClient(sessionId: string, type: string, message: unknown): void;
   readonly clock: ClockTimer;
@@ -108,6 +116,9 @@ export class GameLoop {
     this.bridge.combatSystem.update(dtSec, this.tickPlayersMap, this.tickEnemiesMap, (event) => {
       this.handleCombatHit(event);
     });
+
+    // Resolve entity-to-entity collisions (push overlapping entities apart)
+    this.resolveEntityCollisions();
 
     // Debug: send path data to subscribed admin clients
     if (this.debugPathClients.size > 0) {
@@ -233,6 +244,105 @@ export class GameLoop {
     if (entity.currentPathIndex >= entity.path.length) {
       entity.isMoving = false;
     }
+  }
+
+  // ── Entity collision resolution ──────────────────────────────────────
+
+  private collisionEntities: { x: number; z: number; setPos: (x: number, z: number) => void }[] =
+    [];
+
+  private resolveEntityCollisions(): void {
+    const DIAMETER = ENTITY_COLLISION_RADIUS * 2;
+    const DIAMETER_SQ = DIAMETER * DIAMETER;
+
+    // Build flat array of alive entities (reuse array to reduce GC)
+    const entities = this.collisionEntities;
+    entities.length = 0;
+
+    this.bridge.state.players.forEach((player: PlayerState) => {
+      if (player.health <= 0) return;
+      entities.push({
+        get x() {
+          return player.x;
+        },
+        get z() {
+          return player.z;
+        },
+        setPos(x, z) {
+          player.x = x;
+          player.z = z;
+        },
+      });
+    });
+
+    this.bridge.state.enemies.forEach((enemy: EnemyState) => {
+      if (enemy.isDead) return;
+      entities.push({
+        get x() {
+          return enemy.x;
+        },
+        get z() {
+          return enemy.z;
+        },
+        setPos(x, z) {
+          enemy.x = x;
+          enemy.z = z;
+        },
+      });
+    });
+
+    // O(n^2) pair check — fine for <50 entities in a dungeon
+    for (let i = 0; i < entities.length; i++) {
+      for (let j = i + 1; j < entities.length; j++) {
+        const a = entities[i];
+        const b = entities[j];
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq >= DIAMETER_SQ) continue;
+
+        const dist = Math.sqrt(distSq);
+        const overlap = DIAMETER - dist;
+
+        // Normalized push direction (b away from a)
+        let nx: number, nz: number;
+        if (dist < 0.001) {
+          nx = 1;
+          nz = 0;
+        } else {
+          nx = dx / dist;
+          nz = dz / dist;
+        }
+
+        const half = overlap / 2;
+
+        // Candidate positions
+        const ax = a.x - nx * half;
+        const az = a.z - nz * half;
+        const bx = b.x + nx * half;
+        const bz = b.z + nz * half;
+
+        const aValid = this.isWalkable(ax, az);
+        const bValid = this.isWalkable(bx, bz);
+
+        if (aValid && bValid) {
+          a.setPos(ax, az);
+          b.setPos(bx, bz);
+        } else if (aValid && !bValid) {
+          a.setPos(a.x - nx * overlap, a.z - nz * overlap);
+        } else if (!aValid && bValid) {
+          b.setPos(b.x + nx * overlap, b.z + nz * overlap);
+        }
+        // Both in walls → do nothing, pathfinder will resolve next repath
+      }
+    }
+  }
+
+  private isWalkable(worldX: number, worldZ: number): boolean {
+    const tx = Math.round(worldX / TILE_SIZE);
+    const tz = Math.round(worldZ / TILE_SIZE);
+    return this.bridge.tileMap.isFloor(tx, tz);
   }
 
   setDebugPaths(sessionId: string, enabled: boolean): void {

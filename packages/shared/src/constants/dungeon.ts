@@ -10,5 +10,8 @@ export const DUNGEON_ROOMS = 7;
 export const WALL_HEIGHT = 3;
 export const WALL_DEPTH = 0.2;
 
+// Entity collision
+export const ENTITY_COLLISION_RADIUS = 0.45; // world units — slightly under half a tile
+
 // Minimap
 export const MINIMAP_DISCOVERY_RADIUS = 4; // tiles revealed around player
