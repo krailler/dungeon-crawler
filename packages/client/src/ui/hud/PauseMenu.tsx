@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
+import { playUiSfx } from "../../audio/uiSfx";
 
 export const PauseMenu = (): JSX.Element | null => {
   const { t } = useTranslation();
@@ -32,13 +33,17 @@ export const PauseMenu = (): JSX.Element | null => {
         </h2>
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              playUiSfx("ui_click");
+              setOpen(false);
+            }}
             className="w-full rounded-xl border border-slate-600/40 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-100"
           >
             {t("pause.resume")}
           </button>
           <button
             onClick={() => {
+              playUiSfx("ui_click");
               authStore.logout();
               window.location.reload();
             }}

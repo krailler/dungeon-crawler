@@ -16,6 +16,10 @@ const FOOTSTEP_BASE_PATH = "/audio/footsteps/footstep";
 /** Volume for attack/animation sounds */
 const ATTACK_VOLUME = 0.5;
 
+/** SFX config */
+const SFX_VOLUME = 0.6;
+const SFX_GATE_VOLUME = 0.4;
+
 /** Ambient sound config */
 const AMBIENT_URL = "/audio/ambient/cave_loop.ogg";
 const AMBIENT_VOLUME = 1;
@@ -31,6 +35,7 @@ export class SoundManager {
   private footsteps: Sound[] = [];
   private lastFootstepIndex: number = -1;
   private animSounds: Map<string, AnimSoundEntry> = new Map();
+  private sfx: Map<string, Sound> = new Map();
   private ambient: Sound | null = null;
   private loaded: boolean = false;
 
@@ -64,6 +69,12 @@ export class SoundManager {
       ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"],
       ATTACK_VOLUME,
     );
+
+    // One-shot SFX
+    this.registerSfx("gold_pickup", "/audio/sfx/gold_pickup.ogg", SFX_VOLUME);
+    this.registerSfx("gate_open", "/audio/sfx/gate_open.ogg", SFX_GATE_VOLUME);
+    this.registerSfx("player_join", "/audio/sfx/player_join.ogg", SFX_VOLUME);
+    this.registerSfx("player_leave", "/audio/sfx/player_leave.ogg", SFX_VOLUME);
 
     // Ambient cave loop (starts paused — call playAmbient() to start)
     this.ambient = new Sound("ambient_cave", AMBIENT_URL, this.scene, null, {
@@ -135,6 +146,22 @@ export class SoundManager {
     this.footsteps[index].play();
   }
 
+  /** Register a single one-shot sound effect */
+  private registerSfx(name: string, url: string, volume: number): void {
+    const sound = new Sound(`sfx_${name}`, url, this.scene, null, {
+      volume,
+      autoplay: false,
+      loop: false,
+    });
+    this.sfx.set(name, sound);
+  }
+
+  /** Play a named sound effect (registered via registerSfx) */
+  playSfx(name: string): void {
+    const sound = this.sfx.get(name);
+    if (sound) sound.play();
+  }
+
   /** Start the ambient cave loop */
   playAmbient(): void {
     if (this.ambient && !this.ambient.isPlaying) {
@@ -159,6 +186,10 @@ export class SoundManager {
       }
     }
     this.animSounds.clear();
+    for (const [, sound] of this.sfx) {
+      sound.dispose();
+    }
+    this.sfx.clear();
     if (this.ambient) {
       this.ambient.dispose();
       this.ambient = null;

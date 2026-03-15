@@ -21,6 +21,7 @@ import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
+import { preloadUiSounds } from "../audio/uiSfx";
 import { hudStore, mountHud, disposeHud } from "../ui/stores/hudStore";
 import { debugStore, type DebugSnapshot } from "../ui/stores/debugStore";
 import { adminStore } from "../ui/stores/adminStore";
@@ -103,6 +104,7 @@ export class ClientGame {
     this.playerLoader = new CharacterAssetLoader(this.scene, "/models/characters/player");
     this.enemyLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
     this.soundManager = new SoundManager(this.scene);
+    preloadUiSounds();
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     mountLoading();
     mountHud();
@@ -326,6 +328,7 @@ export class ClientGame {
         gateStore.setGateOpen(gateId, nowOpen);
         if (nowOpen) {
           this.dungeonRenderer.openGateById(gateId);
+          this.soundManager.playSfx("gate_open");
         }
       });
     });
@@ -458,6 +461,7 @@ export class ClientGame {
     // Players added
     state$.players.onAdd((player: any, sessionId: string) => {
       const isLocal = sessionId === this.localSessionId;
+      if (!isLocal) this.soundManager.playSfx("player_join");
       const displayName = player.characterName || sessionId.slice(0, 4).toUpperCase();
       const clientPlayer = new ClientPlayer(
         this.scene,
@@ -508,9 +512,18 @@ export class ClientGame {
         stats: localStats,
       });
 
+      // Track gold for local player to detect increases
+      let prevGold = player.gold as number;
+
       // Listen to changes on this player
       $(player).onChange(() => {
         clientPlayer.setServerState(player.x, player.z, player.rotY, player.animState);
+
+        // Play gold pickup sound when local player earns gold
+        if (isLocal && player.gold > prevGold) {
+          this.soundManager.playSfx("gold_pickup");
+        }
+        prevGold = player.gold;
 
         hudStore.updateMember(sessionId, {
           health: player.health,
@@ -534,6 +547,7 @@ export class ClientGame {
 
     // Players removed
     state$.players.onRemove((_player: any, sessionId: string) => {
+      if (sessionId !== this.localSessionId) this.soundManager.playSfx("player_leave");
       const clientPlayer = this.players.get(sessionId);
       if (clientPlayer) {
         clientPlayer.dispose();

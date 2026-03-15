@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
 import { CoinIcon } from "../icons/CoinIcon";
+import { playUiSfx } from "../../audio/uiSfx";
 
 const StatRow = ({ label, value, color }: { label: string; value: number; color: string }) => (
   <div className="flex items-center justify-between py-1">
@@ -33,7 +34,10 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              playUiSfx("ui_click");
+              onClose();
+            }}
             className="rounded-lg p-1 text-slate-500 transition-colors hover:bg-slate-700/50 hover:text-slate-300"
           >
             <svg

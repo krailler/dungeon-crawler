@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { playUiSfx } from "../../audio/uiSfx";
 
 type ConfirmDialogProps = {
   /** Dialog title */
@@ -42,13 +43,19 @@ export const ConfirmDialog = ({
         <p className="mb-6 text-center text-sm text-slate-400">{message}</p>
         <div className="flex gap-3">
           <button
-            onClick={onCancel}
+            onClick={() => {
+              playUiSfx("ui_click");
+              onCancel();
+            }}
             className="flex-1 rounded-xl border border-slate-600/40 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-100"
           >
             {cancelLabel}
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => {
+              playUiSfx("ui_click");
+              onConfirm();
+            }}
             className="flex-1 rounded-xl border border-amber-500/40 bg-amber-600/20 px-4 py-2 text-sm font-bold text-amber-300 transition-colors hover:border-amber-400/60 hover:bg-amber-600/30 hover:text-amber-200"
           >
             {confirmLabel}

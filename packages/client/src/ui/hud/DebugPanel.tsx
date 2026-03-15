@@ -5,6 +5,7 @@ import { adminStore } from "../stores/adminStore";
 import { authStore } from "../stores/authStore";
 import { minimapStore } from "../stores/minimapStore";
 import { HudButton } from "../components/HudButton";
+import { playUiSfx } from "../../audio/uiSfx";
 
 type ToggleEntry = {
   key: keyof DebugSnapshot;
@@ -72,7 +73,10 @@ export const DebugPanel = (): JSX.Element => {
           </div>
 
           <button
-            onClick={() => debugStore.resetAll()}
+            onClick={() => {
+              playUiSfx("ui_click");
+              debugStore.resetAll();
+            }}
             className="mt-3 w-full rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-200"
           >
             Reset options
@@ -99,7 +103,10 @@ export const DebugPanel = (): JSX.Element => {
               </div>
               <div className="mt-2 flex flex-col gap-1.5">
                 <button
-                  onClick={() => adminStore.restartRoom()}
+                  onClick={() => {
+                    playUiSfx("ui_click");
+                    adminStore.restartRoom();
+                  }}
                   className="w-full rounded border border-red-500/30 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-red-400 transition-colors hover:border-red-400/50 hover:bg-red-950/40 hover:text-red-300"
                 >
                   Restart room
@@ -114,6 +121,7 @@ export const DebugPanel = (): JSX.Element => {
                   />
                   <button
                     onClick={() => {
+                      playUiSfx("ui_click");
                       const seed = seedInput ? parseInt(seedInput, 10) : null;
                       adminStore.restartRoom(Number.isNaN(seed) ? null : seed);
                     }}
@@ -123,7 +131,10 @@ export const DebugPanel = (): JSX.Element => {
                   </button>
                 </div>
                 <button
-                  onClick={() => adminStore.randomRestart()}
+                  onClick={() => {
+                    playUiSfx("ui_click");
+                    adminStore.randomRestart();
+                  }}
                   className="w-full rounded border border-slate-600/40 bg-slate-800/80 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-slate-500/60 hover:bg-slate-700/80 hover:text-slate-200"
                 >
                   Random seed

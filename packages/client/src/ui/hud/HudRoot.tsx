@@ -15,6 +15,7 @@ import { PromptOverlay } from "./PromptOverlay";
 import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
+import { playUiSfx } from "../../audio/uiSfx";
 import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
@@ -221,6 +222,7 @@ export const HudRoot = (): JSX.Element => {
           </div>
           <button
             onClick={() => {
+              playUiSfx("ui_click");
               hudStore.promoteLeader(ctxMenu.member.id);
               closeCtxMenu();
             }}
@@ -237,6 +239,7 @@ export const HudRoot = (): JSX.Element => {
           </button>
           <button
             onClick={() => {
+              playUiSfx("ui_click");
               hudStore.kickPlayer(ctxMenu.member.id);
               closeCtxMenu();
             }}

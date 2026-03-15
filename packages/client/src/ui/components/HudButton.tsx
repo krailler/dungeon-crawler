@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
+import { playUiSfx } from "../../audio/uiSfx";
 
 type HudButtonProps = {
   onClick: () => void;
@@ -45,20 +46,25 @@ export const HudButton = ({
   label,
   suffix,
 }: HudButtonProps): JSX.Element => {
+  const handleClick = useCallback(() => {
+    playUiSfx("ui_click");
+    onClick();
+  }, [onClick]);
+
   // Register keyboard shortcut (case-insensitive, skips when typing in inputs)
   useEffect(() => {
     if (!shortcut) return;
     const lower = shortcut.toLowerCase();
     const handleKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key.toLowerCase() === lower) onClick();
+      if (e.key.toLowerCase() === lower) handleClick();
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [shortcut, onClick]);
+  }, [shortcut, handleClick]);
 
   return (
-    <button onClick={onClick} className={`${baseClass} ${variantClass(variant, isOpen)}`}>
+    <button onClick={handleClick} className={`${baseClass} ${variantClass(variant, isOpen)}`}>
       {icon}
       <span className="uppercase tracking-wider">{label}</span>
       {shortcut && <kbd className={kbdClass(variant)}>{shortcut}</kbd>}
