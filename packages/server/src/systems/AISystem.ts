@@ -7,11 +7,25 @@ const AIState = {
   IDLE: 0,
   CHASE: 1,
   ATTACK: 2,
+  LEASH: 3,
 } as const;
 
 type AIStateType = (typeof AIState)[keyof typeof AIState];
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
+
+// ── Aggro tuning ────────────────────────────────────────────────────────────
+
+/** Threat generated per point of damage dealt */
+const THREAT_PER_DAMAGE = 1.0;
+/** One-time threat burst when a player first enters detection range */
+const THREAT_PROXIMITY_INITIAL = 5;
+/** Passive threat per second for players inside detection range */
+const THREAT_PROXIMITY_TICK = 1;
+/** Threat decay per second for players outside detection range */
+const THREAT_DECAY_RATE = 10;
+/** Threshold below which threat is removed entirely */
+const THREAT_EPSILON = 0.1;
 
 export interface AIHitEvent {
   enemyId: string;
@@ -34,18 +48,25 @@ interface EnemyAI {
   damageAmount: number;
   damageAttack: number;
   damageDefense: number;
+  /** Spawn position — used for leash */
+  spawnX: number;
+  spawnZ: number;
+  leashRange: number;
+  /** Per-player threat table */
+  threatTable: Map<string, number>;
 }
 
 export class AISystem {
   private entries: EnemyAI[] = [];
+  private entryById: Map<string, EnemyAI> = new Map();
   private pathfinder: Pathfinder;
 
   constructor(pathfinder: Pathfinder) {
     this.pathfinder = pathfinder;
   }
 
-  register(enemy: EnemyState, enemyId: string): void {
-    this.entries.push({
+  register(enemy: EnemyState, enemyId: string, leashRange: number): void {
+    const entry: EnemyAI = {
       enemy,
       enemyId,
       state: AIState.IDLE,
@@ -57,7 +78,30 @@ export class AISystem {
       damageAmount: 0,
       damageAttack: 0,
       damageDefense: 0,
-    });
+      spawnX: enemy.x,
+      spawnZ: enemy.z,
+      leashRange,
+      threatTable: new Map(),
+    };
+    this.entries.push(entry);
+    this.entryById.set(enemyId, entry);
+  }
+
+  /** Add threat from an external source (e.g. player dealing damage). */
+  addThreat(enemyId: string, sessionId: string, amount: number): void {
+    const entry = this.entryById.get(enemyId);
+    if (!entry || entry.enemy.isDead) return;
+    // Don't accept threat while leashing
+    if (entry.state === AIState.LEASH) return;
+    const current = entry.threatTable.get(sessionId) ?? 0;
+    entry.threatTable.set(sessionId, current + amount);
+  }
+
+  /** Remove a player from all threat tables (disconnect / death). */
+  removePlayer(sessionId: string): void {
+    for (const entry of this.entries) {
+      entry.threatTable.delete(sessionId);
+    }
   }
 
   update(
@@ -95,59 +139,80 @@ export class AISystem {
         }
       }
 
-      // Find closest alive player
-      let closestPlayer: PlayerState | null = null;
-      let closestSessionId: string | null = null;
-      let closestDist = Infinity;
-
-      for (const [sessionId, player] of players) {
-        if (player.health <= 0) continue;
-        const dist = this.distance(entry.enemy, player);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestPlayer = player;
-          closestSessionId = sessionId;
+      // ── Leash check ──────────────────────────────────────────────────────
+      if (entry.state !== AIState.LEASH) {
+        const distToSpawn = this.distance(entry.enemy, {
+          x: entry.spawnX,
+          z: entry.spawnZ,
+        });
+        if (distToSpawn > entry.leashRange) {
+          this.startLeash(entry);
+          continue;
         }
       }
 
-      if (!closestPlayer || !closestSessionId) {
+      // ── Leash state: walk back to spawn, ignore players ──────────────
+      if (entry.state === AIState.LEASH) {
+        this.updateLeash(entry, dt);
+        continue;
+      }
+
+      // ── Threat management ────────────────────────────────────────────────
+      this.updateThreatTable(entry, dt, players);
+
+      // Find highest-threat alive player
+      const target = this.getHighestThreatTarget(entry, players);
+
+      if (!target) {
         entry.state = AIState.IDLE;
         entry.enemy.isMoving = false;
         continue;
       }
 
+      const { sessionId: targetSessionId, player: targetPlayer } = target;
+      const distToTarget = this.distance(entry.enemy, targetPlayer);
+
       entry.repathTimer -= dt;
       entry.attackTimer -= dt;
 
-      if (closestDist <= entry.enemy.attackRange) {
-        // Attack state
+      if (distToTarget <= entry.enemy.attackRange) {
+        // ── Attack ─────────────────────────────────────────────────────
         entry.state = AIState.ATTACK;
         entry.enemy.isMoving = false;
         entry.enemy.path = [];
 
         // Face the player
-        const angle = Math.atan2(closestPlayer.x - entry.enemy.x, closestPlayer.z - entry.enemy.z);
+        const angle = Math.atan2(targetPlayer.x - entry.enemy.x, targetPlayer.z - entry.enemy.z);
         entry.enemy.rotY = angle;
 
         if (entry.attackTimer <= 0) {
           entry.attackTimer = entry.enemy.attackCooldown;
           entry.enemy.animState = "punch";
           entry.animTimer = ATTACK_ANIM_DURATION;
-          // Delay damage to punch peak (midpoint of animation)
           entry.damageTimer = DAMAGE_DELAY;
-          entry.damageSessionId = closestSessionId;
-          entry.damageAmount = computeDamage(entry.enemy.attackDamage, closestPlayer.defense);
+          entry.damageSessionId = targetSessionId;
+          entry.damageAmount = computeDamage(entry.enemy.attackDamage, targetPlayer.defense);
           entry.damageAttack = entry.enemy.attackDamage;
-          entry.damageDefense = closestPlayer.defense;
+          entry.damageDefense = targetPlayer.defense;
+
+          // Attacking generates threat too (keeps aggro sticky)
+          this.addThreat(
+            entry.enemyId,
+            targetSessionId,
+            entry.damageAmount * THREAT_PER_DAMAGE * 0.5,
+          );
         }
-      } else if (closestDist <= entry.enemy.detectionRange) {
-        // Chase state
+      } else {
+        // ── Chase ──────────────────────────────────────────────────────
         entry.state = AIState.CHASE;
 
         if (entry.repathTimer <= 0) {
           entry.repathTimer = ENEMY_REPATH_INTERVAL;
           const enemyPos: WorldPos = { x: entry.enemy.x, z: entry.enemy.z };
-          const playerPos: WorldPos = { x: closestPlayer.x, z: closestPlayer.z };
+          const playerPos: WorldPos = {
+            x: targetPlayer.x,
+            z: targetPlayer.z,
+          };
           const path = this.pathfinder.findPath(enemyPos, playerPos);
           if (path.length > 0) {
             entry.enemy.path = path;
@@ -157,13 +222,125 @@ export class AISystem {
         }
 
         this.moveEnemy(entry.enemy, dt);
-      } else {
-        // Idle state
-        entry.state = AIState.IDLE;
-        entry.enemy.isMoving = false;
       }
     }
   }
+
+  // ── Threat helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Update threat values each tick:
+   * - Players in detection range get passive threat (proximity aggro)
+   * - Players outside detection range have their threat decayed
+   * - Dead players are purged
+   */
+  private updateThreatTable(entry: EnemyAI, dt: number, players: Map<string, PlayerState>): void {
+    // Passive proximity threat for players in range
+    for (const [sessionId, player] of players) {
+      if (player.health <= 0) {
+        entry.threatTable.delete(sessionId);
+        continue;
+      }
+
+      const dist = this.distance(entry.enemy, player);
+
+      if (dist <= entry.enemy.detectionRange) {
+        const current = entry.threatTable.get(sessionId);
+        if (current === undefined) {
+          // First time in range — initial aggro burst
+          entry.threatTable.set(sessionId, THREAT_PROXIMITY_INITIAL);
+        } else {
+          // Passive tick
+          entry.threatTable.set(sessionId, current + THREAT_PROXIMITY_TICK * dt);
+        }
+      } else {
+        // Out of detection range — decay threat
+        const current = entry.threatTable.get(sessionId);
+        if (current !== undefined) {
+          const decayed = current - THREAT_DECAY_RATE * dt;
+          if (decayed <= THREAT_EPSILON) {
+            entry.threatTable.delete(sessionId);
+          } else {
+            entry.threatTable.set(sessionId, decayed);
+          }
+        }
+      }
+    }
+
+    // Purge entries for disconnected players
+    for (const sessionId of entry.threatTable.keys()) {
+      if (!players.has(sessionId)) {
+        entry.threatTable.delete(sessionId);
+      }
+    }
+  }
+
+  /** Find the alive player with the highest threat value. */
+  private getHighestThreatTarget(
+    entry: EnemyAI,
+    players: Map<string, PlayerState>,
+  ): { sessionId: string; player: PlayerState } | null {
+    let bestSessionId: string | null = null;
+    let bestPlayer: PlayerState | null = null;
+    let bestThreat = 0;
+
+    for (const [sessionId, threat] of entry.threatTable) {
+      if (threat <= 0) continue;
+      const player = players.get(sessionId);
+      if (!player || player.health <= 0) continue;
+      if (threat > bestThreat) {
+        bestThreat = threat;
+        bestSessionId = sessionId;
+        bestPlayer = player;
+      }
+    }
+
+    if (!bestSessionId || !bestPlayer) return null;
+    return { sessionId: bestSessionId, player: bestPlayer };
+  }
+
+  // ── Leash ───────────────────────────────────────────────────────────────────
+
+  private startLeash(entry: EnemyAI): void {
+    entry.state = AIState.LEASH;
+    entry.threatTable.clear();
+    entry.enemy.animState = "";
+    entry.damageTimer = 0;
+    entry.damageSessionId = null;
+
+    // Path back to spawn
+    const enemyPos: WorldPos = { x: entry.enemy.x, z: entry.enemy.z };
+    const spawnPos: WorldPos = { x: entry.spawnX, z: entry.spawnZ };
+    const path = this.pathfinder.findPath(enemyPos, spawnPos);
+    if (path.length > 0) {
+      entry.enemy.path = path;
+      entry.enemy.currentPathIndex = 0;
+      entry.enemy.isMoving = true;
+    }
+
+    // Heal to full on leash
+    entry.enemy.health = entry.enemy.maxHealth;
+  }
+
+  private updateLeash(entry: EnemyAI, dt: number): void {
+    this.moveEnemy(entry.enemy, dt);
+
+    const distToSpawn = this.distance(entry.enemy, {
+      x: entry.spawnX,
+      z: entry.spawnZ,
+    });
+
+    // Arrived back at spawn — return to idle
+    if (distToSpawn < 0.5 || !entry.enemy.isMoving) {
+      entry.state = AIState.IDLE;
+      entry.enemy.isMoving = false;
+      entry.enemy.path = [];
+      entry.repathTimer = 0;
+      entry.attackTimer = 0;
+    }
+  }
+
+  // ── Movement ────────────────────────────────────────────────────────────────
 
   private moveEnemy(enemy: EnemyState, dt: number): void {
     if (!enemy.isMoving || enemy.currentPathIndex >= enemy.path.length) {

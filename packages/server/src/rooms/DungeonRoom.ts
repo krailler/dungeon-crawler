@@ -257,6 +257,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       );
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
+      this.aiSystem.removePlayer(client.sessionId);
       this.reassignLeader();
       return;
     }
@@ -280,6 +281,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.state.players.delete(client.sessionId);
       this.combatSystem.removePlayer(client.sessionId);
+      this.aiSystem.removePlayer(client.sessionId);
       this.unregisterClient(client);
       this.reassignLeader();
     }
@@ -297,6 +299,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
+    this.aiSystem.removePlayer(client.sessionId);
     this.unregisterClient(client);
     this.reassignLeader();
   }
@@ -392,6 +395,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
 
     this.combatSystem.update(dtSec, playersMap, enemiesMap, (event) => {
+      // Player hit generates threat on the enemy
+      this.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
+
       const player = this.state.players.get(event.sessionId);
       const msg: CombatLogMessage = {
         dir: "p2e",
@@ -479,7 +485,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
         const id = `enemy_${enemyId++}`;
         this.state.enemies.set(id, enemy);
-        this.aiSystem.register(enemy, id);
+        this.aiSystem.register(enemy, id, typeDef.leashRange);
       }
     }
   }

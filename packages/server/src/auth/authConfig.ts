@@ -1,7 +1,7 @@
-import { auth, Hash, JWT } from "colyseus";
+import { auth, JWT } from "colyseus";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/database";
-import { accounts, characters } from "../db/schema";
+import { accounts } from "../db/schema";
 
 // JWT secret — use env var in production, dev fallback for local development
 JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-prod";
@@ -13,28 +13,9 @@ auth.settings.onFindUserByEmail = async (email: string) => {
   return account;
 };
 
-auth.settings.onRegisterWithEmailAndPassword = async (
-  email: string,
-  password: string,
-  options: { displayName?: string },
-) => {
-  const db = getDb();
-  const hashedPassword = await Hash.make(password);
-
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      email,
-      password: hashedPassword,
-    })
-    .returning({ id: accounts.id, email: accounts.email });
-
-  await db.insert(characters).values({
-    accountId: account.id,
-    name: options.displayName ?? "Hero",
-  });
-
-  return { id: account.id, email: account.email };
+// Registration disabled — accounts are created via seed only
+auth.settings.onRegisterWithEmailAndPassword = async () => {
+  throw new Error("Registration is disabled");
 };
 
 auth.settings.onGenerateToken = async (userdata: unknown) => {

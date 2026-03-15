@@ -18,6 +18,8 @@ export interface EnemyTypeDefinition {
   overrides: Partial<DerivedStats>;
   detectionRange: number;
   attackRange: number;
+  /** Max distance from spawn before enemy resets aggro and walks back */
+  leashRange: number;
   skin: string;
 }
 
@@ -42,6 +44,7 @@ export const ENEMY_TYPES: Record<EnemyTypeIdValue, EnemyTypeDefinition> = {
     },
     detectionRange: 12,
     attackRange: 2.5,
+    leashRange: 20,
     skin: "zombie",
   },
 };
