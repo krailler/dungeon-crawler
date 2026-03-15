@@ -54,6 +54,8 @@ export type {
   ChatCategoryValue,
   ChatVariantValue,
   CommandInfo,
+  DebugPathEntry,
+  DebugPathsMessage,
 } from "./protocol.js";
 
 export {

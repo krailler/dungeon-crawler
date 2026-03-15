@@ -18,6 +18,7 @@ const TOGGLES: ToggleEntry[] = [
   { key: "wireframe", label: "Wireframe" },
   { key: "ambient", label: "Ambient Sound" },
   { key: "combatLog", label: "Combat Log", adminOnly: true },
+  { key: "showPaths", label: "Show Paths", adminOnly: true },
 ];
 
 export const DebugPanel = (): JSX.Element => {

@@ -5,6 +5,7 @@ export type DebugSnapshot = {
   wireframe: boolean;
   ambient: boolean;
   combatLog: boolean;
+  showPaths: boolean;
 };
 
 type DebugKey = keyof DebugSnapshot;
@@ -19,6 +20,7 @@ const DEFAULTS: DebugSnapshot = {
   wireframe: false,
   ambient: true,
   combatLog: false,
+  showPaths: false,
 };
 
 const listeners = new Set<Listener>();

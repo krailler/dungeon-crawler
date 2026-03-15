@@ -36,6 +36,7 @@ import type {
   AdminRestartMessage,
   CombatLogMessage,
   ChatSendPayload,
+  DebugPathEntry,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 import {
@@ -68,6 +69,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
   /** Maps accountId → sessionId so we can find a disconnected player on re-login */
   private accountToSession: Map<string, string> = new Map();
+  /** Clients subscribed to debug path visualization */
+  private debugPathClients: Set<string> = new Set();
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
@@ -136,6 +139,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const role = (client.auth as { role: string })?.role ?? "user";
       const commands = this.chatSystem.getCommandsForRole(role);
       client.send(MessageType.CHAT_COMMANDS, commands);
+    });
+    // Debug: subscribe/unsubscribe to path visualization (admin-only)
+    this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
+      const role = (client.auth as { role: string })?.role ?? "user";
+      if (role !== "admin") return;
+      if (data.enabled) {
+        this.debugPathClients.add(client.sessionId);
+      } else {
+        this.debugPathClients.delete(client.sessionId);
+      }
     });
 
     // Game loop
@@ -489,6 +502,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     if (auth?.accountId && this.accountToSession.get(auth.accountId) === client.sessionId) {
       this.accountToSession.delete(auth.accountId);
     }
+    this.debugPathClients.delete(client.sessionId);
   }
 
   private clearReconnectTimers(sessionId: string): void {
@@ -619,6 +633,47 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         }, 1000);
       }
     });
+
+    // Debug: send path data to subscribed admin clients
+    if (this.debugPathClients.size > 0) {
+      this.sendDebugPaths();
+    }
+  }
+
+  private sendDebugPaths(): void {
+    const paths: DebugPathEntry[] = [];
+
+    this.state.players.forEach((player: PlayerState, sessionId: string) => {
+      if (player.path.length > 0 && player.currentPathIndex < player.path.length) {
+        paths.push({
+          id: sessionId,
+          kind: "player",
+          x: player.x,
+          z: player.z,
+          path: player.path.slice(player.currentPathIndex),
+        });
+      }
+    });
+
+    this.state.enemies.forEach((enemy: EnemyState, enemyId: string) => {
+      if (enemy.path.length > 0 && enemy.currentPathIndex < enemy.path.length) {
+        paths.push({
+          id: enemyId,
+          kind: "enemy",
+          x: enemy.x,
+          z: enemy.z,
+          path: enemy.path.slice(enemy.currentPathIndex),
+        });
+      }
+    });
+
+    const msg = { paths };
+    for (const sessionId of this.debugPathClients) {
+      const client = this.clients.find((c) => c.sessionId === sessionId);
+      if (client) {
+        client.send(MessageType.DEBUG_PATHS, msg);
+      }
+    }
   }
 
   private moveEntity(entity: PlayerState, dt: number): void {

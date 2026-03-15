@@ -4,6 +4,8 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { LinesMesh } from "@babylonjs/core/Meshes/linesMesh";
 
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
@@ -34,7 +36,7 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
 } from "@dungeon/shared";
-import type { CombatLogMessage, ChatEntry, CommandInfo } from "@dungeon/shared";
+import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
   loadingStore,
@@ -77,6 +79,8 @@ export class ClientGame {
   private onPointerDown: (() => void) | null = null;
   // Pre-allocated map reused each frame for minimap enemy positions
   private activeEnemiesMap: Map<string, { x: number; z: number }> = new Map();
+  // Debug path visualization
+  private debugPathLines: Map<string, LinesMesh> = new Map();
 
   constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
     this.engine = new Engine(canvas, true, {
@@ -224,6 +228,11 @@ export class ClientGame {
               ? "color: #60a5fa"
               : "color: #fbbf24",
         );
+      });
+
+      // Debug: path visualization
+      room.onMessage(MessageType.DEBUG_PATHS, (msg: DebugPathsMessage) => {
+        this.updateDebugPaths(msg);
       });
 
       hudStore.setConnection(
@@ -599,8 +608,64 @@ export class ClientGame {
     if (debug.ambient !== this.lastDebug.ambient) {
       this.soundManager.setAmbientMuted(!debug.ambient);
     }
+    if (debug.showPaths !== this.lastDebug.showPaths) {
+      this.room?.send(MessageType.DEBUG_PATHS, { enabled: debug.showPaths });
+      if (!debug.showPaths) {
+        this.clearDebugPaths();
+      }
+    }
 
     this.lastDebug = debug;
+  }
+
+  private updateDebugPaths(msg: DebugPathsMessage): void {
+    // Track which IDs are in this update
+    const activeIds = new Set<string>();
+
+    for (const entry of msg.paths) {
+      activeIds.add(entry.id);
+
+      // Build points: current position → each waypoint
+      const points: Vector3[] = [new Vector3(entry.x, 0.15, entry.z)];
+      for (const wp of entry.path) {
+        points.push(new Vector3(wp.x, 0.15, wp.z));
+      }
+
+      if (points.length < 2) continue;
+
+      const color =
+        entry.kind === "player" ? new Color3(0.22, 0.74, 0.97) : new Color3(0.97, 0.44, 0.44);
+      const colors = points.map(() => new Color4(color.r, color.g, color.b, 1));
+
+      // Reuse or create line mesh
+      const existing = this.debugPathLines.get(entry.id);
+      if (existing) {
+        existing.dispose();
+      }
+
+      const line = MeshBuilder.CreateLines(
+        `debug_path_${entry.id}`,
+        { points, colors, updatable: false },
+        this.scene,
+      );
+      line.isPickable = false;
+      this.debugPathLines.set(entry.id, line);
+    }
+
+    // Remove lines for entities no longer in the update
+    for (const [id, line] of this.debugPathLines) {
+      if (!activeIds.has(id)) {
+        line.dispose();
+        this.debugPathLines.delete(id);
+      }
+    }
+  }
+
+  private clearDebugPaths(): void {
+    for (const [, line] of this.debugPathLines) {
+      line.dispose();
+    }
+    this.debugPathLines.clear();
   }
 
   private addShadowCaster(mesh: AbstractMesh): void {
@@ -633,6 +698,8 @@ export class ClientGame {
     if (this.onPointerDown) {
       window.removeEventListener("pointerdown", this.onPointerDown);
     }
+
+    this.clearDebugPaths();
 
     // Dispose all entity instances
     for (const [, player] of this.players) {

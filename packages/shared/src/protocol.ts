@@ -6,6 +6,7 @@ export const MessageType = {
   CHAT_SEND: "chat:send",
   CHAT_ENTRY: "chat:entry",
   CHAT_COMMANDS: "chat:commands",
+  DEBUG_PATHS: "debug:paths",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -87,6 +88,27 @@ export interface ChatEntry {
   /** Interpolation params for the i18n key */
   i18nParams?: Record<string, string | number>;
 }
+
+// ── Debug ─────────────────────────────────────────────────────────────────────
+
+/** A single entity path for debug visualization */
+export interface DebugPathEntry {
+  id: string;
+  /** "player" or "enemy" */
+  kind: "player" | "enemy";
+  /** Current position */
+  x: number;
+  z: number;
+  /** Remaining waypoints */
+  path: { x: number; z: number }[];
+}
+
+/** Payload for DEBUG_PATHS message (Server → Client) */
+export interface DebugPathsMessage {
+  paths: DebugPathEntry[];
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
 
 /** Command info sent to client on join for help overlay */
 export interface CommandInfo {
