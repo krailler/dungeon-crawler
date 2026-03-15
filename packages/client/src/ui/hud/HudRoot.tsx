@@ -13,6 +13,7 @@ import { ChatPanel } from "./ChatPanel";
 import { GateHint } from "./GatePrompt";
 import { PromptOverlay } from "./PromptOverlay";
 import { AnnouncementOverlay } from "./AnnouncementOverlay";
+import { XpBar } from "./XpBar";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -20,6 +21,45 @@ import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
 import { CoinIcon } from "../icons/CoinIcon";
+
+type GoldFloat = { id: number; amount: number };
+let goldFloatId = 0;
+
+const GoldPill = ({ gold }: { gold: number }): JSX.Element => {
+  const [floats, setFloats] = useState<GoldFloat[]>([]);
+  const prevGoldRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const prev = prevGoldRef.current;
+    prevGoldRef.current = gold;
+    if (prev === null || gold <= prev) return;
+
+    const gain = gold - prev;
+    const id = ++goldFloatId;
+    setFloats((f) => [...f, { id, amount: gain }]);
+    const timer = setTimeout(() => {
+      setFloats((f) => f.filter((e) => e.id !== id));
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [gold]);
+
+  return (
+    <div className="relative">
+      {floats.map((f) => (
+        <span
+          key={f.id}
+          className="animate-xp-float absolute -top-1 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-xs font-bold text-amber-300 drop-shadow-[0_1px_3px_rgba(251,191,36,0.6)]"
+        >
+          +{f.amount}
+        </span>
+      ))}
+      <HudPill variant="amber">
+        <CoinIcon className="mr-1 inline h-3.5 w-3.5" />
+        {gold.toLocaleString()}
+      </HudPill>
+    </div>
+  );
+};
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -268,12 +308,7 @@ export const HudRoot = (): JSX.Element => {
         </div>
       )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
-        {localMember && (
-          <HudPill variant="amber">
-            <CoinIcon className="mr-1 inline h-3.5 w-3.5" />
-            {localMember.gold.toLocaleString()}
-          </HudPill>
-        )}
+        {localMember && <GoldPill gold={localMember.gold} />}
         {debugSnapshot.showCoords && snapshot.localCoords && (
           <HudPill variant="amber" mono>
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}
@@ -288,6 +323,8 @@ export const HudRoot = (): JSX.Element => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
+      {/* XP bar — bottom center (WoW-style) */}
+      <XpBar />
       {/* HUD buttons — bottom right */}
       <div className="absolute bottom-5 right-5 flex items-center gap-2">
         <HudButton

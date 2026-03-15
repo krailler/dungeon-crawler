@@ -6,7 +6,7 @@ import { getDb } from "../db/database";
 import { characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
-import { computeDerivedStats, TileType, TILE_SIZE } from "@dungeon/shared";
+import { TileType, TILE_SIZE, xpToNextLevel } from "@dungeon/shared";
 import type { TileMap } from "@dungeon/shared";
 import {
   registerSession,
@@ -37,7 +37,7 @@ export class PlayerSessionManager {
   private kickedSessions: Set<string> = new Set();
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
   private accountToSession: Map<string, string> = new Map();
-  private lastSavedGold: Map<string, number> = new Map();
+  private lastSavedHash: Map<string, string> = new Map();
 
   constructor(bridge: SessionRoomBridge, log: Logger) {
     this.bridge = bridge;
@@ -55,6 +55,7 @@ export class PlayerSessionManager {
       agility,
       level,
       gold,
+      xp,
     } = client.auth as {
       accountId: string;
       characterId: string;
@@ -65,6 +66,7 @@ export class PlayerSessionManager {
       agility: number;
       level: number;
       gold: number;
+      xp: number;
     };
 
     // Kick previous session if same account is already connected (any room)
@@ -122,18 +124,17 @@ export class PlayerSessionManager {
     player.agility = agility;
     player.level = level;
     player.gold = gold;
+    player.xp = xp;
+    player.xpToNext = xpToNextLevel(level);
     player.characterId = characterId;
-    this.lastSavedGold.set(characterId, gold);
+    this.lastSavedHash.set(
+      characterId,
+      `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}`,
+    );
 
     // Compute derived stats
-    const derived = computeDerivedStats({ strength, vitality, agility });
-    player.maxHealth = derived.maxHealth;
-    player.health = derived.maxHealth;
-    player.speed = derived.moveSpeed;
-    player.attackDamage = derived.attackDamage;
-    player.defense = derived.defense;
-    player.attackCooldown = derived.attackCooldown;
-    player.attackRange = derived.attackRange;
+    player.applyDerivedStats();
+    player.health = player.maxHealth;
 
     // Find spawn position
     const spawnPos = this.findSpawnPosition();
@@ -225,10 +226,10 @@ export class PlayerSessionManager {
       // Reconnection timed out — remove player
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.clearReconnectTimers(client.sessionId);
-      // Save gold before removing
+      // Save progress before removing
       const droppedPlayer = this.bridge.state.players.get(client.sessionId);
-      if (droppedPlayer?.characterId) {
-        this.savePlayerGold(droppedPlayer.characterId, droppedPlayer.gold);
+      if (droppedPlayer) {
+        this.savePlayerProgress(droppedPlayer);
       }
       this.bridge.chatSystem.broadcastSystemI18n(
         "chat.reconnectExpired",
@@ -262,10 +263,10 @@ export class PlayerSessionManager {
     // If already cleaned up by kick, skip everything
     if (this.kickedSessions.has(client.sessionId)) {
       this.kickedSessions.delete(client.sessionId);
-      // Still save gold for kicked players
+      // Still save progress for kicked players
       const kickedPlayer = this.bridge.state.players.get(client.sessionId);
-      if (kickedPlayer?.characterId) {
-        this.savePlayerGold(kickedPlayer.characterId, kickedPlayer.gold);
+      if (kickedPlayer) {
+        this.savePlayerProgress(kickedPlayer);
       }
       this.removeAccountMapping(client);
       this.unregisterClient(client);
@@ -273,9 +274,9 @@ export class PlayerSessionManager {
     }
     const player = this.bridge.state.players.get(client.sessionId);
     const name = player?.characterName || client.sessionId.slice(0, 6);
-    // Save gold to DB before removing player
-    if (player?.characterId) {
-      this.savePlayerGold(player.characterId, player.gold);
+    // Save progress to DB before removing player
+    if (player) {
+      this.savePlayerProgress(player);
     }
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.bridge.state.players.delete(client.sessionId);
@@ -373,26 +374,27 @@ export class PlayerSessionManager {
     });
   }
 
-  savePlayerGold(characterId: string, gold: number): void {
-    if (this.lastSavedGold.get(characterId) === gold) return;
+  savePlayerProgress(player: PlayerState): void {
+    const { characterId, gold, xp, level, strength, vitality, agility } = player;
+    if (!characterId) return;
+    const hash = `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}`;
+    if (this.lastSavedHash.get(characterId) === hash) return;
     const db = getDb();
     db.update(characters)
-      .set({ gold })
+      .set({ gold, xp, level, strength, vitality, agility })
       .where(eq(characters.id, characterId))
       .then(() => {
-        this.lastSavedGold.set(characterId, gold);
-        this.log.debug({ characterId, gold }, "Gold saved");
+        this.lastSavedHash.set(characterId, hash);
+        this.log.debug({ characterId, gold, xp, level }, "Progress saved");
       })
       .catch((err) => {
-        this.log.error({ characterId, err }, "Failed to save gold");
+        this.log.error({ characterId, err }, "Failed to save progress");
       });
   }
 
-  saveAllPlayersGold(): void {
+  saveAllPlayersProgress(): void {
     this.bridge.state.players.forEach((player: PlayerState) => {
-      if (player.characterId) {
-        this.savePlayerGold(player.characterId, player.gold);
-      }
+      this.savePlayerProgress(player);
     });
   }
 

@@ -77,6 +77,7 @@ export class SoundManager {
     this.registerSfx("player_leave", "/audio/sfx/player_leave.ogg", SFX_VOLUME);
     this.registerSfx("chat_receive", "/audio/sfx/chat_receive.ogg", SFX_VOLUME);
     this.registerSfx("chat_send", "/audio/sfx/chat_send.ogg", SFX_VOLUME);
+    this.registerSfx("level_up", "/audio/sfx/level_up.ogg", SFX_VOLUME);
 
     // Ambient cave loop (starts paused — call playAmbient() to start)
     this.ambient = new Sound("ambient_cave", AMBIENT_URL, this.scene, null, {

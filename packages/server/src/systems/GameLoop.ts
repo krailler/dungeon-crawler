@@ -5,7 +5,7 @@ import type { EnemyState } from "../state/EnemyState";
 import type { AISystem } from "./AISystem";
 import type { CombatSystem } from "./CombatSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
-import { MessageType, computeGoldDrop } from "@dungeon/shared";
+import { MessageType, computeGoldDrop, computeXpDrop, MAX_LEVEL } from "@dungeon/shared";
 import type { CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
 
 export interface GameLoopBridge {
@@ -151,6 +151,28 @@ export class GameLoop {
             { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
             `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
           );
+
+          // Distribute XP to alive players (not split — each player gets full XP)
+          this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
+            if (p.health <= 0 || p.level >= MAX_LEVEL) return;
+
+            const xpGain = computeXpDrop(killedEnemy.level, p.level);
+            const levelUps = p.addXp(xpGain);
+
+            for (const { level, dhp, datk, ddef } of levelUps) {
+              this.bridge.chatSystem.broadcastSystemI18n(
+                "chat.levelUp",
+                { name: p.characterName, level },
+                `${p.characterName} reached level ${level}!`,
+              );
+              this.bridge.chatSystem.sendSystemI18nTo(
+                sessionId,
+                "chat.levelUpStats",
+                { dhp, datk, ddef },
+                `+${dhp} Health\n+${datk} Attack\n+${ddef} Defense`,
+              );
+            }
+          });
         }
 
         this.bridge.clock.setTimeout(() => {

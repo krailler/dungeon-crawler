@@ -62,7 +62,8 @@
     "health": "Health",
     "baseStats": "Attributes",
     "derivedStats": "Combat",
-    "gold": "Gold"
+    "gold": "Gold",
+    "xp": "Experience"
   },
   "hud": {
     "ping": "{{value}} ms",
@@ -92,7 +93,9 @@
     "leaderChanged": "{{name}} is now the party leader.",
     "gateLeaderOnly": "Only the party leader can open the gate.",
     "gateOpened": "The gate opens... The dungeon awaits!",
-    "goldGained": "+{{amount}} gold from {{enemy}}!"
+    "goldGained": "+{{amount}} gold from {{enemy}}!",
+    "levelUp": "{{name}} reached level {{level}}!",
+    "levelUpStats": "+{{dhp}} Health\n+{{datk}} Attack\n+{{ddef}} Defense"
   },
   "gate": {
     "interactHint": "Open the gate",
@@ -111,6 +114,9 @@
     "usageTp": "Usage: /tp <player_name>",
     "usageKick": "Usage: /kick <player_name>",
     "healed": "Healed {{name}} to full HP.",
-    "teleported": "Teleported to {{name}}."
+    "teleported": "Teleported to {{name}}.",
+    "usageSetlevel": "Usage: /setlevel <player_name> <level>",
+    "invalidLevel": "Level must be between 1 and {{max}}.",
+    "setLevel": "Set {{name}} to level {{level}}."
   }
 }

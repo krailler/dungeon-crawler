@@ -90,6 +90,30 @@ export class ChatSystem {
     });
   }
 
+  /** Send a system event with i18n key to a single client. */
+  sendSystemI18nTo(
+    sessionId: string,
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+  ): void {
+    const entry: ChatEntry = {
+      id: this.nextId++,
+      category: ChatCategory.MESSAGE,
+      variant: ChatVariant.SYSTEM,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
+    };
+    for (const client of this.bridge.getClients()) {
+      if (client.sessionId === sessionId) {
+        client.send(MessageType.CHAT_ENTRY, entry);
+        break;
+      }
+    }
+  }
+
   /** Broadcast a center-screen announcement with i18n key. */
   broadcastAnnouncement(
     i18nKey: string,

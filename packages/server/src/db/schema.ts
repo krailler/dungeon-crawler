@@ -22,6 +22,7 @@ export const characters = pgTable(
     agility: integer("agility").notNull().default(10),
     level: integer("level").notNull().default(1),
     gold: integer("gold").notNull().default(0),
+    xp: integer("xp").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

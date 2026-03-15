@@ -230,7 +230,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Auto-save gold for all players periodically
     this.clock.setInterval(() => {
-      this.sessionManager.saveAllPlayersGold();
+      this.sessionManager.saveAllPlayersProgress();
     }, GOLD_SAVE_INTERVAL);
 
     // Game loop
@@ -241,11 +241,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.dungeonSeed = seed;
     this.state.dungeonVersion++;
 
-    // Calculate dungeon level from the leader's level (default 1 if no players yet)
-    let dungeonLevel = 1;
+    // Calculate dungeon level from average party level (default 1 if no players yet)
+    let levelSum = 0;
+    let playerCount = 0;
     this.state.players.forEach((p: PlayerState) => {
-      if (p.isLeader) dungeonLevel = Math.max(1, p.level);
+      levelSum += p.level;
+      playerCount++;
     });
+    const dungeonLevel = playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
     this.state.dungeonLevel = dungeonLevel;
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
@@ -363,6 +366,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     agility: number;
     level: number;
     gold: number;
+    xp: number;
   }> {
     if (!context.token) throw new Error("No auth token provided");
 
@@ -387,6 +391,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         agility: characters.agility,
         level: characters.level,
         gold: characters.gold,
+        xp: characters.xp,
       })
       .from(characters)
       .where(eq(characters.accountId, account.id))
@@ -413,6 +418,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       agility: character.agility,
       level: character.level,
       gold: character.gold,
+      xp: character.xp,
     };
   }
 
@@ -466,7 +472,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Skip first room (player spawn)
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      const enemyCount = 1 + Math.floor(rng() * 2);
+      // More enemies per room at higher dungeon levels
+      const minEnemies = 1 + Math.floor(dungeonLevel / 10);
+      const enemyCount = minEnemies + Math.floor(rng() * 2);
 
       for (let j = 0; j < enemyCount; j++) {
         const tileX = room.x + 1 + Math.floor(rng() * (room.w - 2));

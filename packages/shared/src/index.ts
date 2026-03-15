@@ -54,3 +54,5 @@ export {
 export type { EnemyTypeIdValue, EnemyTypeDefinition } from "./EnemyTypes.js";
 
 export { computeGoldDrop } from "./Economy.js";
+
+export { xpToNextLevel, computeXpDrop } from "./Leveling.js";

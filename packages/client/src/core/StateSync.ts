@@ -266,11 +266,14 @@ export class StateSync {
         isLeader: player.isLeader,
         level: player.level,
         gold: player.gold,
+        xp: player.xp,
+        xpToNext: player.xpToNext,
         stats: localStats,
       });
 
-      // Track gold for local player to detect increases
+      // Track gold and level for local player to detect increases
       let prevGold = player.gold as number;
+      let prevLevel = player.level as number;
 
       // Listen to changes on this player
       $(player).onChange(() => {
@@ -282,6 +285,12 @@ export class StateSync {
         }
         prevGold = player.gold;
 
+        // Play level-up sound when local player levels up
+        if (isLocal && player.level > prevLevel) {
+          this.deps.soundManager.playSfx("level_up");
+        }
+        prevLevel = player.level;
+
         hudStore.updateMember(sessionId, {
           health: player.health,
           maxHealth: player.maxHealth,
@@ -289,6 +298,8 @@ export class StateSync {
           isLeader: player.isLeader,
           level: player.level,
           gold: player.gold,
+          xp: player.xp,
+          xpToNext: player.xpToNext,
           ...(isLocal && {
             stats: {
               strength: player.strength,

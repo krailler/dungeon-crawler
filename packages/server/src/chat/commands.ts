@@ -1,5 +1,6 @@
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
+import { MAX_LEVEL } from "@dungeon/shared";
 
 /**
  * Register all built-in slash commands.
@@ -156,6 +157,40 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         { name: target.player.characterName },
         `${target.player.characterName} is now the party leader.`,
       );
+    },
+  });
+
+  registry.register({
+    name: "setlevel",
+    usage: "/setlevel <player> <level>",
+    description: "Set a player's level (1-30)",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      if (!ctx.args[0] || !ctx.args[1]) {
+        ctx.replyError("Usage: /setlevel <player_name> <level>", "cmd.usageSetlevel");
+        return;
+      }
+      const targetLevel = parseInt(ctx.args[1], 10);
+      if (isNaN(targetLevel) || targetLevel < 1 || targetLevel > MAX_LEVEL) {
+        ctx.replyError(`Level must be between 1 and ${MAX_LEVEL}.`, "cmd.invalidLevel", {
+          max: MAX_LEVEL,
+        });
+        return;
+      }
+      const target = bridge.findPlayerByName(ctx.args[0]);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
+
+      target.player.setLevel(targetLevel);
+
+      ctx.reply(`Set ${target.player.characterName} to level ${targetLevel}.`, "cmd.setLevel", {
+        name: target.player.characterName,
+        level: targetLevel,
+      });
     },
   });
 

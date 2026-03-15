@@ -88,6 +88,20 @@ body {
   }
 }
 
+@keyframes xp-float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+}
+
 @keyframes glow-pulse {
   0%,
   100% {
@@ -109,5 +123,9 @@ body {
 
   .animate-glow-pulse {
     animation: glow-pulse 2.4s ease-in-out infinite;
+  }
+
+  .animate-xp-float {
+    animation: xp-float-up 1.2s ease-out forwards;
   }
 }

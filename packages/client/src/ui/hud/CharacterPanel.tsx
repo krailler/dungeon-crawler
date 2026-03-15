@@ -71,6 +71,24 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
           </div>
         </div>
 
+        {/* XP bar */}
+        {local.xpToNext > 0 && (
+          <div className="mb-4">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">{t("character.xp")}</span>
+              <span className="font-mono text-[11px] text-slate-400">
+                {local.xp.toLocaleString()}/{local.xpToNext.toLocaleString()}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/80">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-400/90 to-violet-500/80 transition-[width] duration-300"
+                style={{ width: `${Math.round((local.xp / Math.max(1, local.xpToNext)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Gold */}
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-900/20 px-3 py-2">
           <CoinIcon className="h-4 w-4 text-amber-400" />
