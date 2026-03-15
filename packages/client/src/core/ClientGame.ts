@@ -250,7 +250,7 @@ export class ClientGame {
         } else if (code === CloseCode.KICKED) {
           authStore.kick(t("kick.kicked"));
         } else {
-          hudStore.setConnection("error", t("connection.lost"));
+          authStore.kick(t("connection.lost"));
         }
       });
     } catch (err) {
