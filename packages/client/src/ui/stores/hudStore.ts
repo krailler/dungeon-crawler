@@ -22,6 +22,7 @@ export type PartyMember = {
   online: boolean;
   isLeader: boolean;
   level: number;
+  gold: number;
   stats?: CharacterStats;
 };
 

@@ -31,8 +31,11 @@ import {
   computeDerivedStats,
   ENEMY_TYPES,
   computeEnemyDerivedStats,
+  scaleEnemyDerivedStats,
+  computeGoldDrop,
   GATE_INTERACT_RANGE,
   GATE_COUNTDOWN_SECONDS,
+  GOLD_SAVE_INTERVAL,
   CloseCode,
 } from "@dungeon/shared";
 import type {
@@ -83,6 +86,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
   private tickEnemiesMap: Map<string, EnemyState> = new Map();
+  /** Last saved gold per characterId — avoids unnecessary DB writes */
+  private lastSavedGold: Map<string, number> = new Map();
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
@@ -273,6 +278,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
     });
 
+    // Auto-save gold for all players periodically
+    this.clock.setInterval(() => {
+      this.saveAllPlayersGold();
+    }, GOLD_SAVE_INTERVAL);
+
     // Game loop
     this.setSimulationInterval(this.update.bind(this), TICK_RATE);
   }
@@ -280,6 +290,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private generateDungeon(seed: number): void {
     this.state.dungeonSeed = seed;
     this.state.dungeonVersion++;
+
+    // Calculate dungeon level from the leader's level (default 1 if no players yet)
+    let dungeonLevel = 1;
+    this.state.players.forEach((p: PlayerState) => {
+      if (p.isLeader) dungeonLevel = Math.max(1, p.level);
+    });
+    this.state.dungeonLevel = dungeonLevel;
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
 
@@ -326,7 +343,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.aiSystem = new AISystem(this.pathfinder);
     this.combatSystem = new CombatSystem();
     const spawnRng = mulberry32(seed ^ 0x454e454d);
-    this.spawnEnemies(rooms, spawnRng);
+    this.spawnEnemies(rooms, spawnRng, dungeonLevel);
 
     this.log.info(
       { seed, rooms: rooms.length, enemies: this.state.enemies.size },
@@ -388,6 +405,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     vitality: number;
     agility: number;
     level: number;
+    gold: number;
   }> {
     if (!context.token) throw new Error("No auth token provided");
 
@@ -411,6 +429,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         vitality: characters.vitality,
         agility: characters.agility,
         level: characters.level,
+        gold: characters.gold,
       })
       .from(characters)
       .where(eq(characters.accountId, account.id))
@@ -436,11 +455,22 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       vitality: character.vitality,
       agility: character.agility,
       level: character.level,
+      gold: character.gold,
     };
   }
 
   onJoin(client: Client): void {
-    const { accountId, characterName, role, strength, vitality, agility, level } = client.auth as {
+    const {
+      accountId,
+      characterId,
+      characterName,
+      role,
+      strength,
+      vitality,
+      agility,
+      level,
+      gold,
+    } = client.auth as {
       accountId: string;
       characterId: string;
       characterName: string;
@@ -449,6 +479,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       vitality: number;
       agility: number;
       level: number;
+      gold: number;
     };
 
     // Kick previous session if same account is already connected (any room)
@@ -508,6 +539,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     player.vitality = vitality;
     player.agility = agility;
     player.level = level;
+    player.gold = gold;
+    player.characterId = characterId;
+    this.lastSavedGold.set(characterId, gold);
 
     // Compute derived stats
     const derived = computeDerivedStats({ strength, vitality, agility });
@@ -569,7 +603,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       return;
     }
 
-    this.log.warn({ player: pid(client.sessionId) }, "Player dropped — waiting 120s for reconnect");
+    this.log.warn(
+      { player: pid(client.sessionId) },
+      `Player dropped — waiting ${RECONNECT_TIMEOUT}s for reconnect`,
+    );
 
     // Stop the player while disconnected
     const player = this.state.players.get(client.sessionId);
@@ -609,6 +646,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Reconnection timed out — remove player
       this.log.info({ player: pid(client.sessionId) }, "Reconnection timed out — player removed");
       this.clearReconnectTimers(client.sessionId);
+      // Save gold before removing
+      const droppedPlayer = this.state.players.get(client.sessionId);
+      if (droppedPlayer?.characterId) {
+        this.savePlayerGold(droppedPlayer.characterId, droppedPlayer.gold);
+      }
       this.chatSystem.broadcastSystemI18n(
         "chat.reconnectExpired",
         { name: playerName },
@@ -641,12 +683,21 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // If already cleaned up by kick, skip everything
     if (this.kickedSessions.has(client.sessionId)) {
       this.kickedSessions.delete(client.sessionId);
+      // Still save gold for kicked players
+      const kickedPlayer = this.state.players.get(client.sessionId);
+      if (kickedPlayer?.characterId) {
+        this.savePlayerGold(kickedPlayer.characterId, kickedPlayer.gold);
+      }
       this.removeAccountMapping(client);
       this.unregisterClient(client);
       return;
     }
     const player = this.state.players.get(client.sessionId);
     const name = player?.characterName || client.sessionId.slice(0, 6);
+    // Save gold to DB before removing player
+    if (player?.characterId) {
+      this.savePlayerGold(player.characterId, player.gold);
+    }
     this.log.info({ player: pid(client.sessionId) }, "Player left");
     this.state.players.delete(client.sessionId);
     this.combatSystem.removePlayer(client.sessionId);
@@ -789,6 +840,34 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
       // Remove dead enemy from state after a short delay so clients see the death
       if (event.killed) {
+        // Distribute gold to alive party members
+        const killedEnemy = this.state.enemies.get(event.enemyId);
+        if (killedEnemy) {
+          let aliveCount = 0;
+          let levelSum = 0;
+          this.state.players.forEach((p: PlayerState) => {
+            if (p.health > 0) {
+              aliveCount++;
+              levelSum += p.level;
+            }
+          });
+          const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
+          const goldPerPlayer = computeGoldDrop(killedEnemy.level, avgPartyLevel, aliveCount);
+
+          this.state.players.forEach((p: PlayerState) => {
+            if (p.health > 0) {
+              p.gold += goldPerPlayer;
+            }
+          });
+
+          // Broadcast gold earned in chat
+          this.chatSystem.broadcastSystemI18n(
+            "chat.goldGained",
+            { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
+            `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
+          );
+        }
+
         this.clock.setTimeout(() => {
           this.state.enemies.delete(event.enemyId);
           this.aiSystem.unregister(event.enemyId);
@@ -880,9 +959,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
   }
 
-  private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number): void {
+  private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number, dungeonLevel: number): void {
     const typeDef = ENEMY_TYPES.zombie;
-    const derived = computeEnemyDerivedStats(typeDef);
+    const baseDerived = computeEnemyDerivedStats(typeDef);
 
     let enemyId = 0;
     // Skip first room (player spawn)
@@ -894,10 +973,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const tileX = room.x + 1 + Math.floor(rng() * (room.w - 2));
         const tileY = room.y + 1 + Math.floor(rng() * (room.h - 2));
 
+        // Assign enemy level in range [dungeonLevel - 1, dungeonLevel + 2] (min 1)
+        const levelOffset = Math.floor(rng() * 4) - 1; // -1 to +2
+        const enemyLevel = Math.max(1, dungeonLevel + levelOffset);
+
+        // Scale stats based on enemy level
+        const derived = scaleEnemyDerivedStats(baseDerived, enemyLevel);
+
         const enemy = new EnemyState();
         enemy.x = tileX * TILE_SIZE;
         enemy.z = tileY * TILE_SIZE;
         enemy.enemyType = typeDef.id;
+        enemy.level = enemyLevel;
         enemy.maxHealth = derived.maxHealth;
         enemy.health = derived.maxHealth;
         enemy.speed = derived.moveSpeed;
@@ -941,6 +1028,31 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(type, message);
       }
     }
+  }
+
+  /** Save a single player's gold to the database (skips if unchanged) */
+  private savePlayerGold(characterId: string, gold: number): void {
+    if (this.lastSavedGold.get(characterId) === gold) return;
+    const db = getDb();
+    db.update(characters)
+      .set({ gold })
+      .where(eq(characters.id, characterId))
+      .then(() => {
+        this.lastSavedGold.set(characterId, gold);
+        this.log.debug({ characterId, gold }, "Gold saved");
+      })
+      .catch((err) => {
+        this.log.error({ characterId, err }, "Failed to save gold");
+      });
+  }
+
+  /** Save gold for all connected players */
+  private saveAllPlayersGold(): void {
+    this.state.players.forEach((player: PlayerState) => {
+      if (player.characterId) {
+        this.savePlayerGold(player.characterId, player.gold);
+      }
+    });
   }
 
   private findSpawnPosition(): { x: number; z: number } | null {

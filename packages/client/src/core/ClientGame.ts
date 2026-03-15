@@ -504,6 +504,7 @@ export class ClientGame {
         online: player.online,
         isLeader: player.isLeader,
         level: player.level,
+        gold: player.gold,
         stats: localStats,
       });
 
@@ -517,6 +518,7 @@ export class ClientGame {
           online: player.online,
           isLeader: player.isLeader,
           level: player.level,
+          gold: player.gold,
           ...(isLocal && {
             stats: {
               strength: player.strength,
@@ -551,6 +553,7 @@ export class ClientGame {
         this.soundManager,
       );
       clientEnemy.snapToPosition(enemy.x, enemy.z);
+      clientEnemy.setLevel(enemy.level);
       clientEnemy.setServerState(
         enemy.x,
         enemy.z,

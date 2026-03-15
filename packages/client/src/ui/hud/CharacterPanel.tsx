@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
+import { CoinIcon } from "../icons/CoinIcon";
 
 const StatRow = ({ label, value, color }: { label: string; value: number; color: string }) => (
   <div className="flex items-center justify-between py-1">
@@ -64,6 +65,14 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
               style={{ width: `${healthPct}%` }}
             />
           </div>
+        </div>
+
+        {/* Gold */}
+        <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-900/20 px-3 py-2">
+          <CoinIcon className="h-4 w-4 text-amber-400" />
+          <span className="text-sm font-semibold text-amber-300">
+            {local.gold.toLocaleString()} {t("character.gold")}
+          </span>
         </div>
 
         {/* Divider + Base stats */}

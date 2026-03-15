@@ -1,5 +1,6 @@
 import type { BaseStats, DerivedStats } from "./Stats.js";
 import { computeDerivedStats } from "./Stats.js";
+import { ENEMY_STAT_SCALE_PER_LEVEL } from "./constants/economy.js";
 
 // ── Enemy type IDs ──────────────────────────────────────────────────────────
 
@@ -63,5 +64,21 @@ export function computeEnemyDerivedStats(typeDef: EnemyTypeDefinition): DerivedS
     ...derived,
     ...typeDef.overrides,
     attackRange: typeDef.attackRange,
+  };
+}
+
+/**
+ * Scale derived stats for an enemy based on its level.
+ * Multiplies maxHealth, attackDamage, defense by a level-based factor.
+ * Speed, cooldown, and range are NOT scaled to preserve gameplay feel.
+ */
+export function scaleEnemyDerivedStats(derived: DerivedStats, level: number): DerivedStats {
+  if (level <= 1) return derived;
+  const scale = 1 + (level - 1) * ENEMY_STAT_SCALE_PER_LEVEL;
+  return {
+    ...derived,
+    maxHealth: Math.round(derived.maxHealth * scale),
+    attackDamage: Math.round(derived.attackDamage * scale),
+    defense: Math.round(derived.defense * scale),
   };
 }

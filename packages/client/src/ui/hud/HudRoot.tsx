@@ -18,6 +18,7 @@ import { HudPill } from "../components/HudPill";
 import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
+import { CoinIcon } from "../icons/CoinIcon";
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -264,6 +265,12 @@ export const HudRoot = (): JSX.Element => {
         </div>
       )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
+        {localMember && (
+          <HudPill variant="amber">
+            <CoinIcon className="mr-1 inline h-3.5 w-3.5" />
+            {localMember.gold.toLocaleString()}
+          </HudPill>
+        )}
         {debugSnapshot.showCoords && snapshot.localCoords && (
           <HudPill variant="amber" mono>
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}

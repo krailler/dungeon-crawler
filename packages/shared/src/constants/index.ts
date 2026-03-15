@@ -5,3 +5,4 @@ export * from "./camera.js";
 export * from "./lighting.js";
 export * from "./gate.js";
 export * from "./chat.js";
+export * from "./economy.js";

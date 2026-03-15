@@ -15,5 +15,6 @@ export class DungeonState extends Schema {
   @type("uint32") dungeonSeed: number = 0;
   /** Incremented on each dungeon regeneration to force client re-render */
   @type("uint32") dungeonVersion: number = 0;
+  @type("int16") dungeonLevel: number = 1;
   @type("float32") tickRate: number = 0;
 }

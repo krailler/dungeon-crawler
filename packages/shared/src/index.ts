@@ -45,5 +45,12 @@ export {
 } from "./Stats.js";
 export type { BaseStats, DerivedStats, StatScaling } from "./Stats.js";
 
-export { EnemyTypeId, ENEMY_TYPES, computeEnemyDerivedStats } from "./EnemyTypes.js";
+export {
+  EnemyTypeId,
+  ENEMY_TYPES,
+  computeEnemyDerivedStats,
+  scaleEnemyDerivedStats,
+} from "./EnemyTypes.js";
 export type { EnemyTypeIdValue, EnemyTypeDefinition } from "./EnemyTypes.js";
+
+export { computeGoldDrop } from "./Economy.js";

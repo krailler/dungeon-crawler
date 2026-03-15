@@ -9,6 +9,7 @@ export class EnemyState extends Schema {
   @type("boolean") isDead: boolean = false;
   @type("string") animState: string = "";
   @type("string") enemyType: string = "zombie";
+  @type("int16") level: number = 1;
 
   // Server-only (not synced)
   path: { x: number; z: number }[] = [];

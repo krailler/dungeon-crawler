@@ -23,7 +23,11 @@ export class PlayerState extends Schema {
   @type("int16") attackDamage: number = 0;
   @type("int16") defense: number = 0;
 
+  // Economy (synced)
+  @type("int32") gold: number = 0;
+
   // Server-only (not synced)
+  characterId: string = "";
   path: { x: number; z: number }[] = [];
   currentPathIndex: number = 0;
   speed: number = 0;

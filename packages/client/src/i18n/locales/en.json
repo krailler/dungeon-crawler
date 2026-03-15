@@ -61,7 +61,8 @@
     "defense": "Defense",
     "health": "Health",
     "baseStats": "Attributes",
-    "derivedStats": "Combat"
+    "derivedStats": "Combat",
+    "gold": "Gold"
   },
   "hud": {
     "ping": "{{value}} ms",
@@ -90,7 +91,8 @@
     "kicked": "{{name}} has been kicked.",
     "leaderChanged": "{{name}} is now the party leader.",
     "gateLeaderOnly": "Only the party leader can open the gate.",
-    "gateOpened": "The gate opens... The dungeon awaits!"
+    "gateOpened": "The gate opens... The dungeon awaits!",
+    "goldGained": "+{{amount}} gold from {{enemy}}!"
   },
   "gate": {
     "interactHint": "Open the gate",

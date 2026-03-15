@@ -9,6 +9,7 @@ import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
+import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
@@ -52,9 +53,11 @@ export class ClientEnemy {
   private hitMaterial: PBRMaterial;
   private hitFlashTimer: number = 0;
 
-  // Floating health bar
+  // Floating health bar + level label
+  private healthBarContainer: Rectangle;
   private healthBarBg: Rectangle;
   private healthBarFill: Rectangle;
+  private levelLabel: TextBlock;
 
   constructor(
     scene: Scene,
@@ -80,7 +83,25 @@ export class ClientEnemy {
     this.hitMaterial.metallic = 0;
     this.hitMaterial.roughness = 1;
 
-    // --- Floating health bar ---
+    // --- Floating health bar + level label ---
+    // Container for both label and health bar
+    this.healthBarContainer = new Rectangle(`enemyHpContainer_${id}`);
+    this.healthBarContainer.widthInPixels = 70;
+    this.healthBarContainer.heightInPixels = 24;
+    this.healthBarContainer.thickness = 0;
+    this.healthBarContainer.background = "transparent";
+    this.healthBarContainer.linkOffsetY = -140;
+    this.healthBarContainer.isVisible = false;
+
+    // Level label above the bar
+    this.levelLabel = new TextBlock(`enemyLvl_${id}`, "Lv.1");
+    this.levelLabel.color = "#ccc";
+    this.levelLabel.fontSize = 10;
+    this.levelLabel.heightInPixels = 14;
+    this.levelLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.levelLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this.healthBarContainer.addControl(this.levelLabel);
+
     this.healthBarBg = new Rectangle(`enemyHpBg_${id}`);
     this.healthBarBg.widthInPixels = 60;
     this.healthBarBg.heightInPixels = 8;
@@ -88,8 +109,7 @@ export class ClientEnemy {
     this.healthBarBg.thickness = 1;
     this.healthBarBg.color = "#555";
     this.healthBarBg.background = "#222";
-    this.healthBarBg.linkOffsetY = -140;
-    this.healthBarBg.isVisible = false;
+    this.healthBarBg.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
 
     this.healthBarFill = new Rectangle(`enemyHpFill_${id}`);
     this.healthBarFill.width = 1;
@@ -99,8 +119,9 @@ export class ClientEnemy {
     this.healthBarFill.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
 
     this.healthBarBg.addControl(this.healthBarFill);
-    guiTexture.addControl(this.healthBarBg);
-    this.healthBarBg.linkWithMesh(this.mesh);
+    this.healthBarContainer.addControl(this.healthBarBg);
+    guiTexture.addControl(this.healthBarContainer);
+    this.healthBarContainer.linkWithMesh(this.mesh);
   }
 
   /** Attach the loaded GLB character instance. */
@@ -166,6 +187,11 @@ export class ClientEnemy {
     }
   }
 
+  /** Set enemy level (updates label) */
+  setLevel(level: number): void {
+    this.levelLabel.text = `Lv.${level}`;
+  }
+
   /** Called when server state changes */
   setServerState(
     x: number,
@@ -194,7 +220,7 @@ export class ClientEnemy {
 
     if (isDead && !this.isDead) {
       this.isDead = true;
-      this.healthBarBg.dispose();
+      this.healthBarContainer.dispose();
       for (const [, anim] of this.animations) {
         anim.dispose();
       }
@@ -271,7 +297,7 @@ export class ClientEnemy {
   private updateHealthBar(health: number, maxHealth: number): void {
     if (maxHealth <= 0) return;
     const ratio = health / maxHealth;
-    this.healthBarBg.isVisible = ratio < 1 && health > 0;
+    this.healthBarContainer.isVisible = ratio < 1 && health > 0;
     this.healthBarFill.width = Math.max(ratio, 0);
     if (ratio > 0.6) {
       this.healthBarFill.background = "#4caf50";
@@ -297,7 +323,7 @@ export class ClientEnemy {
   }
 
   dispose(): void {
-    this.healthBarBg.dispose();
+    this.healthBarContainer.dispose();
     if (!this.isDead) {
       for (const [, anim] of this.animations) {
         anim.dispose();
