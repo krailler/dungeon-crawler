@@ -378,10 +378,12 @@ export class ClientGame {
     // Players added
     state$.players.onAdd((player: any, sessionId: string) => {
       const isLocal = sessionId === this.localSessionId;
+      const displayName = player.characterName || sessionId.slice(0, 4).toUpperCase();
       const clientPlayer = new ClientPlayer(
         this.scene,
         isLocal,
         sessionId,
+        displayName,
         this.guiTexture,
         this.soundManager,
       );

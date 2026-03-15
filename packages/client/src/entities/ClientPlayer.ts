@@ -7,7 +7,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE, ATTACK_ANIM_DURATION } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
@@ -65,6 +65,13 @@ export class ClientPlayer {
   private pendingSoundName: string | null = null;
   private pendingSoundTimer: number = 0;
 
+  // 3D anchor nodes for GUI elements (world-space, resolution-independent)
+  private nameAnchor: TransformNode | null = null;
+  private bubbleAnchor: TransformNode | null = null;
+
+  // Floating name label
+  private nameLabel: TextBlock | null = null;
+
   // Chat bubble
   private guiTexture: AdvancedDynamicTexture | null = null;
   private bubbleContainer: Rectangle | null = null;
@@ -83,6 +90,7 @@ export class ClientPlayer {
     scene: Scene,
     isLocal: boolean,
     id: string,
+    name: string,
     guiTexture: AdvancedDynamicTexture,
     soundManager?: SoundManager,
   ) {
@@ -94,6 +102,28 @@ export class ClientPlayer {
     this.mesh.visibility = 0;
     this.mesh.isPickable = false;
     this.mesh.position.y = 0;
+
+    // 3D anchor for name label (world-space Y so it scales with camera)
+    this.nameAnchor = new TransformNode(`nameAnchor_${id}`, scene);
+    this.nameAnchor.parent = this.mesh;
+    this.nameAnchor.position.y = 2.2;
+
+    // 3D anchor for chat bubble (slightly above name)
+    this.bubbleAnchor = new TransformNode(`bubbleAnchor_${id}`, scene);
+    this.bubbleAnchor.parent = this.mesh;
+    this.bubbleAnchor.position.y = 2.7;
+
+    // Floating name label (all players)
+    this.nameLabel = new TextBlock(`playerName_${id}`, name);
+    this.nameLabel.color = isLocal ? "#38bdf8" : "#e2e8f0";
+    this.nameLabel.fontSize = 13;
+    this.nameLabel.fontFamily = "system-ui, -apple-system, sans-serif";
+    this.nameLabel.fontWeight = "600";
+    this.nameLabel.outlineWidth = 3;
+    this.nameLabel.outlineColor = "rgba(0, 0, 0, 0.8)";
+    this.nameLabel.resizeToFit = true;
+    guiTexture.addControl(this.nameLabel);
+    this.nameLabel.linkWithMesh(this.nameAnchor);
 
     // Only local player gets a torch light
     if (isLocal) {
@@ -297,7 +327,6 @@ export class ClientPlayer {
       this.bubbleContainer.paddingBottomInPixels = 0;
       this.bubbleContainer.paddingLeftInPixels = 0;
       this.bubbleContainer.paddingRightInPixels = 0;
-      this.bubbleContainer.linkOffsetY = -200;
       this.bubbleContainer.shadowColor = "rgba(0, 0, 0, 0.5)";
       this.bubbleContainer.shadowBlur = 8;
       this.bubbleContainer.shadowOffsetY = 2;
@@ -319,7 +348,7 @@ export class ClientPlayer {
 
       this.bubbleContainer.addControl(this.bubbleText);
       this.guiTexture.addControl(this.bubbleContainer);
-      this.bubbleContainer.linkWithMesh(this.mesh);
+      this.bubbleContainer.linkWithMesh(this.bubbleAnchor);
     }
 
     // Update text and clamp width
@@ -349,10 +378,16 @@ export class ClientPlayer {
     for (const [, anim] of this.animations) {
       anim.dispose();
     }
+    if (this.nameLabel) {
+      this.guiTexture?.removeControl(this.nameLabel);
+      this.nameLabel.dispose();
+    }
     if (this.bubbleContainer) {
       this.guiTexture?.removeControl(this.bubbleContainer);
       this.bubbleContainer.dispose();
     }
+    this.nameAnchor?.dispose();
+    this.bubbleAnchor?.dispose();
     this.modelRoot?.dispose(false, false);
     this.shadowGenerator?.dispose();
     this.torchLight?.dispose();
