@@ -429,6 +429,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   onLeave(client: Client): void {
+    // During an active dungeon, treat a consented leave (tab close / page reload)
+    // as a drop so the player gets a reconnect window instead of being removed.
+    // This allows browser refreshes to rejoin via session migration in onAuth.
+    if (this.isDungeonStarted()) {
+      this.sessionManager.handleDrop(client);
+      return;
+    }
     this.sessionManager.handleLeave(client);
   }
 
