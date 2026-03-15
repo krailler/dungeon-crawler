@@ -454,6 +454,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onJoin(client: Client): void {
     this.sessionManager.handleJoin(client);
+    // Add this player's secret state to the client's view so only they see it
+    const player = this.state.players.get(client.sessionId);
+    if (player && client.view) {
+      client.view.add(player.secret);
+    }
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -462,6 +467,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onReconnect(client: Client): void {
     this.sessionManager.handleReconnect(client);
+    // Re-add secret to the new client view after reconnect
+    const player = this.state.players.get(client.sessionId);
+    if (player && client.view) {
+      client.view.add(player.secret);
+    }
   }
 
   onLeave(client: Client): void {

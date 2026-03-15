@@ -28,11 +28,12 @@ export type PartyMember = {
   online: boolean;
   isLeader: boolean;
   level: number;
-  gold: number;
-  xp: number;
-  xpToNext: number;
-  skills: string[];
-  autoAttackEnabled: boolean;
+  // Private fields — only available for the local player (via @view)
+  gold?: number;
+  xp?: number;
+  xpToNext?: number;
+  skills?: string[];
+  autoAttackEnabled?: boolean;
   stats?: CharacterStats;
 };
 
@@ -209,6 +210,11 @@ export const hudStore = {
     if (!room) return;
     const msg: PartyKickMessage = { targetSessionId };
     room.send(MessageType.PARTY_KICK, msg);
+  },
+  /** Helper: safely read local player's gold (may be undefined for non-local) */
+  getLocalGold(): number {
+    const local = cachedSnapshot.members.find((m) => m.isLocal);
+    return local?.gold ?? 0;
   },
   toggleSkill(skillId: SkillIdValue): void {
     if (!room) return;

@@ -1,7 +1,9 @@
-import { ArraySchema, Schema, type } from "@colyseus/schema";
-import { computeDerivedStats, xpToNextLevel, MAX_LEVEL, DEFAULT_SKILLS } from "@dungeon/shared";
+import { Schema, type, view } from "@colyseus/schema";
+import { computeDerivedStats, xpToNextLevel, MAX_LEVEL } from "@dungeon/shared";
+import { PlayerSecretState } from "./PlayerSecretState";
 
 export class PlayerState extends Schema {
+  // ── Public fields (visible to all clients) ─────────────────────────────────
   @type("float32") x: number = 0;
   @type("float32") z: number = 0;
   @type("float32") rotY: number = 0;
@@ -10,38 +12,96 @@ export class PlayerState extends Schema {
   @type("boolean") isMoving: boolean = false;
   @type("string") animState: string = "";
   @type("string") characterName: string = "";
-  @type("string") role: string = "user";
   @type("boolean") online: boolean = true;
   @type("boolean") isLeader: boolean = false;
-
-  // Base stats (synced for future character sheet UI)
-  @type("int16") strength: number = 10;
-  @type("int16") vitality: number = 10;
-  @type("int16") agility: number = 10;
   @type("int16") level: number = 1;
 
-  // Derived stats (synced for client display)
-  @type("int16") attackDamage: number = 0;
-  @type("int16") defense: number = 0;
+  // ── Private fields (only visible to the owning client via StateView) ───────
+  @view() @type(PlayerSecretState) secret = new PlayerSecretState();
 
-  // Economy & progression (synced)
-  @type("int32") gold: number = 0;
-  @type("int32") xp: number = 0;
-  @type("int32") xpToNext: number = 0;
-
-  // Skills (synced — ordered list of skill IDs for the action bar)
-  @type(["string"]) skills = new ArraySchema<string>(...DEFAULT_SKILLS);
-
-  // Skill toggles (synced — client needs to show active/inactive state)
-  @type("boolean") autoAttackEnabled: boolean = true;
-
-  // Server-only (not synced)
+  // ── Server-only (not synced at all) ────────────────────────────────────────
   characterId: string = "";
   path: { x: number; z: number }[] = [];
   currentPathIndex: number = 0;
   speed: number = 0;
   attackCooldown: number = 1.0;
   attackRange: number = 2.5;
+
+  // ── Convenience getters (delegate to secret for server-side code) ──────────
+
+  get strength(): number {
+    return this.secret.strength;
+  }
+  set strength(v: number) {
+    this.secret.strength = v;
+  }
+
+  get vitality(): number {
+    return this.secret.vitality;
+  }
+  set vitality(v: number) {
+    this.secret.vitality = v;
+  }
+
+  get agility(): number {
+    return this.secret.agility;
+  }
+  set agility(v: number) {
+    this.secret.agility = v;
+  }
+
+  get attackDamage(): number {
+    return this.secret.attackDamage;
+  }
+  set attackDamage(v: number) {
+    this.secret.attackDamage = v;
+  }
+
+  get defense(): number {
+    return this.secret.defense;
+  }
+  set defense(v: number) {
+    this.secret.defense = v;
+  }
+
+  get gold(): number {
+    return this.secret.gold;
+  }
+  set gold(v: number) {
+    this.secret.gold = v;
+  }
+
+  get xp(): number {
+    return this.secret.xp;
+  }
+  set xp(v: number) {
+    this.secret.xp = v;
+  }
+
+  get xpToNext(): number {
+    return this.secret.xpToNext;
+  }
+  set xpToNext(v: number) {
+    this.secret.xpToNext = v;
+  }
+
+  get role(): string {
+    return this.secret.role;
+  }
+  set role(v: string) {
+    this.secret.role = v;
+  }
+
+  get skills() {
+    return this.secret.skills;
+  }
+
+  get autoAttackEnabled(): boolean {
+    return this.secret.autoAttackEnabled;
+  }
+  set autoAttackEnabled(v: boolean) {
+    this.secret.autoAttackEnabled = v;
+  }
 
   /** Recompute all derived stats from current base stats and apply them. */
   applyDerivedStats(): void {

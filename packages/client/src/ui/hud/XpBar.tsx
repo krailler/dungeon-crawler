@@ -18,12 +18,12 @@ export const XpBar = (): JSX.Element | null => {
   useEffect(() => {
     if (!local) return;
     const prevXp = prevXpRef.current;
-    prevXpRef.current = local.xp;
+    prevXpRef.current = local.xp ?? 0;
 
     // Skip initial render (prevXp is null) and decreases
-    if (prevXp === null || local.xp <= prevXp) return;
+    if (prevXp === null || (local.xp ?? 0) <= prevXp) return;
 
-    const gain = local.xp - prevXp;
+    const gain = (local.xp ?? 0) - prevXp;
     const id = ++floatId;
     setFloats((prev) => [...prev, { id, amount: gain }]);
 
@@ -34,12 +34,12 @@ export const XpBar = (): JSX.Element | null => {
     return () => clearTimeout(timer);
   }, [local?.xp]);
 
-  if (!local || local.xpToNext <= 0) return null;
+  const xp = local?.xp ?? 0;
+  const xpToNext = local?.xpToNext ?? 0;
 
-  const pct = Math.min(
-    100,
-    Math.max(0, Math.round((local.xp / Math.max(1, local.xpToNext)) * 100)),
-  );
+  if (!local || xpToNext <= 0) return null;
+
+  const pct = Math.min(100, Math.max(0, Math.round((xp / Math.max(1, xpToNext)) * 100)));
 
   return (
     <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 w-[60%] max-w-[700px]">
@@ -64,7 +64,7 @@ export const XpBar = (): JSX.Element | null => {
 
         {/* XP numbers — right */}
         <span className="absolute -top-4 right-0 font-mono text-[10px] text-slate-400/70">
-          {local.xp.toLocaleString()} / {local.xpToNext.toLocaleString()}
+          {xp.toLocaleString()} / {xpToNext.toLocaleString()}
         </span>
 
         {/* Bar background */}

@@ -240,7 +240,10 @@ export class StateSync {
 
       if (isLocal) {
         this.deps.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
-        authStore.setRole(player.role);
+        // Role is in the private secret state (only visible to owning client)
+        if (player.secret) {
+          authStore.setRole(player.secret.role);
+        }
       }
 
       // Attach GLB character model
@@ -253,13 +256,16 @@ export class StateSync {
       }
 
       const name = player.characterName || sessionId.slice(0, 4).toUpperCase();
-      const localStats = isLocal
+
+      // Private data lives in player.secret (only visible to the owning client via @view)
+      const secret = isLocal ? player.secret : undefined;
+      const localStats = secret
         ? {
-            strength: player.strength,
-            vitality: player.vitality,
-            agility: player.agility,
-            attackDamage: player.attackDamage,
-            defense: player.defense,
+            strength: secret.strength,
+            vitality: secret.vitality,
+            agility: secret.agility,
+            attackDamage: secret.attackDamage,
+            defense: secret.defense,
           }
         : undefined;
       hudStore.setMember({
@@ -271,38 +277,61 @@ export class StateSync {
         online: player.online,
         isLeader: player.isLeader,
         level: player.level,
-        gold: player.gold,
-        xp: player.xp,
-        xpToNext: player.xpToNext,
-        skills: Array.from(player.skills as Iterable<string>),
-        autoAttackEnabled: player.autoAttackEnabled ?? true,
-        stats: localStats,
+        // Private fields — only for local player
+        ...(secret && {
+          gold: secret.gold,
+          xp: secret.xp,
+          xpToNext: secret.xpToNext,
+          skills: Array.from(secret.skills as Iterable<string>),
+          autoAttackEnabled: secret.autoAttackEnabled ?? true,
+          stats: localStats,
+        }),
       });
 
-      // Sync skills array — onAdd/onRemove fire when server modifies the ArraySchema
-      if (isLocal) {
+      // Local-only listeners: skills, gold, xp/level-up from secret state
+      if (isLocal && secret) {
+        // Sync skills array — onAdd/onRemove fire when server modifies the ArraySchema
         const syncSkills = (): void => {
           hudStore.updateMember(sessionId, {
-            skills: Array.from(player.skills as Iterable<string>),
+            skills: Array.from(secret.skills as Iterable<string>),
           });
         };
-        $(player).skills.onAdd(syncSkills);
-        $(player).skills.onRemove(syncSkills);
+        $(secret).skills.onAdd(syncSkills);
+        $(secret).skills.onRemove(syncSkills);
+
+        // Track gold changes for pickup sound
+        let prevGold = secret.gold as number;
+
+        // Listen to changes on the secret (private) state
+        $(secret).onChange(() => {
+          // Play gold pickup sound when local player earns gold
+          if (secret.gold > prevGold) {
+            this.deps.soundManager.playSfx("gold_pickup");
+          }
+          prevGold = secret.gold;
+
+          hudStore.updateMember(sessionId, {
+            gold: secret.gold,
+            xp: secret.xp,
+            xpToNext: secret.xpToNext,
+            autoAttackEnabled: secret.autoAttackEnabled ?? true,
+            stats: {
+              strength: secret.strength,
+              vitality: secret.vitality,
+              agility: secret.agility,
+              attackDamage: secret.attackDamage,
+              defense: secret.defense,
+            },
+          });
+        });
       }
 
-      // Track gold and level to detect increases
-      let prevGold = player.gold as number;
+      // Track level to detect level-up (level is public, visible to all)
       let prevLevel = player.level as number;
 
-      // Listen to changes on this player
+      // Listen to changes on public player state
       $(player).onChange(() => {
         clientPlayer.setServerState(player.x, player.z, player.rotY, player.animState);
-
-        // Play gold pickup sound when local player earns gold
-        if (isLocal && player.gold > prevGold) {
-          this.deps.soundManager.playSfx("gold_pickup");
-        }
-        prevGold = player.gold;
 
         // Level-up: sound (local only) + particle aura (all players)
         if (player.level > prevLevel) {
@@ -319,19 +348,6 @@ export class StateSync {
           online: player.online,
           isLeader: player.isLeader,
           level: player.level,
-          gold: player.gold,
-          xp: player.xp,
-          xpToNext: player.xpToNext,
-          autoAttackEnabled: player.autoAttackEnabled ?? true,
-          ...(isLocal && {
-            stats: {
-              strength: player.strength,
-              vitality: player.vitality,
-              agility: player.agility,
-              attackDamage: player.attackDamage,
-              defense: player.defense,
-            },
-          }),
         });
       });
     });

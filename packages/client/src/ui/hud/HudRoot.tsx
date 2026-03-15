@@ -309,7 +309,7 @@ export const HudRoot = (): JSX.Element => {
         </div>
       )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
-        {localMember && <GoldPill gold={localMember.gold} />}
+        {localMember && <GoldPill gold={localMember.gold ?? 0} />}
         {debugSnapshot.showCoords && snapshot.localCoords && (
           <HudPill variant="amber" mono>
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}

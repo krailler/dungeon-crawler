@@ -72,18 +72,20 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
         </div>
 
         {/* XP bar */}
-        {local.xpToNext > 0 && (
+        {(local.xpToNext ?? 0) > 0 && (
           <div className="mb-4">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-[11px] text-slate-500">{t("character.xp")}</span>
               <span className="font-mono text-[11px] text-slate-400">
-                {local.xp.toLocaleString()}/{local.xpToNext.toLocaleString()}
+                {(local.xp ?? 0).toLocaleString()}/{(local.xpToNext ?? 0).toLocaleString()}
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/80">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-purple-400/90 to-violet-500/80 transition-[width] duration-300"
-                style={{ width: `${Math.round((local.xp / Math.max(1, local.xpToNext)) * 100)}%` }}
+                style={{
+                  width: `${Math.round(((local.xp ?? 0) / Math.max(1, local.xpToNext ?? 1)) * 100)}%`,
+                }}
               />
             </div>
           </div>
@@ -93,7 +95,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-900/20 px-3 py-2">
           <CoinIcon className="h-4 w-4 text-amber-400" />
           <span className="text-sm font-semibold text-amber-300">
-            {local.gold.toLocaleString()} {t("character.gold")}
+            {(local.gold ?? 0).toLocaleString()} {t("character.gold")}
           </span>
         </div>
 
