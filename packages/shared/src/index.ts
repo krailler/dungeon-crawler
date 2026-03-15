@@ -44,7 +44,7 @@ export {
   CHAT_RATE_LIMIT_WINDOW,
 } from "./Constants.js";
 
-export { MessageType, CloseCode, ChatCategory } from "./protocol.js";
+export { MessageType, CloseCode, ChatCategory, ChatVariant } from "./protocol.js";
 export type {
   MoveMessage,
   AdminRestartMessage,
@@ -52,6 +52,7 @@ export type {
   ChatSendPayload,
   ChatEntry,
   ChatCategoryValue,
+  ChatVariantValue,
   CommandInfo,
 } from "./protocol.js";
 

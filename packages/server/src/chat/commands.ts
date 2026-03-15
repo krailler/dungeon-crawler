@@ -1,4 +1,3 @@
-import { ChatCategory } from "@dungeon/shared";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
 
@@ -19,10 +18,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     handler: (ctx: CommandContext) => {
       const cmds = chat.getCommandsForRole(ctx.role);
       const lines = cmds.map((c) => `  ${c.usage} — ${c.description}`);
-      const client = findClient(bridge, ctx.sessionId);
-      if (client) {
-        chat.sendToClient(client, ChatCategory.COMMAND, "Available commands:\n" + lines.join("\n"));
-      }
+      ctx.reply("Available commands:\n" + lines.join("\n"));
     },
   });
 
@@ -39,14 +35,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         const hp = `${Math.ceil(p.health)}/${p.maxHealth}`;
         lines.push(`  ${p.characterName || sid.slice(0, 6)} — ${hp} HP (${status})`);
       });
-      const client = findClient(bridge, ctx.sessionId);
-      if (client) {
-        chat.sendToClient(
-          client,
-          ChatCategory.COMMAND,
-          `Players (${players.size}):\n${lines.join("\n")}`,
-        );
-      }
+      ctx.reply(`Players (${players.size}):\n${lines.join("\n")}`);
     },
   });
 
@@ -58,9 +47,17 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     description: "Kill a player",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) throw new Error("Usage: /kill <player_name>");
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /kill <player_name>", "cmd.usageKill");
+        return;
+      }
       const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) throw new Error(`Player not found: ${ctx.args[0]}`);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
       target.player.health = 0;
       chat.broadcastSystemI18n(
         "chat.killedByAdmin",
@@ -79,20 +76,20 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       let target: { player: import("../state/PlayerState").PlayerState; sessionId: string };
       if (ctx.args[0]) {
         const found = bridge.findPlayerByName(ctx.args[0]);
-        if (!found) throw new Error(`Player not found: ${ctx.args[0]}`);
+        if (!found) {
+          ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+            name: ctx.args[0],
+          });
+          return;
+        }
         target = found;
       } else {
         target = { player: ctx.player, sessionId: ctx.sessionId };
       }
       target.player.health = target.player.maxHealth;
-      const client = findClient(bridge, ctx.sessionId);
-      if (client) {
-        chat.sendToClient(
-          client,
-          ChatCategory.COMMAND,
-          `Healed ${target.player.characterName} to full HP.`,
-        );
-      }
+      ctx.reply(`Healed ${target.player.characterName} to full HP.`, "cmd.healed", {
+        name: target.player.characterName,
+      });
     },
   });
 
@@ -102,22 +99,25 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     description: "Teleport to a player",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) throw new Error("Usage: /tp <player_name>");
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /tp <player_name>", "cmd.usageTp");
+        return;
+      }
       const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) throw new Error(`Player not found: ${ctx.args[0]}`);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
       ctx.player.x = target.player.x;
       ctx.player.z = target.player.z;
       ctx.player.path = [];
       ctx.player.currentPathIndex = 0;
       ctx.player.isMoving = false;
-      const client = findClient(bridge, ctx.sessionId);
-      if (client) {
-        chat.sendToClient(
-          client,
-          ChatCategory.COMMAND,
-          `Teleported to ${target.player.characterName}.`,
-        );
-      }
+      ctx.reply(`Teleported to ${target.player.characterName}.`, "cmd.teleported", {
+        name: target.player.characterName,
+      });
     },
   });
 
@@ -127,9 +127,17 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     description: "Kick a player from the room",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) throw new Error("Usage: /kick <player_name>");
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /kick <player_name>", "cmd.usageKick");
+        return;
+      }
       const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) throw new Error(`Player not found: ${ctx.args[0]}`);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
       const targetClient = findClient(bridge, target.sessionId);
       if (targetClient) {
         const name = target.player.characterName;

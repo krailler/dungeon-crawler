@@ -84,9 +84,14 @@ const categoryStyles: Record<string, { wrapper: string; prefix: string }> = {
     wrapper: "text-amber-300",
     prefix: "font-semibold",
   },
+};
+
+/** Variant overrides for command messages */
+const variantStyles: Record<string, { wrapper: string; label: string; labelClass: string }> = {
   error: {
     wrapper: "text-red-400",
-    prefix: "font-semibold",
+    label: "[Error] ",
+    labelClass: "text-red-500 mr-1",
   },
 };
 
@@ -97,7 +102,11 @@ const senderColor = (role?: string): string => {
 
 const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.Element => {
   const { t } = useTranslation();
-  const style = categoryStyles[msg.category] || categoryStyles.player;
+  const baseStyle = categoryStyles[msg.category] || categoryStyles.player;
+  const variant = msg.variant ? variantStyles[msg.variant] : null;
+
+  // Variant overrides wrapper color for command messages
+  const wrapperClass = variant ? variant.wrapper : baseStyle.wrapper;
 
   // Resolve text: use i18n key if available, otherwise fallback to plain text
   const displayText = msg.i18nKey
@@ -108,18 +117,22 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.E
     <div
       className={[
         "px-2 py-0.5 text-[13px] leading-snug transition-opacity duration-500",
-        style.wrapper,
+        wrapperClass,
         faded ? "opacity-0" : "opacity-100",
       ].join(" ")}
     >
       {msg.category === "player" && msg.sender && (
         <>
-          <span className={`${style.prefix} ${senderColor(msg.senderRole)}`}>{msg.sender}</span>
+          <span className={`${baseStyle.prefix} ${senderColor(msg.senderRole)}`}>{msg.sender}</span>
           <span className="text-slate-500">: </span>
         </>
       )}
-      {msg.category === "command" && <span className="text-amber-500 mr-1">[Server] </span>}
-      {msg.category === "error" && <span className="text-red-500 mr-1">[Error] </span>}
+      {msg.category === "command" && variant && (
+        <span className={variant.labelClass}>{variant.label}</span>
+      )}
+      {msg.category === "command" && !variant && (
+        <span className="text-amber-500 mr-1">[Server] </span>
+      )}
       <span className="whitespace-pre-wrap break-words">{displayText}</span>
     </div>
   );

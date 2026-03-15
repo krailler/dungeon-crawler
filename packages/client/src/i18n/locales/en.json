@@ -79,5 +79,13 @@
     "adminRequired": "This command requires admin privileges.",
     "killedByAdmin": "{{name}} has been slain by divine intervention!",
     "kicked": "{{name}} has been kicked."
+  },
+  "cmd": {
+    "playerNotFound": "Player not found: {{name}}",
+    "usageKill": "Usage: /kill <player_name>",
+    "usageTp": "Usage: /tp <player_name>",
+    "usageKick": "Usage: /kick <player_name>",
+    "healed": "Healed {{name}} to full HP.",
+    "teleported": "Teleported to {{name}}."
   }
 }

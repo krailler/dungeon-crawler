@@ -2,14 +2,14 @@ import type { Client } from "colyseus";
 import type { PlayerState } from "../state/PlayerState";
 import {
   ChatCategory,
+  ChatVariant,
   CHAT_MAX_LENGTH,
   CHAT_RATE_LIMIT_BURST,
   CHAT_RATE_LIMIT_WINDOW,
   MessageType,
 } from "@dungeon/shared";
-import type { ChatEntry, ChatCategoryValue } from "@dungeon/shared";
+import type { ChatEntry, ChatCategoryValue, ChatVariantValue } from "@dungeon/shared";
 import { CommandRegistry } from "./CommandRegistry";
-import type { CommandContext } from "./CommandRegistry";
 
 export interface ChatRoomBridge {
   getClients(): Iterable<Client>;
@@ -45,10 +45,11 @@ export class ChatSystem {
     if (!this.checkRateLimit(client.sessionId)) {
       this.sendToClientI18n(
         client,
-        ChatCategory.ERROR,
+        ChatCategory.COMMAND,
         "chat.rateLimited",
         {},
         "You are sending messages too fast.",
+        ChatVariant.ERROR,
       );
       return;
     }
@@ -88,13 +89,18 @@ export class ChatSystem {
   }
 
   /** Send a message to a single client. */
-  sendToClient(client: Client, category: ChatCategoryValue, text: string, sender?: string): void {
+  sendToClient(
+    client: Client,
+    category: ChatCategoryValue,
+    text: string,
+    variant?: ChatVariantValue,
+  ): void {
     const entry: ChatEntry = {
       id: this.nextId++,
       category,
       timestamp: Date.now(),
       text,
-      sender,
+      variant,
     };
     client.send(MessageType.CHAT_ENTRY, entry);
   }
@@ -106,12 +112,14 @@ export class ChatSystem {
     i18nKey: string,
     i18nParams: Record<string, string | number>,
     fallbackText: string,
+    variant?: ChatVariantValue,
   ): void {
     const entry: ChatEntry = {
       id: this.nextId++,
       category,
       timestamp: Date.now(),
       text: fallbackText,
+      variant,
       i18nKey,
       i18nParams,
     };
@@ -129,10 +137,11 @@ export class ChatSystem {
     if (text.length > CHAT_MAX_LENGTH) {
       this.sendToClientI18n(
         client,
-        ChatCategory.ERROR,
+        ChatCategory.COMMAND,
         "chat.messageTooLong",
         { max: CHAT_MAX_LENGTH },
         `Message too long (max ${CHAT_MAX_LENGTH} characters).`,
+        ChatVariant.ERROR,
       );
       return;
     }
@@ -162,10 +171,11 @@ export class ChatSystem {
     if (!cmd) {
       this.sendToClientI18n(
         client,
-        ChatCategory.ERROR,
+        ChatCategory.COMMAND,
         "chat.unknownCommand",
         { name: cmdName },
         `Unknown command: /${cmdName}`,
+        ChatVariant.ERROR,
       );
       return;
     }
@@ -174,10 +184,11 @@ export class ChatSystem {
     if (cmd.adminOnly && role !== "admin") {
       this.sendToClientI18n(
         client,
-        ChatCategory.ERROR,
+        ChatCategory.COMMAND,
         "chat.adminRequired",
         {},
         "This command requires admin privileges.",
+        ChatVariant.ERROR,
       );
       return;
     }
@@ -185,20 +196,50 @@ export class ChatSystem {
     const player = this.bridge.getPlayer(client.sessionId);
     if (!player) return;
 
-    const ctx: CommandContext = {
+    const ctx = {
       sessionId: client.sessionId,
       player,
       role,
       args,
       rawArgs,
+      reply: (
+        fallbackText: string,
+        i18nKey?: string,
+        i18nParams?: Record<string, string | number>,
+      ) => {
+        if (i18nKey) {
+          this.sendToClientI18n(
+            client,
+            ChatCategory.COMMAND,
+            i18nKey,
+            i18nParams ?? {},
+            fallbackText,
+          );
+        } else {
+          this.sendToClient(client, ChatCategory.COMMAND, fallbackText);
+        }
+      },
+      replyError: (
+        fallbackText: string,
+        i18nKey?: string,
+        i18nParams?: Record<string, string | number>,
+      ) => {
+        if (i18nKey) {
+          this.sendToClientI18n(
+            client,
+            ChatCategory.COMMAND,
+            i18nKey,
+            i18nParams ?? {},
+            fallbackText,
+            ChatVariant.ERROR,
+          );
+        } else {
+          this.sendToClient(client, ChatCategory.COMMAND, fallbackText, ChatVariant.ERROR);
+        }
+      },
     };
 
-    try {
-      cmd.handler(ctx);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Command failed";
-      this.sendToClient(client, ChatCategory.ERROR, message);
-    }
+    cmd.handler(ctx);
   }
 
   private broadcast(entry: ChatEntry): void {

@@ -1,5 +1,5 @@
 import { CHAT_MAX_HISTORY } from "@dungeon/shared";
-import type { ChatCategoryValue, CommandInfo, ChatEntry } from "@dungeon/shared";
+import type { ChatCategoryValue, ChatVariantValue, CommandInfo, ChatEntry } from "@dungeon/shared";
 
 export type ChatMessage = {
   id: number;
@@ -8,6 +8,7 @@ export type ChatMessage = {
   sender?: string;
   senderRole?: string;
   text: string;
+  variant?: ChatVariantValue;
   i18nKey?: string;
   i18nParams?: Record<string, string | number>;
 };
@@ -61,6 +62,7 @@ export const chatStore = {
       sender: entry.sender,
       senderRole: entry.senderRole,
       text: entry.text,
+      variant: entry.variant,
       i18nKey: entry.i18nKey,
       i18nParams: entry.i18nParams,
     };

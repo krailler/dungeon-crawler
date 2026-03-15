@@ -6,6 +6,18 @@ export interface CommandContext {
   role: string;
   args: string[];
   rawArgs: string;
+  /** Send a COMMAND response to the invoking player. */
+  reply: (
+    fallbackText: string,
+    i18nKey?: string,
+    i18nParams?: Record<string, string | number>,
+  ) => void;
+  /** Send a COMMAND error response (red) to the invoking player. */
+  replyError: (
+    fallbackText: string,
+    i18nKey?: string,
+    i18nParams?: Record<string, string | number>,
+  ) => void;
 }
 
 export interface CommandDefinition {

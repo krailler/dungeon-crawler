@@ -56,8 +56,14 @@ export const ChatCategory = {
   PLAYER: "player",
   SYSTEM: "system",
   COMMAND: "command",
+} as const;
+
+/** Optional variant for COMMAND messages to change color */
+export const ChatVariant = {
   ERROR: "error",
 } as const;
+
+export type ChatVariantValue = (typeof ChatVariant)[keyof typeof ChatVariant];
 
 export type ChatCategoryValue = (typeof ChatCategory)[keyof typeof ChatCategory];
 
@@ -74,6 +80,8 @@ export interface ChatEntry {
   sender?: string;
   senderRole?: string;
   text: string;
+  /** Optional visual variant (e.g. "error" for red command responses) */
+  variant?: ChatVariantValue;
   /** i18n translation key — if present, client should use t(i18nKey, i18nParams) instead of text */
   i18nKey?: string;
   /** Interpolation params for the i18n key */
