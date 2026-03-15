@@ -40,6 +40,7 @@ packages/
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
       EnemyTypes.ts   # Enemy type definitions + computeEnemyDerivedStats() + scaleEnemyDerivedStats()
       Economy.ts      # computeGoldDrop() — gold distribution formula
+      Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
       FloorVariants.ts, WallVariants.ts, TileSets.ts, random.ts
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
@@ -108,15 +109,19 @@ packages/
 
 ## Key Game Systems
 
-### Economy (gold + levels)
+### Economy (gold + XP + levels)
 
-- Dungeon level = leader's player level; enemy levels = `[dungeonLevel-1, dungeonLevel+2]`
-- Enemy stats scale with level: `scale = 1 + (level-1) * 0.15` on HP/attack/defense
+- Dungeon level = average party level at generation time; enemy levels = `[dungeonLevel-1, dungeonLevel+2]`
+- Enemy stats scale with level: `scale = 1 + (level-1) * 0.20` on HP/attack/defense
+- Enemy count per room scales: `minEnemies = 1 + floor(dungeonLevel / 10)`
 - Gold per kill: `(5 + enemyLevel*3) * levelModifier / alivePartyCount` (min 1)
-- Gold persisted to DB on leave + auto-save every 60s (skip if unchanged)
-- Shared: `Economy.ts`, `constants/economy.ts`, `EnemyTypes.ts`
-- Server: `DungeonRoom.ts` (distribution + persistence), `PlayerState.gold`, `EnemyState.level`
-- Client: gold pill in HudRoot, gold in CharacterPanel, level label on enemy health bars
+- XP per kill: `(20 + enemyLevel*6) * levelModifier` — NOT split among party (incentivizes grouping)
+- XP curve: `xpToNextLevel(level) = floor(50 × level²)` — exponential, MAX_LEVEL = 30
+- Level-up: +1 str/vit/agi, full heal, carry-over excess XP, chat announcement
+- Gold + XP + level + stats persisted to DB on leave + auto-save every 60s (skip if unchanged)
+- Shared: `Economy.ts`, `Leveling.ts`, `constants/economy.ts`, `EnemyTypes.ts`
+- Server: `DungeonRoom.ts` (distribution + persistence), `PlayerState` (gold, xp, xpToNext, level, addXp, setLevel)
+- Client: gold pill with floating "+amount" animation, XP bar (bottom center, WoW-style) with floating "+XP" text, level-up particle effect (golden aura)
 
 ### Combat
 
@@ -127,6 +132,14 @@ packages/
 ### Reconnection
 
 - Token in localStorage, 120s reconnect window, session migration for re-login without token
+
+### Chat
+
+- Server-side ChatSystem with rate limiting, command parsing, broadcasting
+- Slash commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick (admin)
+- Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
+- Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
+- Messages fade after 10s, hover to reveal all
 
 ## Vite Configuration
 

@@ -84,16 +84,20 @@
 
 ### Economy System
 
-- **Dungeon level**: `dungeonLevel = leader's level` (min 1, default 1 if no players)
+- **Dungeon level**: `dungeonLevel = average party level` at dungeon generation time (min 1, default 1 if no players). Does NOT rebalance when new players join mid-dungeon.
 - **Enemy levels**: each enemy assigned level in range `[dungeonLevel - 1, dungeonLevel + 2]` (min 1) using seeded RNG
-- **Enemy stat scaling**: multiplicative `scale = 1 + (level - 1) * 0.15` applied to maxHealth, attackDamage, defense (not speed/cooldown/range)
+- **Enemy count per room**: scales with dungeon level: `minEnemies = 1 + floor(dungeonLevel / 10)` — forces grouping at high levels
+- **Enemy stat scaling**: multiplicative `scale = 1 + (level - 1) * 0.20` applied to maxHealth, attackDamage, defense (not speed/cooldown/range)
 - **Gold formula**: `baseGold = 5 + enemyLevel * 3`, modified by level difference between enemy and average party level
   - Anti-farming: enemies 5+ levels below party give only 10% gold
   - Mild penalty for lower enemies, mild bonus for higher enemies
   - Equal split among alive party members
-- **Persistence**: gold saved to DB on leave/disconnect + periodic auto-save every 60s (optimized: only writes when gold changed via `lastSavedGold` tracking)
-- **Client display**: gold pill in HUD top-right, gold row in CharacterPanel, level label on enemy floating health bars
-- **Shared code**: `Economy.ts` (computeGoldDrop), `constants/economy.ts` (tuning constants), `EnemyTypes.ts` (scaleEnemyDerivedStats)
+- **XP formula**: `baseXp = 20 + enemyLevel * 6`, modified by level difference — NOT split among party (incentivizes grouping)
+- **XP curve**: `xpToNextLevel(level) = floor(50 × level²)` — exponential, MAX_LEVEL = 30
+- **Level-up**: +1 strength, +1 vitality, +1 agility per level; full heal; carry-over excess XP; chat announcement
+- **Persistence**: gold + xp + level + stats saved to DB on leave/disconnect + periodic auto-save every 60s (optimized: only writes when hash of `gold:xp:level:str:vit:agi` changes)
+- **Client display**: gold pill with floating "+amount" animation, XP bar (WoW-style, bottom center) with floating "+XP" text, level-up golden particle effect (all players), level label on enemy floating health bars
+- **Shared code**: `Economy.ts` (computeGoldDrop), `Leveling.ts` (xpToNextLevel, computeXpDrop), `constants/economy.ts` (tuning constants), `EnemyTypes.ts` (scaleEnemyDerivedStats)
 
 ### Admin & Combat Log
 
@@ -112,6 +116,8 @@
 - Slash commands registered via CommandRegistry with admin-only flag
 - Client ChatPanel: Enter to open/send, Escape to close, message fade after 10s, hover to reveal
 - Command help overlay appears when input starts with `/`, Tab to autocomplete
+- Chat input history: arrow up/down navigates sent messages (max 50, draft preserved on ArrowUp, restored past end on ArrowDown)
+- Player name autocomplete for commands that expect `<player>` argument
 
 ### Reconnection & Session Migration
 
@@ -151,7 +157,8 @@
 - `Stats.ts` — BaseStats, DerivedStats, `computeDerivedStats()`, `computeDamage()`, scaling constants
 - `EnemyTypes.ts` — Enemy type definitions with baseStats + overrides, `computeEnemyDerivedStats()`, `scaleEnemyDerivedStats(derived, level)`
 - `Economy.ts` — `computeGoldDrop(enemyLevel, avgPartyLevel, aliveCount)` with anti-farming modifiers
-- `constants/economy.ts` — Economy tuning constants (BASE_GOLD_PER_KILL, scaling rates, save interval)
+- `Leveling.ts` — `xpToNextLevel(level)`, `computeXpDrop(enemyLevel, playerLevel)` with level diff modifier
+- `constants/economy.ts` — Economy + XP tuning constants (BASE_GOLD_PER_KILL, BASE_XP_PER_KILL, XP_CURVE_BASE, MAX_LEVEL, ENEMY_STAT_SCALE_PER_LEVEL, save interval)
 - `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
 - `WallVariants.ts` — Deterministic wall decoration variant generation (3 variants, weighted: 40/45/15%)
 - `TileSets.ts` — Tile set definitions + name↔id mapping
@@ -164,9 +171,10 @@
 - `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save gold, reconnection with session migration + countdown warnings, gate system, party kick
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
-- `chat/commands.ts` — Built-in commands: /help, /me, /players, /kill, /heal, /tp, /restart, /kick
+- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick
 - `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies/gates, tileMapData, tickRate, dungeonLevel, dungeonVersion)
-- `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats, gold synced) + server-only (path, combat data, characterId)
+- `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats, gold, xp, xpToNext, level synced) + server-only (path, combat data, characterId) + `addXp()`, `setLevel()`, `applyDerivedStats()`
+- `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle, session migration, `savePlayerProgress()` (gold + xp + level + stats), leader reassignment
 - `state/EnemyState.ts` — Enemy Schema (position, health, isDead, enemyType, level) + server-only AI/combat data
 - `state/GateState.ts` — Gate Schema (position, type, open state)
 - `systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK, multi-player targeting (threat table), A\* repath, combat event callbacks
@@ -174,17 +182,19 @@
 - `dungeon/DungeonGenerator.ts` — Procedural dungeon (no Babylon deps)
 - `navigation/Pathfinder.ts` — A\* on TileMap (uses WorldPos, no Babylon deps)
 - `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
-- `db/schema.ts` — Drizzle ORM schema: accounts (id, email, password, role), characters (stats, level, gold)
+- `db/schema.ts` — Drizzle ORM schema: accounts (id, email, password, role), characters (stats, level, gold, xp)
 - `db/database.ts` — PostgreSQL connection + auto-migration
 
 ### Client (`packages/client/src/`)
 
 - `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame, auth state watcher
-- `core/ClientGame.ts` — Colyseus client, state listeners (players with gold, enemies with level), render loop, reconnection, combat log, chat, debug paths
+- `core/ClientGame.ts` — Colyseus client, render loop, reconnection, combat log, chat, debug paths
+- `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect), enemies (level), minimap sync
 - `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms)
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15
 - `entities/CharacterAssetLoader.ts` — Loads GLB character models per skin (basePath), instantiates with retargeted animations
-- `entities/ClientPlayer.ts` — GLB character model + SpotLight torch + ShadowGenerator PCF + lerp + idle/run + facing target
+- `entities/ClientPlayer.ts` — GLB character model + SpotLight torch + ShadowGenerator PCF + lerp + idle/run + facing target + chat bubble + level-up particle effect (golden aura)
+- `entities/AnimationController.ts` — Animation state machine: crossfade between idle/run/oneshot, footstep sound timing
 - `entities/ClientEnemy.ts` — GLB zombie model + lerp + hit flash + idle/run + floating health bar with level label ("Lv.X")
 - `dungeon/DungeonRenderer.ts` — GLB floor tiles, thin wall segments, GLB wall decorations, wall torch lights + particles, gate meshes
 - `dungeon/FloorAssetLoader.ts` — Loads floor tile GLBs per set, GPU-efficient instancing
@@ -195,7 +205,7 @@
 - `i18n/i18n.ts` — i18next initialization
 - `i18n/locales/en.json` — English translations (all UI strings)
 - `ui/stores/authStore.ts` — Auth state: login/logout/kick, token, role
-- `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, online), FPS, ping, connection
+- `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, xp, xpToNext, online), FPS, ping, connection
 - `ui/stores/chatStore.ts` — Chat pub-sub: message history, input, commands
 - `ui/stores/debugStore.ts` — Debug toggles, persisted localStorage
 - `ui/stores/adminStore.ts` — Admin state: room ref, seed, tickRate, actions
@@ -204,8 +214,9 @@
 - `ui/stores/gateStore.ts` — Gate state: positions, open state, nearest interactable
 - `ui/stores/promptStore.ts` — Confirmation prompt state
 - `ui/stores/announcementStore.ts` — Center-screen announcement overlay
-- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill, FPS/ping, context menu (promote/kick), character/minimap buttons
-- `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab
+- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap buttons
+- `ui/hud/XpBar.tsx` — WoW-style XP bar (bottom center, 60% width): purple gradient, level label, XP numbers, floating "+XP" animated text on gain
+- `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab, arrow up/down history navigation
 - `ui/hud/CharacterPanel.tsx` — Character sheet: name, level, health bar, gold display, base stats, derived stats
 - `ui/hud/DebugPanel.tsx` — Debug toggles + admin section
 - `ui/hud/MinimapOverlay.tsx` — Minimap with fog, player/enemy dots
