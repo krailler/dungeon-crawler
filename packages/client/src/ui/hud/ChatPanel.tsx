@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
+import { hudStore } from "../stores/hudStore";
 import { CHAT_FADE_MS } from "@dungeon/shared";
 import type { CommandInfo } from "@dungeon/shared";
 
@@ -14,6 +15,57 @@ export function setChatSendFn(fn: (text: string) => void): void {
 
 export function clearChatSendFn(): void {
   sendChatFn = null;
+}
+
+// ── Autocomplete mode detection ─────────────────────────────────────────────
+
+type AutocompleteMode =
+  | { kind: "commands"; prefix: string }
+  | { kind: "players"; cmdName: string; argPrefix: string }
+  | null;
+
+/** Check if a command expects a <player> or [player] argument */
+function commandExpectsPlayer(cmd: CommandInfo): boolean {
+  return /[<[]player[>\]]/.test(cmd.usage.toLowerCase());
+}
+
+/**
+ * Determine what autocomplete to show based on current input.
+ * - "/hel" → commands filtered by "hel"
+ * - "/kill ar" → players filtered by "ar" (if /kill expects <player>)
+ * - "/players" → commands (no space yet, still completing command name)
+ */
+function getAutocompleteMode(
+  input: string,
+  commands: CommandInfo[],
+  isAdmin: boolean,
+): AutocompleteMode {
+  if (!input.startsWith("/")) return null;
+
+  const withoutSlash = input.slice(1);
+  const spaceIdx = withoutSlash.indexOf(" ");
+
+  if (spaceIdx === -1) {
+    // Still typing command name
+    return { kind: "commands", prefix: withoutSlash };
+  }
+
+  // Have a space — check if the command expects a player arg
+  const cmdName = withoutSlash.slice(0, spaceIdx).toLowerCase();
+  const cmd = commands.find((c) => c.name.toLowerCase() === cmdName);
+
+  if (!cmd) return null;
+  if (cmd.adminOnly && !isAdmin) return null;
+
+  if (commandExpectsPlayer(cmd)) {
+    const argPrefix = withoutSlash
+      .slice(spaceIdx + 1)
+      .trim()
+      .toLowerCase();
+    return { kind: "players", cmdName: cmd.name, argPrefix };
+  }
+
+  return null;
 }
 
 // ── Message row ─────────────────────────────────────────────────────────────
@@ -69,30 +121,39 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.E
 // ── Command help overlay ────────────────────────────────────────────────────
 
 const CommandHelpOverlay = ({
-  filter,
+  prefix,
   commands,
   isAdmin,
+  onSelect,
 }: {
-  filter: string;
+  prefix: string;
   commands: CommandInfo[];
   isAdmin: boolean;
+  onSelect: (name: string) => void;
 }): JSX.Element | null => {
   const filtered = useMemo(() => {
-    const prefix = filter.slice(1).toLowerCase(); // remove leading "/"
+    const lower = prefix.toLowerCase();
     return commands
       .filter((c) => {
         if (c.adminOnly && !isAdmin) return false;
-        return c.name.toLowerCase().startsWith(prefix);
+        return c.name.toLowerCase().startsWith(lower);
       })
       .slice(0, 8);
-  }, [filter, commands, isAdmin]);
+  }, [prefix, commands, isAdmin]);
 
   if (filtered.length === 0) return null;
 
   return (
     <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-slate-600/40 bg-slate-900/95 backdrop-blur-sm p-2 shadow-xl">
       {filtered.map((cmd) => (
-        <div key={cmd.name} className="flex items-center gap-2 px-2 py-1 text-[12px]">
+        <div
+          key={cmd.name}
+          className="flex items-center gap-2 px-2 py-1 text-[12px] cursor-pointer rounded hover:bg-slate-800/60 transition-colors"
+          onMouseDown={(e) => {
+            e.preventDefault(); // Prevent blur
+            onSelect(cmd.name);
+          }}
+        >
           <span className="font-mono text-sky-400">{cmd.usage}</span>
           <span className="text-slate-500">&mdash;</span>
           <span className="text-slate-400">{cmd.description}</span>
@@ -107,17 +168,80 @@ const CommandHelpOverlay = ({
   );
 };
 
+// ── Player suggestion overlay ───────────────────────────────────────────────
+
+const PlayerSuggestOverlay = ({
+  cmdName,
+  argPrefix,
+  playerNames,
+  onSelect,
+}: {
+  cmdName: string;
+  argPrefix: string;
+  playerNames: string[];
+  onSelect: (name: string) => void;
+}): JSX.Element | null => {
+  const filtered = useMemo(() => {
+    const lower = argPrefix.toLowerCase();
+    return playerNames.filter((n) => n.toLowerCase().startsWith(lower)).slice(0, 8);
+  }, [argPrefix, playerNames]);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-slate-600/40 bg-slate-900/95 backdrop-blur-sm p-2 shadow-xl">
+      <div className="px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+        /{cmdName} &mdash; select player
+      </div>
+      {filtered.map((name) => (
+        <div
+          key={name}
+          className="flex items-center gap-2 px-2 py-1.5 text-[12px] cursor-pointer rounded hover:bg-slate-800/60 transition-colors"
+          onMouseDown={(e) => {
+            e.preventDefault(); // Prevent blur
+            onSelect(name);
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-3.5 w-3.5 text-sky-400/70"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="text-slate-200">{name}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ── ChatPanel ───────────────────────────────────────────────────────────────
 
 export const ChatPanel = (): JSX.Element => {
   const snapshot = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
+  const hudSnapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
   const [inputValue, setInputValue] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
+
+  // Player names from HUD store
+  const playerNames = useMemo(() => hudSnapshot.members.map((m) => m.name), [hudSnapshot.members]);
+
+  // Determine autocomplete mode
+  const acMode = useMemo(
+    () => getAutocompleteMode(inputValue, snapshot.commands, isAdmin),
+    [inputValue, snapshot.commands, isAdmin],
+  );
 
   // Refresh "now" every second for fade calculation
   useEffect(() => {
@@ -155,6 +279,22 @@ export const ChatPanel = (): JSX.Element => {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
+  // Select a command from the overlay
+  const selectCommand = useCallback((name: string) => {
+    setInputValue(`/${name} `);
+    inputRef.current?.focus();
+  }, []);
+
+  // Select a player from the overlay
+  const selectPlayer = useCallback(
+    (name: string) => {
+      if (!acMode || acMode.kind !== "players") return;
+      setInputValue(`/${acMode.cmdName} ${name} `);
+      inputRef.current?.focus();
+    },
+    [acMode],
+  );
+
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
     if (text && sendChatFn) {
@@ -174,24 +314,35 @@ export const ChatPanel = (): JSX.Element => {
         setInputValue("");
         chatStore.setInputOpen(false);
       } else if (e.key === "Tab") {
-        // Tab autocomplete for commands
-        if (inputValue.startsWith("/")) {
-          e.preventDefault();
-          const prefix = inputValue.slice(1).toLowerCase();
+        e.preventDefault();
+
+        if (!acMode) return;
+
+        if (acMode.kind === "commands") {
+          // Tab autocomplete command name
           const match = snapshot.commands.find((c) => {
             if (c.adminOnly && !isAdmin) return false;
-            return c.name.toLowerCase().startsWith(prefix);
+            return c.name.toLowerCase().startsWith(acMode.prefix.toLowerCase());
           });
           if (match) {
             setInputValue(`/${match.name} `);
           }
+        } else if (acMode.kind === "players") {
+          // Tab autocomplete player name — cycle through matches
+          const lower = acMode.argPrefix.toLowerCase();
+          const matches = playerNames.filter((n) => n.toLowerCase().startsWith(lower));
+          if (matches.length === 0) return;
+
+          // Find current match and cycle to next
+          const currentArg = inputValue.slice(inputValue.indexOf(" ") + 1).trim();
+          const currentIdx = matches.findIndex((n) => n.toLowerCase() === currentArg.toLowerCase());
+          const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % matches.length;
+          setInputValue(`/${acMode.cmdName} ${matches[nextIdx]}`);
         }
       }
     },
-    [handleSend, inputValue, snapshot.commands, isAdmin],
+    [handleSend, inputValue, snapshot.commands, isAdmin, acMode, playerNames],
   );
-
-  const showHelp = snapshot.inputOpen && inputValue.startsWith("/");
 
   return (
     <div
@@ -218,11 +369,20 @@ export const ChatPanel = (): JSX.Element => {
       {/* Input area */}
       {snapshot.inputOpen && (
         <div className="relative">
-          {showHelp && (
+          {acMode?.kind === "commands" && (
             <CommandHelpOverlay
-              filter={inputValue}
+              prefix={acMode.prefix}
               commands={snapshot.commands}
               isAdmin={isAdmin}
+              onSelect={selectCommand}
+            />
+          )}
+          {acMode?.kind === "players" && (
+            <PlayerSuggestOverlay
+              cmdName={acMode.cmdName}
+              argPrefix={acMode.argPrefix}
+              playerNames={playerNames}
+              onSelect={selectPlayer}
             />
           )}
           <input

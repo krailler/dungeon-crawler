@@ -247,6 +247,8 @@ export class ClientGame {
       room.onLeave((code: number) => {
         if (code === CloseCode.KICKED_DUPLICATE) {
           authStore.kick(t("kick.duplicate"));
+        } else if (code === CloseCode.KICKED) {
+          authStore.kick(t("kick.kicked"));
         } else {
           hudStore.setConnection("error", t("connection.lost"));
         }

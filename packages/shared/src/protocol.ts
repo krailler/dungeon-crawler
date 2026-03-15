@@ -11,6 +11,7 @@ export const MessageType = {
 /** Custom WebSocket close codes (4xxx range) */
 export const CloseCode = {
   KICKED_DUPLICATE: 4100,
+  KICKED: 4101,
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

@@ -38,7 +38,8 @@
     "other": "Player {{id}}"
   },
   "kick": {
-    "duplicate": "You were disconnected because your account logged in from another session."
+    "duplicate": "You were disconnected because your account logged in from another session.",
+    "kicked": "You have been kicked from the dungeon by an administrator."
   },
   "pause": {
     "title": "Paused",
