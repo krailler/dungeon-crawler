@@ -259,6 +259,67 @@ export class PlayerSessionManager {
     }
   }
 
+  /**
+   * Handle a consented leave (tab close / page reload) during an active dungeon.
+   *
+   * Unlike `handleDrop` this does NOT call `allowReconnection` — that API is
+   * only valid inside `onDrop`. Instead we just mark the player as offline and
+   * set a timeout.  If the same account logs in again, `handleJoin` will
+   * migrate the player state via `accountToSession`.
+   */
+  handleConsentedLeaveDuringDungeon(client: Client): void {
+    const auth = client.auth as { accountId?: string } | undefined;
+
+    // If this client was replaced by a newer session, clean up immediately
+    if (auth?.accountId && !isActiveSession(auth.accountId, client)) {
+      this.log.info(
+        { player: pid(client.sessionId) },
+        "Replaced session left — removing immediately",
+      );
+      this.clearReconnectTimers(client.sessionId);
+      this.removePlayerFromAllSystems(client.sessionId);
+      this.reassignLeader();
+      return;
+    }
+
+    const player = this.bridge.state.players.get(client.sessionId);
+    if (player) {
+      player.isMoving = false;
+      player.online = false;
+      player.path = [];
+      player.currentPathIndex = 0;
+
+      const name = player.characterName || client.sessionId.slice(0, 6);
+      this.log.warn(
+        { player: pid(client.sessionId) },
+        `Player left during dungeon — waiting ${RECONNECT_TIMEOUT}s for rejoin`,
+      );
+      this.bridge.chatSystem.broadcastSystemI18n(
+        "chat.disconnectedWithTime",
+        { name, seconds: RECONNECT_TIMEOUT },
+        `${name} disconnected. ${RECONNECT_TIMEOUT}s to reconnect.`,
+      );
+
+      // Schedule timeout to remove the player if they don't come back
+      const timer = setTimeout(() => {
+        // Only remove if this session is still the active one for this account
+        if (!this.bridge.state.players.has(client.sessionId)) return;
+        this.log.info({ player: pid(client.sessionId) }, "Rejoin timed out — player removed");
+        this.savePlayerProgress(player);
+        this.removePlayerFromAllSystems(client.sessionId);
+        this.removeAccountMapping(client);
+        this.unregisterClient(client);
+        this.reassignLeader();
+        this.bridge.chatSystem.broadcastSystemI18n(
+          "chat.reconnectExpired",
+          { name },
+          `${name} failed to reconnect and has been removed.`,
+        );
+      }, RECONNECT_TIMEOUT * 1000);
+      this.reconnectTimers.set(client.sessionId, [timer]);
+    }
+  }
+
   handleLeave(client: Client): void {
     // If already cleaned up by kick, skip everything
     if (this.kickedSessions.has(client.sessionId)) {
