@@ -74,6 +74,10 @@ export interface ChatEntry {
   sender?: string;
   senderRole?: string;
   text: string;
+  /** i18n translation key — if present, client should use t(i18nKey, i18nParams) instead of text */
+  i18nKey?: string;
+  /** Interpolation params for the i18n key */
+  i18nParams?: Record<string, string | number>;
 }
 
 /** Command info sent to client on join for help overlay */

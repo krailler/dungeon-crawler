@@ -62,7 +62,11 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       const target = bridge.findPlayerByName(ctx.args[0]);
       if (!target) throw new Error(`Player not found: ${ctx.args[0]}`);
       target.player.health = 0;
-      chat.broadcastSystem(`${target.player.characterName} has been slain by divine intervention!`);
+      chat.broadcastSystemI18n(
+        "chat.killedByAdmin",
+        { name: target.player.characterName },
+        `${target.player.characterName} has been slain by divine intervention!`,
+      );
     },
   });
 
@@ -131,7 +135,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         const name = target.player.characterName;
         // Clean up player state BEFORE disconnecting
         bridge.kickPlayer(target.sessionId);
-        chat.broadcastSystem(`${name} has been kicked.`);
+        chat.broadcastSystemI18n("chat.kicked", { name }, `${name} has been kicked.`);
         targetClient.leave(4101);
       }
     },

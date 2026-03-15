@@ -76,6 +76,8 @@
     "rateLimited": "You are sending messages too fast.",
     "messageTooLong": "Message too long (max {{max}} characters).",
     "unknownCommand": "Unknown command: /{{name}}",
-    "adminRequired": "This command requires admin privileges."
+    "adminRequired": "This command requires admin privileges.",
+    "killedByAdmin": "{{name}} has been slain by divine intervention!",
+    "kicked": "{{name}} has been kicked."
   }
 }

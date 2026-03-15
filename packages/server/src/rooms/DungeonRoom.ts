@@ -195,7 +195,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.combatSystem.registerPlayer(sessionId);
     });
 
-    this.chatSystem.broadcastSystem("The dungeon reshapes itself...");
+    this.chatSystem.broadcastSystemI18n(
+      "chat.dungeonReshape",
+      {},
+      "The dungeon reshapes itself...",
+    );
   }
 
   async onAuth(
@@ -304,7 +308,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.reassignLeader();
 
     // Chat: broadcast join event
-    this.chatSystem.broadcastSystem(`${characterName} joined the dungeon.`);
+    this.chatSystem.broadcastSystemI18n(
+      "chat.joined",
+      { name: characterName },
+      `${characterName} joined the dungeon.`,
+    );
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -343,7 +351,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.online = false;
       player.path = [];
       player.currentPathIndex = 0;
-      this.chatSystem.broadcastSystem(`${player.characterName} disconnected.`);
+      this.chatSystem.broadcastSystemI18n(
+        "chat.disconnected",
+        { name: player.characterName },
+        `${player.characterName} disconnected.`,
+      );
     }
 
     // Allow reconnection for 120 seconds
@@ -365,7 +377,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.online = true;
-      this.chatSystem.broadcastSystem(`${player.characterName} reconnected.`);
+      this.chatSystem.broadcastSystemI18n(
+        "chat.reconnected",
+        { name: player.characterName },
+        `${player.characterName} reconnected.`,
+      );
     }
   }
 
@@ -379,7 +395,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.chatSystem.removePlayer(client.sessionId);
     this.unregisterClient(client);
     this.reassignLeader();
-    this.chatSystem.broadcastSystem(`${name} left the dungeon.`);
+    this.chatSystem.broadcastSystemI18n("chat.left", { name }, `${name} left the dungeon.`);
   }
 
   private unregisterClient(client: Client): void {
@@ -447,9 +463,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         player.health -= damage;
         if (player.health < 0) player.health = 0;
         if (player.health <= 0) {
-          this.chatSystem.broadcastSystem(
-            `${player.characterName || sessionId.slice(0, 6)} has been slain!`,
-          );
+          const name = player.characterName || sessionId.slice(0, 6);
+          this.chatSystem.broadcastSystemI18n("chat.slain", { name }, `${name} has been slain!`);
         }
       },
       (event) => {

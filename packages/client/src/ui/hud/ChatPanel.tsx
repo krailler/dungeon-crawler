@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
@@ -95,7 +96,13 @@ const senderColor = (role?: string): string => {
 };
 
 const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.Element => {
+  const { t } = useTranslation();
   const style = categoryStyles[msg.category] || categoryStyles.player;
+
+  // Resolve text: use i18n key if available, otherwise fallback to plain text
+  const displayText = msg.i18nKey
+    ? t(msg.i18nKey, { ...msg.i18nParams, defaultValue: msg.text })
+    : msg.text;
 
   return (
     <div
@@ -113,7 +120,7 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.E
       )}
       {msg.category === "command" && <span className="text-amber-500 mr-1">[Server] </span>}
       {msg.category === "error" && <span className="text-red-500 mr-1">[Error] </span>}
-      <span className="whitespace-pre-wrap break-words">{msg.text}</span>
+      <span className="whitespace-pre-wrap break-words">{displayText}</span>
     </div>
   );
 };

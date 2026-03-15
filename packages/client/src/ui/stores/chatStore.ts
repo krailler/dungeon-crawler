@@ -8,6 +8,8 @@ export type ChatMessage = {
   sender?: string;
   senderRole?: string;
   text: string;
+  i18nKey?: string;
+  i18nParams?: Record<string, string | number>;
 };
 
 export type ChatSnapshot = {
@@ -59,6 +61,8 @@ export const chatStore = {
       sender: entry.sender,
       senderRole: entry.senderRole,
       text: entry.text,
+      i18nKey: entry.i18nKey,
+      i18nParams: entry.i18nParams,
     };
     messages = [...messages, msg];
     if (messages.length > CHAT_MAX_HISTORY) {

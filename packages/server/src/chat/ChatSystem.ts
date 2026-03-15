@@ -43,7 +43,13 @@ export class ChatSystem {
 
     // Rate limit check
     if (!this.checkRateLimit(client.sessionId)) {
-      this.sendToClient(client, ChatCategory.ERROR, "You are sending messages too fast.");
+      this.sendToClientI18n(
+        client,
+        ChatCategory.ERROR,
+        "chat.rateLimited",
+        {},
+        "You are sending messages too fast.",
+      );
       return;
     }
 
@@ -55,13 +61,29 @@ export class ChatSystem {
     }
   }
 
-  /** Broadcast a system event to all clients. */
+  /** Broadcast a system event to all clients (plain text, no i18n). */
   broadcastSystem(text: string): void {
     this.broadcast({
       id: this.nextId++,
       category: ChatCategory.SYSTEM,
       timestamp: Date.now(),
       text,
+    });
+  }
+
+  /** Broadcast a system event with i18n key so clients translate locally. */
+  broadcastSystemI18n(
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+  ): void {
+    this.broadcast({
+      id: this.nextId++,
+      category: ChatCategory.SYSTEM,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
     });
   }
 
@@ -77,6 +99,25 @@ export class ChatSystem {
     client.send(MessageType.CHAT_ENTRY, entry);
   }
 
+  /** Send a message with i18n key to a single client. */
+  sendToClientI18n(
+    client: Client,
+    category: ChatCategoryValue,
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+  ): void {
+    const entry: ChatEntry = {
+      id: this.nextId++,
+      category,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
+    };
+    client.send(MessageType.CHAT_ENTRY, entry);
+  }
+
   /** Get available commands for a role (sent on join). */
   getCommandsForRole(role: string): ReturnType<CommandRegistry["getAvailable"]> {
     return this.registry.getAvailable(role);
@@ -86,9 +127,11 @@ export class ChatSystem {
 
   private handleChat(client: Client, text: string): void {
     if (text.length > CHAT_MAX_LENGTH) {
-      this.sendToClient(
+      this.sendToClientI18n(
         client,
         ChatCategory.ERROR,
+        "chat.messageTooLong",
+        { max: CHAT_MAX_LENGTH },
         `Message too long (max ${CHAT_MAX_LENGTH} characters).`,
       );
       return;
@@ -117,13 +160,25 @@ export class ChatSystem {
 
     const cmd = this.registry.get(cmdName);
     if (!cmd) {
-      this.sendToClient(client, ChatCategory.ERROR, `Unknown command: /${cmdName}`);
+      this.sendToClientI18n(
+        client,
+        ChatCategory.ERROR,
+        "chat.unknownCommand",
+        { name: cmdName },
+        `Unknown command: /${cmdName}`,
+      );
       return;
     }
 
     const role = this.bridge.getPlayerRole(client);
     if (cmd.adminOnly && role !== "admin") {
-      this.sendToClient(client, ChatCategory.ERROR, "This command requires admin privileges.");
+      this.sendToClientI18n(
+        client,
+        ChatCategory.ERROR,
+        "chat.adminRequired",
+        {},
+        "This command requires admin privileges.",
+      );
       return;
     }
 
