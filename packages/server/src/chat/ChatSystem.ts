@@ -45,7 +45,7 @@ export class ChatSystem {
     if (!this.checkRateLimit(client.sessionId)) {
       this.sendToClientI18n(
         client,
-        ChatCategory.COMMAND,
+        ChatCategory.MESSAGE,
         "chat.rateLimited",
         {},
         "You are sending messages too fast.",
@@ -66,7 +66,8 @@ export class ChatSystem {
   broadcastSystem(text: string): void {
     this.broadcast({
       id: this.nextId++,
-      category: ChatCategory.SYSTEM,
+      category: ChatCategory.MESSAGE,
+      variant: ChatVariant.SYSTEM,
       timestamp: Date.now(),
       text,
     });
@@ -80,7 +81,8 @@ export class ChatSystem {
   ): void {
     this.broadcast({
       id: this.nextId++,
-      category: ChatCategory.SYSTEM,
+      category: ChatCategory.MESSAGE,
+      variant: ChatVariant.SYSTEM,
       timestamp: Date.now(),
       text: fallbackText,
       i18nKey,
@@ -137,7 +139,7 @@ export class ChatSystem {
     if (text.length > CHAT_MAX_LENGTH) {
       this.sendToClientI18n(
         client,
-        ChatCategory.COMMAND,
+        ChatCategory.MESSAGE,
         "chat.messageTooLong",
         { max: CHAT_MAX_LENGTH },
         `Message too long (max ${CHAT_MAX_LENGTH} characters).`,
@@ -171,7 +173,7 @@ export class ChatSystem {
     if (!cmd) {
       this.sendToClientI18n(
         client,
-        ChatCategory.COMMAND,
+        ChatCategory.MESSAGE,
         "chat.unknownCommand",
         { name: cmdName },
         `Unknown command: /${cmdName}`,
@@ -184,7 +186,7 @@ export class ChatSystem {
     if (cmd.adminOnly && role !== "admin") {
       this.sendToClientI18n(
         client,
-        ChatCategory.COMMAND,
+        ChatCategory.MESSAGE,
         "chat.adminRequired",
         {},
         "This command requires admin privileges.",
@@ -210,13 +212,13 @@ export class ChatSystem {
         if (i18nKey) {
           this.sendToClientI18n(
             client,
-            ChatCategory.COMMAND,
+            ChatCategory.MESSAGE,
             i18nKey,
             i18nParams ?? {},
             fallbackText,
           );
         } else {
-          this.sendToClient(client, ChatCategory.COMMAND, fallbackText);
+          this.sendToClient(client, ChatCategory.MESSAGE, fallbackText);
         }
       },
       replyError: (
@@ -227,14 +229,14 @@ export class ChatSystem {
         if (i18nKey) {
           this.sendToClientI18n(
             client,
-            ChatCategory.COMMAND,
+            ChatCategory.MESSAGE,
             i18nKey,
             i18nParams ?? {},
             fallbackText,
             ChatVariant.ERROR,
           );
         } else {
-          this.sendToClient(client, ChatCategory.COMMAND, fallbackText, ChatVariant.ERROR);
+          this.sendToClient(client, ChatCategory.MESSAGE, fallbackText, ChatVariant.ERROR);
         }
       },
     };

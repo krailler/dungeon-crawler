@@ -76,22 +76,23 @@ const categoryStyles: Record<string, { wrapper: string; prefix: string }> = {
     wrapper: "text-slate-200",
     prefix: "font-semibold",
   },
-  system: {
-    wrapper: "text-emerald-400/70",
-    prefix: "",
-  },
-  command: {
+  message: {
     wrapper: "text-amber-300",
     prefix: "font-semibold",
   },
 };
 
-/** Variant overrides for command messages */
+/** Variant overrides for MESSAGE category to change color/label */
 const variantStyles: Record<string, { wrapper: string; label: string; labelClass: string }> = {
   error: {
     wrapper: "text-red-400",
     label: "[Error] ",
     labelClass: "text-red-500 mr-1",
+  },
+  system: {
+    wrapper: "text-emerald-400/70",
+    label: "",
+    labelClass: "",
   },
 };
 
@@ -127,10 +128,10 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.E
           <span className="text-slate-500">: </span>
         </>
       )}
-      {msg.category === "command" && variant && (
+      {msg.category === "message" && variant && (
         <span className={variant.labelClass}>{variant.label}</span>
       )}
-      {msg.category === "command" && !variant && (
+      {msg.category === "message" && !variant && (
         <span className="text-amber-500 mr-1">[Server] </span>
       )}
       <span className="whitespace-pre-wrap break-words">{displayText}</span>

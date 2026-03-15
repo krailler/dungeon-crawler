@@ -54,13 +54,13 @@ export interface CombatLogMessage {
 /** Chat message categories for visual formatting */
 export const ChatCategory = {
   PLAYER: "player",
-  SYSTEM: "system",
-  COMMAND: "command",
+  MESSAGE: "message",
 } as const;
 
-/** Optional variant for COMMAND messages to change color */
+/** Optional variant for MESSAGE category to change color/label */
 export const ChatVariant = {
   ERROR: "error",
+  SYSTEM: "system",
 } as const;
 
 export type ChatVariantValue = (typeof ChatVariant)[keyof typeof ChatVariant];
