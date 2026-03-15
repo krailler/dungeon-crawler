@@ -10,6 +10,7 @@ export const MessageType = {
   PROMOTE_LEADER: "party:promote",
   PARTY_KICK: "party:kick",
   GATE_INTERACT: "gate:interact",
+  SKILL_TOGGLE: "skill:toggle",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -133,6 +134,11 @@ export interface GateInteractMessage {
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
+
+/** Client → Server: toggle a skill on/off */
+export interface SkillToggleMessage {
+  skillId: import("./Skills.js").SkillIdValue;
+}
 
 /** Command info sent to client on join for help overlay */
 export interface CommandInfo {

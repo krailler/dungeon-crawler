@@ -108,6 +108,14 @@
     "gateCountdownStart": "{{name}} is opening the gate in {{seconds}} seconds...",
     "gateOpened": "The gate opens... The dungeon awaits!"
   },
+  "skills": {
+    "basicAttack": "Basic Attack",
+    "basicAttackDesc": "Automatically attacks the nearest enemy",
+    "passive": "Passive",
+    "disabled": "Disabled",
+    "locked": "Locked",
+    "clickToToggle": "Click or press key to toggle"
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",

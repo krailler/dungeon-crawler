@@ -18,6 +18,7 @@ export type {
   DebugPathEntry,
   DebugPathsMessage,
   GateInteractMessage,
+  SkillToggleMessage,
 } from "./protocol.js";
 
 export {
@@ -56,3 +57,6 @@ export type { EnemyTypeIdValue, EnemyTypeDefinition } from "./EnemyTypes.js";
 export { computeGoldDrop } from "./Economy.js";
 
 export { xpToNextLevel, computeXpDrop } from "./Leveling.js";
+
+export { MAX_SKILL_SLOTS, SkillId, SKILL_DEFS, DEFAULT_SKILLS } from "./Skills.js";
+export type { SkillIdValue, SkillIcon, SkillDef } from "./Skills.js";

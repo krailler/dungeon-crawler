@@ -2,7 +2,12 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
-import type { PromoteLeaderMessage, PartyKickMessage } from "@dungeon/shared";
+import type {
+  PromoteLeaderMessage,
+  PartyKickMessage,
+  SkillToggleMessage,
+  SkillIdValue,
+} from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
 export type CharacterStats = {
@@ -25,6 +30,8 @@ export type PartyMember = {
   gold: number;
   xp: number;
   xpToNext: number;
+  skills: string[];
+  autoAttackEnabled: boolean;
   stats?: CharacterStats;
 };
 
@@ -188,6 +195,11 @@ export const hudStore = {
     if (!room) return;
     const msg: PartyKickMessage = { targetSessionId };
     room.send(MessageType.PARTY_KICK, msg);
+  },
+  toggleSkill(skillId: SkillIdValue): void {
+    if (!room) return;
+    const msg: SkillToggleMessage = { skillId };
+    room.send(MessageType.SKILL_TOGGLE, msg);
   },
 };
 

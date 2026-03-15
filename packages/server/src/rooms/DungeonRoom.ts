@@ -35,6 +35,7 @@ import {
   scaleEnemyDerivedStats,
   GOLD_SAVE_INTERVAL,
   CloseCode,
+  SkillId,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -220,6 +221,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: { gateId: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (player) this.gateSystem.handleInteract(client, player, data);
+    });
+    // Skill toggle: enable/disable a skill (e.g. auto-attack)
+    this.onMessage(MessageType.SKILL_TOGGLE, (client: Client, data: { skillId: string }) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (data.skillId === SkillId.BASIC_ATTACK) {
+        player.autoAttackEnabled = !player.autoAttackEnabled;
+      }
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {

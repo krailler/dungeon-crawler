@@ -14,6 +14,7 @@ import { GateHint } from "./GatePrompt";
 import { PromptOverlay } from "./PromptOverlay";
 import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { XpBar } from "./XpBar";
+import { SkillBar } from "./SkillBar";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -323,6 +324,8 @@ export const HudRoot = (): JSX.Element => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
+      {/* Skill bar — bottom center, above XP bar */}
+      <SkillBar />
       {/* XP bar — bottom center (WoW-style) */}
       <XpBar />
       {/* HUD buttons — bottom right */}

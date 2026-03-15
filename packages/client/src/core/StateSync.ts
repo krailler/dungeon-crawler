@@ -268,8 +268,21 @@ export class StateSync {
         gold: player.gold,
         xp: player.xp,
         xpToNext: player.xpToNext,
+        skills: Array.from(player.skills as Iterable<string>),
+        autoAttackEnabled: player.autoAttackEnabled ?? true,
         stats: localStats,
       });
+
+      // Sync skills array — onAdd/onRemove fire when server modifies the ArraySchema
+      if (isLocal) {
+        const syncSkills = (): void => {
+          hudStore.updateMember(sessionId, {
+            skills: Array.from(player.skills as Iterable<string>),
+          });
+        };
+        $(player).skills.onAdd(syncSkills);
+        $(player).skills.onRemove(syncSkills);
+      }
 
       // Track gold and level to detect increases
       let prevGold = player.gold as number;
@@ -303,6 +316,7 @@ export class StateSync {
           gold: player.gold,
           xp: player.xp,
           xpToNext: player.xpToNext,
+          autoAttackEnabled: player.autoAttackEnabled ?? true,
           ...(isLocal && {
             stats: {
               strength: player.strength,

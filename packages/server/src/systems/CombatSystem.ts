@@ -97,6 +97,9 @@ export class CombatSystem {
 
       if (!player || player.health <= 0) continue;
 
+      // Skip auto-attack if player has it disabled
+      if (!player.autoAttackEnabled) continue;
+
       // Find closest alive enemy in range
       let closest: EnemyState | null = null;
       let closestId = "";

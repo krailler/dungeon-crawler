@@ -1,5 +1,5 @@
-import { Schema, type } from "@colyseus/schema";
-import { computeDerivedStats, xpToNextLevel, MAX_LEVEL } from "@dungeon/shared";
+import { ArraySchema, Schema, type } from "@colyseus/schema";
+import { computeDerivedStats, xpToNextLevel, MAX_LEVEL, DEFAULT_SKILLS } from "@dungeon/shared";
 
 export class PlayerState extends Schema {
   @type("float32") x: number = 0;
@@ -28,6 +28,12 @@ export class PlayerState extends Schema {
   @type("int32") gold: number = 0;
   @type("int32") xp: number = 0;
   @type("int32") xpToNext: number = 0;
+
+  // Skills (synced — ordered list of skill IDs for the action bar)
+  @type(["string"]) skills = new ArraySchema<string>(...DEFAULT_SKILLS);
+
+  // Skill toggles (synced — client needs to show active/inactive state)
+  @type("boolean") autoAttackEnabled: boolean = true;
 
   // Server-only (not synced)
   characterId: string = "";
