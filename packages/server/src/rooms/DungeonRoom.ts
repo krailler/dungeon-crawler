@@ -533,9 +533,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   async onDrop(client: Client): Promise<void> {
     const auth = client.auth as { accountId?: string } | undefined;
 
-    // If this client was kicked via /kick, state already cleaned up — just unregister
+    // If this client was kicked via /kick or party kick, state already cleaned up — just unregister
+    // Don't delete from kickedSessions here; onLeave will consume it to skip the "left" broadcast
     if (this.kickedSessions.has(client.sessionId)) {
-      this.kickedSessions.delete(client.sessionId);
       this.log.info(
         { player: pid(client.sessionId) },
         "Kicked player dropped — skipping reconnect",
@@ -628,6 +628,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   onLeave(client: Client): void {
+    // If already cleaned up by kick, skip everything
+    if (this.kickedSessions.has(client.sessionId)) {
+      this.kickedSessions.delete(client.sessionId);
+      this.removeAccountMapping(client);
+      this.unregisterClient(client);
+      return;
+    }
     const player = this.state.players.get(client.sessionId);
     const name = player?.characterName || client.sessionId.slice(0, 6);
     this.log.info({ player: pid(client.sessionId) }, "Player left");
