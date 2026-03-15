@@ -4,41 +4,26 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import type { LinesMesh } from "@babylonjs/core/Meshes/linesMesh";
 
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
 
-import { Client, Room, getStateCallbacks } from "@colyseus/sdk";
+import { Client, Room } from "@colyseus/sdk";
 
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
-import { ClientPlayer } from "../entities/ClientPlayer";
-import { ClientEnemy } from "../entities/ClientEnemy";
 import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
-import { InputManager } from "./InputManager";
-import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
 import { preloadUiSounds } from "../audio/uiSfx";
+import { StateSync } from "./StateSync";
+import { ClientUpdateLoop } from "./ClientUpdateLoop";
 import { hudStore, mountHud, disposeHud } from "../ui/stores/hudStore";
-import { debugStore, type DebugSnapshot } from "../ui/stores/debugStore";
+import { debugStore } from "../ui/stores/debugStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
-import {
-  CloseCode,
-  MessageType,
-  TileMap,
-  unpackSetId,
-  tileSetNameFromId,
-  AMBIENT_INTENSITY,
-  TILE_SIZE,
-  MINIMAP_DISCOVERY_RADIUS,
-  GATE_INTERACT_RANGE,
-  ChatCategory,
-} from "@dungeon/shared";
+import { CloseCode, MessageType, AMBIENT_INTENSITY, ChatCategory } from "@dungeon/shared";
 import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -60,7 +45,6 @@ export class ClientGame {
   private scene: Scene;
   public isoCamera: IsometricCamera;
   private dungeonRenderer: DungeonRenderer;
-  private wallOcclusion: WallOcclusionSystem | null = null;
   private fogOfWar: FogOfWarSystem;
   private guiTexture: AdvancedDynamicTexture;
 
@@ -72,20 +56,14 @@ export class ClientGame {
   private enemyLoader: CharacterAssetLoader;
   private soundManager: SoundManager;
 
-  // Entities synced from server
-  private players: Map<string, ClientPlayer> = new Map();
-  private enemies: Map<string, ClientEnemy> = new Map();
-  private localSessionId: string = "";
+  // Extracted modules
+  private stateSync: StateSync;
+  private updateLoop: ClientUpdateLoop;
+
   private pingInterval: number = 0;
-  private inputManager: InputManager | null = null;
-  private lastDebug: DebugSnapshot = debugStore.getSnapshot();
   private onResize: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
-  // Pre-allocated map reused each frame for minimap enemy positions
-  private activeEnemiesMap: Map<string, { x: number; z: number }> = new Map();
-  // Debug path visualization
-  private debugPathLines: Map<string, LinesMesh> = new Map();
 
   constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
     this.engine = new Engine(canvas, true, {
@@ -106,13 +84,46 @@ export class ClientGame {
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
+
+    // Initialize extracted modules
+    this.stateSync = new StateSync({
+      scene: this.scene,
+      isoCamera: this.isoCamera,
+      dungeonRenderer: this.dungeonRenderer,
+      playerLoader: this.playerLoader,
+      enemyLoader: this.enemyLoader,
+      soundManager: this.soundManager,
+      fogOfWar: this.fogOfWar,
+      guiTexture: this.guiTexture,
+      addShadowCaster: (mesh: AbstractMesh) => this.addShadowCaster(mesh),
+      onDungeonReady: () => {
+        this.ambientReady = true;
+        this.tryStartAmbient();
+      },
+    });
+
+    const self = this;
+    this.updateLoop = new ClientUpdateLoop({
+      isoCamera: this.isoCamera,
+      fogOfWar: this.fogOfWar,
+      soundManager: this.soundManager,
+      dungeonRenderer: this.dungeonRenderer,
+      scene: this.scene,
+      getPlayers: () => self.stateSync.players,
+      getEnemies: () => self.stateSync.enemies,
+      getLocalSessionId: () => self.stateSync.localSessionId,
+      getInputManager: () => self.stateSync.inputManager,
+      getWallOcclusion: () => self.stateSync.wallOcclusion,
+      getRoom: () => self.room,
+    });
+
     mountLoading();
     mountHud();
     this.client = colyseusClient;
 
     // Game loop — render + interpolation
     this.scene.onBeforeRenderObservable.add(() => {
-      this.update(this.engine.getDeltaTime() / 1000);
+      this.updateLoop.update(this.engine.getDeltaTime() / 1000);
     });
 
     this.engine.runRenderLoop(() => {
@@ -178,7 +189,6 @@ export class ClientGame {
       adminStore.setRoom(room);
       hudStore.setRoom(room);
       gateStore.setRoom(room);
-      this.localSessionId = room.sessionId;
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
@@ -197,7 +207,7 @@ export class ClientGame {
 
         // Show chat bubble above player's head for player messages
         if (entry.category === ChatCategory.PLAYER && entry.sender) {
-          for (const [sessionId, clientPlayer] of this.players) {
+          for (const [sessionId, clientPlayer] of this.stateSync.players) {
             const member = hudStore.getSnapshot().members.find((m) => m.id === sessionId);
             if (member && member.name === entry.sender) {
               clientPlayer.showChatBubble(entry.text);
@@ -238,7 +248,7 @@ export class ClientGame {
 
       // Debug: path visualization
       room.onMessage(MessageType.DEBUG_PATHS, (msg: DebugPathsMessage) => {
-        this.updateDebugPaths(msg);
+        this.updateLoop.handleDebugPaths(msg);
       });
 
       hudStore.setConnection(
@@ -250,7 +260,7 @@ export class ClientGame {
       );
 
       loadingStore.setPhase(LoadingPhase.DUNGEON_ASSETS);
-      this.setupStateListeners(room);
+      this.stateSync.setup(room, room.sessionId);
 
       // Ping polling — every 2 seconds
       room.ping((ms: number) => hudStore.setPing(ms));
@@ -296,320 +306,6 @@ export class ClientGame {
     }
   }
 
-  private setupStateListeners(room: Room): void {
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    const $ = getStateCallbacks(room as any) as any;
-    const state$ = $(room.state);
-
-    // Track dungeon seed + tick rate for admin panel
-    state$.listen("dungeonSeed", (value: number) => {
-      adminStore.setSeed(value);
-    });
-    state$.listen("tickRate", (value: number) => {
-      adminStore.setTickRate(value);
-    });
-
-    // Gate state listeners (MapSchema<GateState>)
-    // NOTE: onAdd fires for initial state BEFORE the async dungeon render completes,
-    // so we only track data in stores here. Mesh placement happens after render()
-    // inside the dungeonVersion listener, which iterates room.state.gates explicitly.
-    state$.gates.onAdd((gate: any, gateId: string) => {
-      const tileX = gate.tileX as number;
-      const tileY = gate.tileY as number;
-      const open = gate.open as boolean;
-      const gateType = (gate.gateType as string) || "lobby";
-
-      gateStore.addGate(gateId, gateType, tileX, tileY, open);
-      minimapStore.addGatePosition(gateId, tileX, tileY);
-
-      // Listen for changes on this gate (open/close)
-      $(gate).onChange(() => {
-        const nowOpen = gate.open as boolean;
-        gateStore.setGateOpen(gateId, nowOpen);
-        if (nowOpen) {
-          this.dungeonRenderer.openGateById(gateId);
-          this.soundManager.playSfx("gate_open");
-        }
-      });
-    });
-
-    state$.gates.onRemove((_gate: any, gateId: string) => {
-      gateStore.removeGate(gateId);
-      minimapStore.removeGatePosition(gateId);
-      this.dungeonRenderer.removeGate(gateId);
-    });
-
-    // Listen for dungeon version (fires on join and every restart, even same-seed)
-    state$.listen("dungeonVersion", () => {
-      const tileMapData = (room.state as any).tileMapData as string;
-      if (!tileMapData) return;
-
-      // If loading screen already dismissed, this is a restart — re-show it
-      const isRestart = !loadingStore.getSnapshot().visible;
-      if (isRestart) {
-        loadingStore.reset();
-        loadingStore.setPhase(LoadingPhase.DUNGEON_ASSETS);
-        // Dispose subsystems that will be recreated after render
-        this.inputManager?.dispose();
-        this.inputManager = null;
-        this.wallOcclusion?.dispose();
-        this.wallOcclusion = null;
-      }
-
-      // Rebuild dungeon — wrapped in a function so we can defer it on restart
-      // to let React paint the loading screen before the heavy work blocks the thread
-      const rebuildDungeon = (): void => {
-        const flat = JSON.parse(tileMapData) as number[];
-        const width = (room.state as any).mapWidth;
-        const height = (room.state as any).mapHeight;
-        const tileMap = TileMap.fromSerialized(width, height, flat);
-        minimapStore.setTileMap(tileMap);
-
-        // Parse packed floor variant data from server
-        const variantRaw = (room.state as any).floorVariantData;
-        const floorVariants: number[] = variantRaw ? JSON.parse(variantRaw) : [];
-
-        // Parse packed wall variant data from server
-        const wallVariantRaw = (room.state as any).wallVariantData;
-        const wallVariants: number[] = wallVariantRaw ? JSON.parse(wallVariantRaw) : [];
-
-        // Scan packed values to find which tile sets are actually used (floors)
-        const usedFloorSets = new Set<string>();
-        for (const packed of floorVariants) {
-          if (packed === 0) continue;
-          const setId = unpackSetId(packed);
-          const name = tileSetNameFromId(setId);
-          if (name) usedFloorSets.add(name);
-        }
-
-        // Scan packed values to find which wall tile sets are used
-        const usedWallSets = new Set<string>();
-        for (const packed of wallVariants) {
-          if (packed === 0) continue;
-          const setId = unpackSetId(packed);
-          const name = tileSetNameFromId(setId);
-          if (name) usedWallSets.add(name);
-        }
-
-        // Load only the sets this dungeon needs, then render
-        const floorSetNames = Array.from(usedFloorSets);
-        const wallSetNames = Array.from(usedWallSets);
-        console.log("[Client] Loading floor tile sets:", floorSetNames);
-        console.log("[Client] Loading wall tile sets:", wallSetNames);
-        this.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
-          loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
-          console.log("[Client] Assets loaded, rendering dungeon");
-          this.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
-
-          // Place gate meshes from current state (onAdd already tracked data in stores,
-          // but mesh placement must happen after render since render() disposes everything)
-          const gates = (room.state as any).gates;
-          if (gates) {
-            gates.forEach((gate: any, gateId: string) => {
-              const open = gate.open as boolean;
-              if (!open && gate.tileX >= 0 && gate.tileY >= 0) {
-                this.dungeonRenderer.placeGate(gateId, gate.tileX, gate.tileY, gate.isNS, gate.dir);
-              }
-            });
-          }
-
-          // Setup input after dungeon renders (sends move commands to server)
-          this.inputManager = new InputManager(
-            this.scene,
-            this.dungeonRenderer.getFloorMeshes(),
-            room,
-          );
-
-          // Setup wall occlusion (with wall decoration map for toggling)
-          this.wallOcclusion = new WallOcclusionSystem(
-            this.scene,
-            this.isoCamera.camera,
-            this.dungeonRenderer.getWallMeshes(),
-            this.dungeonRenderer.getWallDecoMap(),
-          );
-
-          // Tell fog of war where spawn is (expanded visibility near spawn)
-          const spawnPos = this.dungeonRenderer.getSpawnWorldPosition(tileMap);
-          if (spawnPos) {
-            this.fogOfWar.setSpawnPosition(spawnPos.x, spawnPos.z);
-          }
-
-          // Enable shadow receiving on floor meshes
-          for (const mesh of this.dungeonRenderer.getFloorMeshes()) {
-            mesh.receiveShadows = true;
-          }
-
-          // Loading complete — fade out loading screen
-          loadingStore.setPhase(LoadingPhase.COMPLETE);
-          loadingStore.startFadeOut();
-
-          // Mark ambient as ready — actual playback starts on first user click
-          // (AudioContext requires a user gesture to unlock)
-          this.ambientReady = true;
-          this.tryStartAmbient();
-        });
-      };
-
-      if (isRestart) {
-        // Yield two frames so React can paint the loading screen before heavy work
-        requestAnimationFrame(() => requestAnimationFrame(rebuildDungeon));
-      } else {
-        rebuildDungeon();
-      }
-    });
-
-    // Players added
-    state$.players.onAdd((player: any, sessionId: string) => {
-      const isLocal = sessionId === this.localSessionId;
-      if (!isLocal) this.soundManager.playSfx("player_join");
-      const displayName = player.characterName || sessionId.slice(0, 4).toUpperCase();
-      const clientPlayer = new ClientPlayer(
-        this.scene,
-        isLocal,
-        sessionId,
-        displayName,
-        this.guiTexture,
-        this.soundManager,
-      );
-      clientPlayer.snapToPosition(player.x, player.z);
-      clientPlayer.setServerState(player.x, player.z, player.rotY);
-      this.players.set(sessionId, clientPlayer);
-
-      if (isLocal) {
-        this.isoCamera.camera.target = new Vector3(player.x, 0, player.z);
-        authStore.setRole(player.role);
-      }
-
-      // Attach GLB character model
-      const charInstance = this.playerLoader.instantiate(`char_${sessionId}`);
-      clientPlayer.attachModel(charInstance);
-
-      // Add model meshes as shadow casters for local player's torch
-      for (const m of clientPlayer.modelMeshes) {
-        this.addShadowCaster(m);
-      }
-
-      const name = player.characterName || sessionId.slice(0, 4).toUpperCase();
-      const localStats = isLocal
-        ? {
-            strength: player.strength,
-            vitality: player.vitality,
-            agility: player.agility,
-            attackDamage: player.attackDamage,
-            defense: player.defense,
-          }
-        : undefined;
-      hudStore.setMember({
-        id: sessionId,
-        name,
-        health: player.health,
-        maxHealth: player.maxHealth,
-        isLocal,
-        online: player.online,
-        isLeader: player.isLeader,
-        level: player.level,
-        gold: player.gold,
-        stats: localStats,
-      });
-
-      // Track gold for local player to detect increases
-      let prevGold = player.gold as number;
-
-      // Listen to changes on this player
-      $(player).onChange(() => {
-        clientPlayer.setServerState(player.x, player.z, player.rotY, player.animState);
-
-        // Play gold pickup sound when local player earns gold
-        if (isLocal && player.gold > prevGold) {
-          this.soundManager.playSfx("gold_pickup");
-        }
-        prevGold = player.gold;
-
-        hudStore.updateMember(sessionId, {
-          health: player.health,
-          maxHealth: player.maxHealth,
-          online: player.online,
-          isLeader: player.isLeader,
-          level: player.level,
-          gold: player.gold,
-          ...(isLocal && {
-            stats: {
-              strength: player.strength,
-              vitality: player.vitality,
-              agility: player.agility,
-              attackDamage: player.attackDamage,
-              defense: player.defense,
-            },
-          }),
-        });
-      });
-    });
-
-    // Players removed
-    state$.players.onRemove((_player: any, sessionId: string) => {
-      if (sessionId !== this.localSessionId) this.soundManager.playSfx("player_leave");
-      const clientPlayer = this.players.get(sessionId);
-      if (clientPlayer) {
-        clientPlayer.dispose();
-        this.players.delete(sessionId);
-      }
-      hudStore.removeMember(sessionId);
-      minimapStore.removePlayer(sessionId);
-    });
-
-    // Enemies added
-    state$.enemies.onAdd((enemy: any, id: string) => {
-      const clientEnemy = new ClientEnemy(
-        this.scene,
-        id,
-        enemy.health,
-        this.guiTexture,
-        this.soundManager,
-      );
-      clientEnemy.snapToPosition(enemy.x, enemy.z);
-      clientEnemy.setLevel(enemy.level);
-      clientEnemy.setServerState(
-        enemy.x,
-        enemy.z,
-        enemy.rotY,
-        enemy.health,
-        enemy.maxHealth,
-        enemy.isDead,
-        enemy.animState,
-      );
-      // Attach zombie GLB model
-      const enemyInstance = this.enemyLoader.instantiate(`enemy_${id}`);
-      clientEnemy.attachModel(enemyInstance);
-
-      this.enemies.set(id, clientEnemy);
-      for (const m of clientEnemy.modelMeshes) {
-        this.addShadowCaster(m);
-      }
-
-      // Listen to changes on this enemy
-      $(enemy).onChange(() => {
-        clientEnemy.setServerState(
-          enemy.x,
-          enemy.z,
-          enemy.rotY,
-          enemy.health,
-          enemy.maxHealth,
-          enemy.isDead,
-          enemy.animState,
-        );
-      });
-    });
-
-    // Enemies removed
-    state$.enemies.onRemove((_enemy: any, id: string) => {
-      const clientEnemy = this.enemies.get(id);
-      if (clientEnemy) {
-        clientEnemy.dispose();
-        this.enemies.delete(id);
-      }
-    });
-  }
-
   private setupLighting(): void {
     const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), this.scene);
     ambient.intensity = AMBIENT_INTENSITY;
@@ -620,192 +316,8 @@ export class ClientGame {
     glow.intensity = 0.4;
   }
 
-  private update(dt: number): void {
-    // Apply debug toggles (only when changed)
-    this.applyDebugFlags();
-
-    // Interpolate all entities toward server state
-    for (const [, player] of this.players) {
-      player.update(dt);
-    }
-
-    for (const [, enemy] of this.enemies) {
-      enemy.update(dt);
-    }
-
-    // Local player faces cursor while holding click
-    const localPlayer = this.players.get(this.localSessionId);
-    if (localPlayer && this.inputManager) {
-      const holdTarget = this.inputManager.getHoldTarget();
-      if (holdTarget) {
-        localPlayer.setFacingTarget(holdTarget.x, holdTarget.z);
-      } else {
-        localPlayer.clearFacingTarget();
-      }
-    }
-
-    // Gate proximity check — find nearest interactable gate for "Press F" hint
-    if (localPlayer && !promptStore.getSnapshot().current) {
-      const gateWorldPositions = this.dungeonRenderer.getGateWorldPositions();
-      const gateSnap = gateStore.getSnapshot();
-      const pPos = localPlayer.getWorldPosition();
-      const localMember = hudStore.getSnapshot().members.find((m) => m.isLocal);
-      const isLeader = localMember?.isLeader ?? false;
-      const rangeSq = GATE_INTERACT_RANGE * GATE_INTERACT_RANGE;
-
-      let nearestId: string | null = null;
-      let nearestDistSq = Infinity;
-
-      for (const [id, wpos] of gateWorldPositions) {
-        // Skip gates that are already open
-        const info = gateSnap.gates.get(id);
-        if (!info || info.isOpen) continue;
-        // Lobby gates require leader
-        if (info.gateType === "lobby" && !isLeader) continue;
-
-        const dx = pPos.x - wpos.x;
-        const dz = pPos.z - wpos.z;
-        const distSq = dx * dx + dz * dz;
-        if (distSq <= rangeSq && distSq < nearestDistSq) {
-          nearestDistSq = distSq;
-          nearestId = id;
-        }
-      }
-
-      gateStore.setNearestInteractable(nearestId);
-    }
-
-    // Update debug coords
-    if (localPlayer && debugStore.getSnapshot().showCoords) {
-      const cp = localPlayer.getWorldPosition();
-      hudStore.setLocalCoords(cp.x, cp.z);
-    }
-
-    // Camera follows local player
-    if (localPlayer) {
-      const pos = localPlayer.getWorldPosition();
-
-      // Free camera: don't follow player
-      const debug = debugStore.getSnapshot();
-      if (!debug.freeCamera) {
-        this.isoCamera.followTarget(pos);
-      }
-
-      // Wall occlusion
-      if (this.wallOcclusion && debug.wallOcclusion) {
-        this.wallOcclusion.update(pos.x, pos.z);
-      }
-
-      // Fog of war
-      this.fogOfWar.update(pos.x, pos.z);
-
-      // Minimap: reveal tiles around local player
-      const tileX = Math.floor(pos.x / TILE_SIZE);
-      const tileY = Math.floor(pos.z / TILE_SIZE);
-      minimapStore.revealAround(tileX, tileY, MINIMAP_DISCOVERY_RADIUS);
-    }
-
-    // Minimap: update all player positions (silent, no emit)
-    for (const [sessionId, player] of this.players) {
-      const p = player.getWorldPosition();
-      minimapStore.updatePlayerPosition(sessionId, p.x, p.z);
-    }
-
-    // Minimap: update active enemy positions (moving or attacking only)
-    this.activeEnemiesMap.clear();
-    for (const [id, enemy] of this.enemies) {
-      if (enemy.isActive) {
-        const ep = enemy.getWorldPosition();
-        this.activeEnemiesMap.set(id, { x: ep.x, z: ep.z });
-      }
-    }
-    minimapStore.setActiveEnemies(this.activeEnemiesMap);
-
-    // Single batched emit per frame (only when minimap is visible)
-    minimapStore.flush();
-
-    // FPS
-    hudStore.updateFPS(dt);
-  }
-
-  private applyDebugFlags(): void {
-    const debug = debugStore.getSnapshot();
-    if (debug === this.lastDebug) return;
-
-    if (debug.fog !== this.lastDebug.fog) {
-      this.fogOfWar.setEnabled(debug.fog);
-    }
-    if (debug.freeCamera !== this.lastDebug.freeCamera) {
-      this.isoCamera.setFreeCamera(debug.freeCamera);
-    }
-    if (debug.wireframe !== this.lastDebug.wireframe) {
-      this.scene.forceWireframe = debug.wireframe;
-    }
-    if (debug.ambient !== this.lastDebug.ambient) {
-      this.soundManager.setAmbientMuted(!debug.ambient);
-    }
-    if (debug.showPaths !== this.lastDebug.showPaths) {
-      this.room?.send(MessageType.DEBUG_PATHS, { enabled: debug.showPaths });
-      if (!debug.showPaths) {
-        this.clearDebugPaths();
-      }
-    }
-
-    this.lastDebug = debug;
-  }
-
-  private updateDebugPaths(msg: DebugPathsMessage): void {
-    // Track which IDs are in this update
-    const activeIds = new Set<string>();
-
-    for (const entry of msg.paths) {
-      activeIds.add(entry.id);
-
-      // Build points: current position → each waypoint
-      const points: Vector3[] = [new Vector3(entry.x, 0.15, entry.z)];
-      for (const wp of entry.path) {
-        points.push(new Vector3(wp.x, 0.15, wp.z));
-      }
-
-      if (points.length < 2) continue;
-
-      const color =
-        entry.kind === "player" ? new Color3(0.22, 0.74, 0.97) : new Color3(0.97, 0.44, 0.44);
-      const colors = points.map(() => new Color4(color.r, color.g, color.b, 1));
-
-      // Reuse or create line mesh
-      const existing = this.debugPathLines.get(entry.id);
-      if (existing) {
-        existing.dispose();
-      }
-
-      const line = MeshBuilder.CreateLines(
-        `debug_path_${entry.id}`,
-        { points, colors, updatable: false },
-        this.scene,
-      );
-      line.isPickable = false;
-      this.debugPathLines.set(entry.id, line);
-    }
-
-    // Remove lines for entities no longer in the update
-    for (const [id, line] of this.debugPathLines) {
-      if (!activeIds.has(id)) {
-        line.dispose();
-        this.debugPathLines.delete(id);
-      }
-    }
-  }
-
-  private clearDebugPaths(): void {
-    for (const [, line] of this.debugPathLines) {
-      line.dispose();
-    }
-    this.debugPathLines.clear();
-  }
-
   private addShadowCaster(mesh: AbstractMesh): void {
-    const local = this.players.get(this.localSessionId);
+    const local = this.stateSync.players.get(this.stateSync.localSessionId);
     if (local?.shadowGenerator) {
       local.shadowGenerator.addShadowCaster(mesh);
     }
@@ -837,21 +349,8 @@ export class ClientGame {
       window.removeEventListener("pointerdown", this.onPointerDown);
     }
 
-    this.clearDebugPaths();
-
-    // Dispose all entity instances
-    for (const [, player] of this.players) {
-      player.dispose();
-    }
-    this.players.clear();
-    for (const [, enemy] of this.enemies) {
-      enemy.dispose();
-    }
-    this.enemies.clear();
-
-    // Dispose subsystems
-    this.inputManager?.dispose();
-    this.wallOcclusion?.dispose();
+    this.updateLoop.dispose();
+    this.stateSync.dispose();
 
     disposeLoading();
     disposeHud();
