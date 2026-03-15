@@ -16,7 +16,14 @@ export function registerSession(accountId: string, client: Client): void {
       { accountId, oldSession: existing.sessionId, newSession: client.sessionId },
       "Duplicate login — kicking previous session",
     );
-    existing.leave(CloseCode.KICKED_DUPLICATE, "Logged in from another session");
+    try {
+      existing.leave(CloseCode.KICKED_DUPLICATE, "Logged in from another session");
+    } catch (err) {
+      logger.error(
+        { accountId, oldSession: existing.sessionId, err },
+        "Failed to kick previous session (transport already closed?)",
+      );
+    }
   }
   activeSessions.set(accountId, client);
 }

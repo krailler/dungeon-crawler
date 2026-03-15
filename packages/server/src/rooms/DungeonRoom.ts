@@ -3,7 +3,7 @@ import type { Client, AuthContext } from "colyseus";
 import { StateView } from "@colyseus/schema";
 import type { Logger } from "pino";
 import { eq } from "drizzle-orm";
-import { createRoomLogger, pid } from "../logger";
+import { createRoomLogger } from "../logger";
 import { getDb } from "../db/database";
 import { accounts, characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
@@ -345,7 +345,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private handleAdminRestart(client: Client, data: AdminRestartMessage): void {
     const auth = client.auth as { role: string };
     if (auth.role !== "admin") {
-      this.log.warn({ player: pid(client.sessionId) }, "Non-admin tried to restart room");
+      this.log.warn({ player: client.sessionId }, "Non-admin tried to restart room");
       return;
     }
 
@@ -435,6 +435,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const oldSessionId = this.sessionManager.getSessionForAccount(account.id);
       const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
       if (!existingPlayer) {
+        this.log.warn({ accountId: account.id }, "Rejected join — dungeon already started");
         throw new Error("DUNGEON_STARTED");
       }
     }
@@ -466,7 +467,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   async onDrop(client: Client): Promise<void> {
-    await this.sessionManager.handleDrop(client);
+    if (this.isDungeonStarted()) {
+      await this.sessionManager.handleDrop(client);
+    } else {
+      this.sessionManager.handleLeave(client);
+    }
   }
 
   onReconnect(client: Client): void {

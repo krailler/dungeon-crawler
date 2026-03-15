@@ -15,7 +15,7 @@ import {
 } from "../sessions/activeSessionRegistry";
 
 const RECONNECT_TIMEOUT = 60 * 5; // seconds
-const RECONNECT_WARNINGS = [30, 10];
+const RECONNECT_WARNINGS = [30, 10, 5, 4, 3, 2, 1]; // seconds before timeout to send warnings
 
 export interface SessionRoomBridge {
   readonly state: DungeonState;
@@ -38,6 +38,8 @@ export class PlayerSessionManager {
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
   private accountToSession: Map<string, string> = new Map();
   private lastSavedHash: Map<string, string> = new Map();
+  /** Sessions currently being processed by handleDrop/handleConsentedLeaveDuringDungeon — prevents double processing when both onDrop and onLeave fire for the same client. */
+  private processingDisconnect: Set<string> = new Set();
 
   constructor(bridge: SessionRoomBridge, log: Logger) {
     this.bridge = bridge;
@@ -72,14 +74,14 @@ export class PlayerSessionManager {
     // Kick previous session if same account is already connected (any room)
     registerSession(accountId, client);
 
+    // Check if this account already has a disconnected player in this room
+    const oldSessionId = this.accountToSession.get(accountId);
+    const existingPlayer = oldSessionId ? this.bridge.state.players.get(oldSessionId) : undefined;
+
     this.log.info(
       { player: pid(client.sessionId), accountId, characterName, role },
       "Player joined",
     );
-
-    // Check if this account already has a disconnected player in this room
-    const oldSessionId = this.accountToSession.get(accountId);
-    const existingPlayer = oldSessionId ? this.bridge.state.players.get(oldSessionId) : undefined;
 
     if (existingPlayer && oldSessionId && oldSessionId !== client.sessionId) {
       // Migrate existing player state to the new session
@@ -171,34 +173,32 @@ export class PlayerSessionManager {
 
     if (this.handleReplacedSession(client)) return;
 
+    // Guard: prevent double processing if onLeave also fires for this client
+    if (this.processingDisconnect.has(client.sessionId)) return;
+    this.processingDisconnect.add(client.sessionId);
+
     this.log.warn(
       { player: pid(client.sessionId) },
       `Player dropped — waiting ${RECONNECT_TIMEOUT}s for reconnect`,
     );
 
     const playerName = this.suspendPlayer(client);
+    this.scheduleReconnectTimers(client, playerName, false);
 
-    // Schedule warning timers
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    for (const remaining of RECONNECT_WARNINGS) {
-      const delay = (RECONNECT_TIMEOUT - remaining) * 1000;
-      timers.push(
-        setTimeout(() => {
-          this.bridge.chatSystem.broadcastSystemI18n(
-            "chat.reconnectWarning",
-            { name: playerName, seconds: remaining },
-            `${playerName} has ${remaining}s to reconnect.`,
-          );
-        }, delay),
-      );
-    }
-    this.reconnectTimers.set(client.sessionId, timers);
-
-    // Allow reconnection (only valid inside onDrop)
+    // Allow reconnection (only valid inside onDrop — handles expiry itself)
     try {
       await this.bridge.allowReconnection(client, RECONNECT_TIMEOUT);
     } catch {
-      this.expirePlayer(client, playerName);
+      // If the session was replaced (player migrated to a new session), skip expiry
+      const auth = client.auth as { accountId?: string } | undefined;
+      const replaced = auth?.accountId && !isActiveSession(auth.accountId, client);
+      if (replaced) {
+        this.clearReconnectTimers(client.sessionId);
+      } else {
+        this.expirePlayer(client, playerName);
+      }
+    } finally {
+      this.processingDisconnect.delete(client.sessionId);
     }
   }
 
@@ -213,24 +213,35 @@ export class PlayerSessionManager {
   handleConsentedLeaveDuringDungeon(client: Client): void {
     if (this.handleReplacedSession(client)) return;
 
+    // Player already removed (e.g. by a prior expiry) — nothing to do
+    if (!this.bridge.state.players.has(client.sessionId)) return;
+
+    // Guard: prevent double processing if onDrop already handled this client
+    if (this.processingDisconnect.has(client.sessionId)) return;
+    this.processingDisconnect.add(client.sessionId);
+
     this.log.warn(
       { player: pid(client.sessionId) },
       `Player left during dungeon — waiting ${RECONNECT_TIMEOUT}s for rejoin`,
     );
 
     const playerName = this.suspendPlayer(client);
-
-    // Schedule timeout to remove the player if they don't come back
-    const timer = setTimeout(() => {
-      if (!this.bridge.state.players.has(client.sessionId)) return;
-      this.expirePlayer(client, playerName);
-    }, RECONNECT_TIMEOUT * 1000);
-    this.reconnectTimers.set(client.sessionId, [timer]);
+    this.scheduleReconnectTimers(client, playerName, true);
   }
 
   handleReconnect(client: Client): void {
     this.log.info({ player: pid(client.sessionId) }, "Player reconnected");
+    this.processingDisconnect.delete(client.sessionId);
     this.clearReconnectTimers(client.sessionId);
+
+    // Re-register session — Colyseus may provide a new Client reference after
+    // reconnection, so the activeSessionRegistry must be updated to avoid
+    // isActiveSession() returning false for the reconnected client.
+    const auth = client.auth as { accountId?: string } | undefined;
+    if (auth?.accountId) {
+      registerSession(auth.accountId, client);
+    }
+
     const player = this.bridge.state.players.get(client.sessionId);
     if (player) {
       player.online = true;
@@ -244,6 +255,37 @@ export class PlayerSessionManager {
 
   // ── Shared helpers for handleDrop / handleConsentedLeaveDuringDungeon ────
 
+  /**
+   * Schedule warning timers for a disconnected player.
+   * @param withExpiry If true, also schedule a timeout to remove the player.
+   *                   Pass false when `allowReconnection` handles the expiry.
+   */
+  private scheduleReconnectTimers(client: Client, playerName: string, withExpiry: boolean): void {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const remaining of RECONNECT_WARNINGS) {
+      const delay = (RECONNECT_TIMEOUT - remaining) * 1000;
+      timers.push(
+        setTimeout(() => {
+          this.bridge.chatSystem.broadcastSystemI18n(
+            "chat.reconnectWarning",
+            { name: playerName, seconds: remaining },
+            `${playerName} has ${remaining}s to reconnect.`,
+          );
+        }, delay),
+      );
+    }
+    if (withExpiry) {
+      timers.push(
+        setTimeout(() => {
+          if (!this.bridge.state.players.has(client.sessionId)) return;
+          this.expirePlayer(client, playerName);
+          this.processingDisconnect.delete(client.sessionId);
+        }, RECONNECT_TIMEOUT * 1000),
+      );
+    }
+    this.reconnectTimers.set(client.sessionId, timers);
+  }
+
   /** If the session was replaced by a newer login, clean up and return true. */
   private handleReplacedSession(client: Client): boolean {
     const auth = client.auth as { accountId?: string } | undefined;
@@ -251,6 +293,7 @@ export class PlayerSessionManager {
       this.log.info({ player: pid(client.sessionId) }, "Replaced session — removing immediately");
       this.clearReconnectTimers(client.sessionId);
       this.removePlayerFromAllSystems(client.sessionId);
+      this.processingDisconnect.delete(client.sessionId);
       this.reassignLeader();
       return true;
     }
@@ -307,16 +350,18 @@ export class PlayerSessionManager {
       return;
     }
     const player = this.bridge.state.players.get(client.sessionId);
-    const name = player?.characterName || client.sessionId.slice(0, 6);
-    // Save progress to DB before removing player
-    if (player) {
-      this.savePlayerProgress(player);
+
+    // If player was already removed (e.g. reconnect timeout expired), skip
+    if (!player) {
+      this.removeAccountMapping(client);
+      this.unregisterClient(client);
+      return;
     }
+
+    const name = player.characterName;
+    this.savePlayerProgress(player);
     this.log.info({ player: pid(client.sessionId) }, "Player left");
-    this.bridge.state.players.delete(client.sessionId);
-    this.bridge.combatSystem.removePlayer(client.sessionId);
-    this.bridge.aiSystem.removePlayer(client.sessionId);
-    this.bridge.chatSystem.removePlayer(client.sessionId);
+    this.removePlayerFromAllSystems(client.sessionId);
     this.removeAccountMapping(client);
     this.unregisterClient(client);
     this.reassignLeader();
