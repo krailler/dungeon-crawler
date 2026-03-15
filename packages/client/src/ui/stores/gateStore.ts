@@ -6,8 +6,6 @@ type GateSnapshot = {
   isOpen: boolean;
   /** Show "Press F" hint when leader is near the gate */
   showInteractHint: boolean;
-  /** Show the confirmation prompt */
-  showPrompt: boolean;
 };
 
 type Listener = () => void;
@@ -18,7 +16,6 @@ let room: Room | null = null;
 let snapshot: GateSnapshot = {
   isOpen: false,
   showInteractHint: false,
-  showPrompt: false,
 };
 
 const emit = (): void => {
@@ -40,7 +37,7 @@ export const gateStore = {
   },
   setOpen(value: boolean): void {
     if (snapshot.isOpen === value) return;
-    snapshot = { ...snapshot, isOpen: value, showInteractHint: false, showPrompt: false };
+    snapshot = { ...snapshot, isOpen: value, showInteractHint: false };
     emit();
   },
   setInteractHint(visible: boolean): void {
@@ -48,24 +45,15 @@ export const gateStore = {
     snapshot = { ...snapshot, showInteractHint: visible };
     emit();
   },
-  showPrompt(): void {
-    snapshot = { ...snapshot, showPrompt: true, showInteractHint: false };
-    emit();
-  },
-  hidePrompt(): void {
-    snapshot = { ...snapshot, showPrompt: false };
-    emit();
-  },
   /** Send gate interaction to server */
   confirmOpen(): void {
     if (!room) return;
     room.send(MessageType.GATE_INTERACT);
-    snapshot = { ...snapshot, showPrompt: false };
     emit();
   },
   reset(): void {
     room = null;
-    snapshot = { isOpen: false, showInteractHint: false, showPrompt: false };
+    snapshot = { isOpen: false, showInteractHint: false };
     emit();
   },
 };

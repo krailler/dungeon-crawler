@@ -10,7 +10,8 @@ import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
 import { CharacterPanel } from "./CharacterPanel";
 import { ChatPanel } from "./ChatPanel";
-import { GatePrompt } from "./GatePrompt";
+import { GateHint } from "./GatePrompt";
+import { PromptOverlay } from "./PromptOverlay";
 import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
@@ -137,7 +138,8 @@ export const HudRoot = (): JSX.Element => {
     <div className="pointer-events-none absolute inset-0 text-slate-100">
       {isAdmin && <DebugPanel />}
       <PauseMenu />
-      <GatePrompt />
+      <GateHint />
+      <PromptOverlay />
       <AnnouncementOverlay />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}

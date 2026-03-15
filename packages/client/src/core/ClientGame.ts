@@ -49,6 +49,7 @@ import {
 import { authStore } from "../ui/stores/authStore";
 import { chatStore } from "../ui/stores/chatStore";
 import { gateStore } from "../ui/stores/gateStore";
+import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
@@ -130,7 +131,13 @@ export class ClientGame {
           return;
         const gate = gateStore.getSnapshot();
         if (gate.showInteractHint && !gate.isOpen) {
-          gateStore.showPrompt();
+          promptStore.show({
+            title: t("gate.promptTitle"),
+            message: t("gate.promptMessage"),
+            confirmLabel: t("gate.promptAccept"),
+            cancelLabel: t("gate.promptCancel"),
+            onConfirm: () => gateStore.confirmOpen(),
+          });
         }
       }
     };
@@ -618,7 +625,7 @@ export class ClientGame {
     // Gate proximity check — show interaction hint for leader
     if (localPlayer) {
       const gate = gateStore.getSnapshot();
-      if (!gate.isOpen && !gate.showPrompt) {
+      if (!gate.isOpen && !promptStore.getSnapshot().current) {
         const gatePos = this.dungeonRenderer.getGateWorldPosition();
         if (gatePos) {
           const pPos = localPlayer.getWorldPosition();
@@ -789,6 +796,7 @@ export class ClientGame {
     clearChatSendFn();
     chatStore.reset();
     gateStore.reset();
+    promptStore.reset();
     announcementStore.reset();
     localStorage.removeItem("reconnectionToken");
     this.room?.leave();
