@@ -16,6 +16,7 @@ function forceReloadPlugin(): Plugin {
     /\/stores\//, // all pub-sub stores (hudStore, authStore, etc.)
     /\/core\//, // ClientGame, StateSync, InputManager, ClientUpdateLoop
     /\/audio\//, // SoundManager, uiSfx (AudioContext singletons)
+    /\/systems\//, // WallOcclusionSystem, FogOfWarSystem (instantiated once)
   ];
 
   return {
