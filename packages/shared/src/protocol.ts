@@ -8,6 +8,7 @@ export const MessageType = {
   CHAT_COMMANDS: "chat:commands",
   DEBUG_PATHS: "debug:paths",
   PROMOTE_LEADER: "party:promote",
+  PARTY_KICK: "party:kick",
   GATE_INTERACT: "gate:interact",
 } as const;
 
@@ -116,6 +117,11 @@ export interface DebugPathsMessage {
 
 /** Client → Server: promote a player to leader */
 export interface PromoteLeaderMessage {
+  targetSessionId: string;
+}
+
+/** Client → Server: leader kicks a player from the party */
+export interface PartyKickMessage {
   targetSessionId: string;
 }
 

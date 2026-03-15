@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
-import type { PromoteLeaderMessage } from "@dungeon/shared";
+import type { PromoteLeaderMessage, PartyKickMessage } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
 export type CharacterStats = {
@@ -180,6 +180,11 @@ export const hudStore = {
     if (!room) return;
     const msg: PromoteLeaderMessage = { targetSessionId };
     room.send(MessageType.PROMOTE_LEADER, msg);
+  },
+  kickPlayer(targetSessionId: string): void {
+    if (!room) return;
+    const msg: PartyKickMessage = { targetSessionId };
+    room.send(MessageType.PARTY_KICK, msg);
   },
 };
 

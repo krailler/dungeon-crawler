@@ -136,19 +136,27 @@ export const HudRoot = (): JSX.Element => {
   // Close context menu on click outside or Escape
   useEffect(() => {
     if (!ctxMenu) return;
-    const handleClick = (e: MouseEvent) => {
+    const handlePointer = (e: PointerEvent) => {
       if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
         setCtxMenu(null);
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCtxMenu(null);
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+        setCtxMenu(null);
+      }
     };
-    window.addEventListener("mousedown", handleClick);
-    window.addEventListener("keydown", handleKey);
+    // Defer so the opening right-click doesn't immediately close the menu
+    const frame = requestAnimationFrame(() => {
+      document.addEventListener("pointerdown", handlePointer, true);
+      document.addEventListener("keydown", handleKey, true);
+    });
     return () => {
-      window.removeEventListener("mousedown", handleClick);
-      window.removeEventListener("keydown", handleKey);
+      cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", handlePointer, true);
+      document.removeEventListener("keydown", handleKey, true);
     };
   }, [ctxMenu]);
 
@@ -225,6 +233,33 @@ export const HudRoot = (): JSX.Element => {
           >
             <StarIcon className="h-3.5 w-3.5 text-amber-400" />
             {t("party.promoteLeader")}
+          </button>
+          <button
+            onClick={() => {
+              hudStore.kickPlayer(ctxMenu.member.id);
+              closeCtxMenu();
+            }}
+            disabled={!localMember?.isLeader}
+            className={[
+              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
+              localMember?.isLeader
+                ? "text-red-300 hover:bg-red-900/30"
+                : "cursor-default text-red-300 opacity-40",
+            ].join(" ")}
+          >
+            <svg
+              className="h-3.5 w-3.5 text-red-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+            {t("party.kick")}
           </button>
         </div>
       )}

@@ -9,6 +9,7 @@ export type {
   AdminRestartMessage,
   CombatLogMessage,
   PromoteLeaderMessage,
+  PartyKickMessage,
   ChatSendPayload,
   ChatEntry,
   ChatCategoryValue,

@@ -25,6 +25,7 @@
     "roleMember": "Member",
     "waiting": "Waiting for adventurers...",
     "promoteLeader": "Promote to Leader",
+    "kick": "Kick from Party",
     "dead": "Dead",
     "offline": "Offline"
   },

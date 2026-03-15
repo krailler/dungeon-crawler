@@ -33,6 +33,7 @@ import {
   computeEnemyDerivedStats,
   GATE_INTERACT_RANGE,
   GATE_COUNTDOWN_SECONDS,
+  CloseCode,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -41,6 +42,7 @@ import type {
   ChatSendPayload,
   PromoteLeaderMessage,
   GateInteractMessage,
+  PartyKickMessage,
   DebugPathEntry,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
@@ -163,6 +165,34 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         { name: target.characterName },
         `${target.characterName} is now the party leader.`,
       );
+    });
+    // Party: leader kicks a player
+    this.onMessage(MessageType.PARTY_KICK, (client: Client, data: PartyKickMessage) => {
+      const sender = this.state.players.get(client.sessionId);
+      if (!sender?.isLeader) return; // only leader can kick
+      const target = this.state.players.get(data.targetSessionId);
+      if (!target || data.targetSessionId === client.sessionId) return; // can't kick yourself
+
+      const targetName = target.characterName || data.targetSessionId.slice(0, 6);
+      this.chatSystem.broadcastSystemI18n(
+        "chat.kicked",
+        { name: targetName },
+        `${targetName} has been kicked.`,
+      );
+
+      // Reuse the same kick logic as /kick command
+      this.kickedSessions.add(data.targetSessionId);
+      const kickedClient = this.clients.find((c) => c.sessionId === data.targetSessionId);
+      if (kickedClient) {
+        const kickAuth = kickedClient.auth as { accountId?: string } | undefined;
+        if (kickAuth?.accountId) this.accountToSession.delete(kickAuth.accountId);
+        kickedClient.leave(CloseCode.KICKED);
+      }
+      this.state.players.delete(data.targetSessionId);
+      this.combatSystem.removePlayer(data.targetSessionId);
+      this.aiSystem.removePlayer(data.targetSessionId);
+      this.chatSystem.removePlayer(data.targetSessionId);
+      this.reassignLeader();
     });
     // Gate: leader opens a gate (with countdown for lobby type)
     this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: GateInteractMessage) => {
