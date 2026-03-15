@@ -104,8 +104,8 @@ left_forearm_base = get_arm_down_rotation(pb["LeftForeArm"], FOREARM_BEND)
 right_forearm_base = get_arm_down_rotation(pb["RightForeArm"], FOREARM_BEND)
 
 # --- Walk cycle parameters ---
-TOTAL_FRAMES = 30       # 1 second at 30fps
-CYCLE_FRAMES = 30       # Full stride cycle
+TOTAL_FRAMES = 13       # ~0.43 seconds at 30fps (fast run)
+CYCLE_FRAMES = 13       # Full stride cycle
 
 # Leg swing amplitudes
 UPLEG_SWING = 20        # degrees: thigh forward/back swing

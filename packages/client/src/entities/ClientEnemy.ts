@@ -26,6 +26,9 @@ const MOVE_THRESHOLD = 0.05;
 /** Delay before playing attack sound (at punch peak) */
 const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
 
+/** Duration of crossfade between animations (seconds) */
+const CROSSFADE_DURATION = 0.1;
+
 export class ClientEnemy {
   /** Invisible anchor mesh used for positioning */
   public mesh: Mesh;
@@ -37,6 +40,8 @@ export class ClientEnemy {
 
   private animations: Map<AnimName, AnimationGroup> = new Map();
   private currentAnim: AnimName | null = null;
+  private previousAnim: AnimName | null = null;
+  private crossfadeTimer: number = 0;
   private isPlayingOneShot: boolean = false;
   private soundManager: SoundManager | null = null;
   private pendingSoundName: string | null = null;
@@ -159,15 +164,38 @@ export class ClientEnemy {
   private playAnimation(name: AnimName): void {
     if (this.currentAnim === name) return;
 
+    const next = this.animations.get(name);
+    if (!next) return;
+
     if (this.currentAnim) {
-      const current = this.animations.get(this.currentAnim);
-      current?.stop();
+      this.previousAnim = this.currentAnim;
     }
 
-    const anim = this.animations.get(name);
-    if (anim) {
-      anim.start(true);
-      this.currentAnim = name;
+    next.setWeightForAllAnimatables(0);
+    next.start(true);
+    this.currentAnim = name;
+    this.crossfadeTimer = CROSSFADE_DURATION;
+  }
+
+  private updateCrossfade(dt: number): void {
+    if (this.crossfadeTimer <= 0) return;
+
+    this.crossfadeTimer -= dt;
+    const t = Math.max(0, this.crossfadeTimer / CROSSFADE_DURATION);
+
+    const current = this.currentAnim ? this.animations.get(this.currentAnim) : null;
+    const previous = this.previousAnim ? this.animations.get(this.previousAnim) : null;
+
+    if (current) current.setWeightForAllAnimatables(1 - t);
+    if (previous) previous.setWeightForAllAnimatables(t);
+
+    if (this.crossfadeTimer <= 0) {
+      if (previous) {
+        previous.stop();
+        previous.setWeightForAllAnimatables(1);
+      }
+      if (current) current.setWeightForAllAnimatables(1);
+      this.previousAnim = null;
     }
   }
 
@@ -259,6 +287,9 @@ export class ClientEnemy {
   /** Interpolate toward server state each frame */
   update(dt: number): void {
     if (this.isDead) return;
+
+    // Update animation crossfade blending
+    this.updateCrossfade(dt);
 
     // Tick pending attack sound timer
     if (this.pendingSoundTimer > 0) {

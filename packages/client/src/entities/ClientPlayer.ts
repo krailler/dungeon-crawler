@@ -32,6 +32,9 @@ const MOVE_THRESHOLD = 0.05;
 /** Interval between footstep sounds while running (seconds) */
 const FOOTSTEP_INTERVAL = 0.32;
 
+/** Duration of crossfade between animations (seconds) */
+const CROSSFADE_DURATION = 0.1;
+
 /** Delay before playing attack sound (at punch peak) */
 const ATTACK_SOUND_DELAY = ATTACK_ANIM_DURATION / 2;
 
@@ -57,6 +60,8 @@ export class ClientPlayer {
 
   private animations: Map<AnimName, AnimationGroup> = new Map();
   private currentAnim: AnimName | null = null;
+  private previousAnim: AnimName | null = null;
+  private crossfadeTimer: number = 0;
   private isPlayingOneShot: boolean = false;
 
   // Audio
@@ -187,16 +192,42 @@ export class ClientPlayer {
   private playAnimation(name: AnimName): void {
     if (this.currentAnim === name) return;
 
-    // Stop current
+    const next = this.animations.get(name);
+    if (!next) return;
+
+    // Start crossfade: previous anim fades out, new anim fades in
     if (this.currentAnim) {
-      const current = this.animations.get(this.currentAnim);
-      current?.stop();
+      this.previousAnim = this.currentAnim;
     }
 
-    const anim = this.animations.get(name);
-    if (anim) {
-      anim.start(true); // loop
-      this.currentAnim = name;
+    next.setWeightForAllAnimatables(0);
+    next.start(true); // loop
+    this.currentAnim = name;
+    this.crossfadeTimer = CROSSFADE_DURATION;
+  }
+
+  private updateCrossfade(dt: number): void {
+    if (this.crossfadeTimer <= 0) return;
+
+    this.crossfadeTimer -= dt;
+    const t = Math.max(0, this.crossfadeTimer / CROSSFADE_DURATION);
+    const inWeight = 1 - t;
+    const outWeight = t;
+
+    const current = this.currentAnim ? this.animations.get(this.currentAnim) : null;
+    const previous = this.previousAnim ? this.animations.get(this.previousAnim) : null;
+
+    if (current) current.setWeightForAllAnimatables(inWeight);
+    if (previous) previous.setWeightForAllAnimatables(outWeight);
+
+    // Crossfade complete — stop the old animation
+    if (this.crossfadeTimer <= 0) {
+      if (previous) {
+        previous.stop();
+        previous.setWeightForAllAnimatables(1);
+      }
+      if (current) current.setWeightForAllAnimatables(1);
+      this.previousAnim = null;
     }
   }
 
@@ -245,6 +276,9 @@ export class ClientPlayer {
 
   /** Interpolate toward server state each frame */
   update(dt: number): void {
+    // Update animation crossfade blending
+    this.updateCrossfade(dt);
+
     // Tick pending attack sound timer
     if (this.pendingSoundTimer > 0) {
       this.pendingSoundTimer -= dt;
