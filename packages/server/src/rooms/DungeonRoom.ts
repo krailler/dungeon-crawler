@@ -267,6 +267,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.SKILL_USE, (client: Client, data: { skillId: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
+      if (player.health <= 0) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
+        return;
+      }
       // Build enemies map for combat system
       const enemiesMap = new Map<string, EnemyState>();
       this.state.enemies.forEach((e: EnemyState, id: string) => enemiesMap.set(id, e));
@@ -282,6 +286,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           duration: result.duration,
           remaining: result.remaining,
         });
+      } else {
+        // Determine reason for failure
+        const skillId = data.skillId as SkillIdValue;
+        const cd = this.combatSystem.getSkillCooldown(client.sessionId, skillId);
+        if (cd > 0) {
+          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.onCooldown" });
+        } else {
+          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.noTarget" });
+        }
       }
     });
     // Tutorial: player dismisses a tutorial hint
@@ -317,21 +330,34 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Item use: consume an item from inventory
     this.onMessage(MessageType.ITEM_USE, (client: Client, data: ItemUseMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || player.health <= 0) return;
+      if (!player) return;
+      if (player.health <= 0) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
+        return;
+      }
 
       const def = getItemDef(data.itemId);
       if (!def || !def.consumable) return;
 
       // Check cooldown
       const cd = player.itemCooldowns.get(data.itemId);
-      if (cd && cd > 0) return;
+      if (cd && cd > 0) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.onCooldown" });
+        return;
+      }
 
       // Check player has the item
-      if (player.countItem(data.itemId) <= 0) return;
+      if (player.countItem(data.itemId) <= 0) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.noItem" });
+        return;
+      }
 
       // Execute effect
       const success = executeEffect(def.effectType, player, def.effectParams);
-      if (!success) return;
+      if (!success) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.alreadyFull" });
+        return;
+      }
 
       // Consume one
       player.removeItem(data.itemId, 1);

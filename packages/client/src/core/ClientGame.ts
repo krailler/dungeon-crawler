@@ -38,6 +38,7 @@ import type {
   TutorialHintMessage,
   DamageDealtMessage,
   ItemCooldownMessage,
+  ActionFeedbackMessage,
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -53,6 +54,7 @@ import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
+import { feedbackStore } from "../ui/stores/feedbackStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -309,6 +311,11 @@ export class ClientGame {
       // Item cooldown from server
       room.onMessage(MessageType.ITEM_COOLDOWN, (data: ItemCooldownMessage) => {
         hudStore.setItemCooldown(data.itemId, data.duration);
+      });
+
+      // Action feedback (skill/item use failures)
+      room.onMessage(MessageType.ACTION_FEEDBACK, (data: ActionFeedbackMessage) => {
+        feedbackStore.push(data.i18nKey);
       });
 
       hudStore.setConnection(

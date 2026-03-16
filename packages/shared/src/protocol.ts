@@ -27,6 +27,7 @@ export const MessageType = {
   DAMAGE_DEALT: "combat:damage",
   ITEM_USE: "item:use",
   ITEM_COOLDOWN: "item:cooldown",
+  ACTION_FEEDBACK: "action:feedback",
   ITEM_DEFS_REQUEST: "item:defs:req",
   ITEM_DEFS_RESPONSE: "item:defs:res",
 } as const;
@@ -240,6 +241,14 @@ export interface ItemDefsResponseMessage {
   /** Cache version — changes when item definitions are modified */
   version: number;
   items: ItemDef[];
+}
+
+// ── Action feedback ─────────────────────────────────────────────────────────
+
+/** Server → Client: action failed with i18n reason */
+export interface ActionFeedbackMessage {
+  /** i18n translation key for the feedback text */
+  i18nKey: string;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

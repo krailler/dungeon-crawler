@@ -31,6 +31,7 @@ export type {
   ItemCooldownMessage,
   ItemDefsRequestMessage,
   ItemDefsResponseMessage,
+  ActionFeedbackMessage,
 } from "./protocol.js";
 
 export {

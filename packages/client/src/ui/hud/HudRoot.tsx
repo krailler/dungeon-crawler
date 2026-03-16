@@ -19,6 +19,7 @@ import { SkillBar } from "./SkillBar";
 import { ConsumableSlots } from "./ConsumableSlots";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
+import { ActionFeedback } from "./ActionFeedback";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -372,6 +373,8 @@ export const HudRoot = (): JSX.Element => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
+      {/* Action feedback — floats above action bar */}
+      <ActionFeedback />
       {/* Action bar — bottom center, above XP bar: consumables + skills */}
       <div className="pointer-events-auto absolute bottom-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3">
         <ConsumableSlots />

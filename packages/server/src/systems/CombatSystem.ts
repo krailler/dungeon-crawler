@@ -165,6 +165,11 @@ export class CombatSystem {
     };
   }
 
+  /** Get remaining cooldown for a skill (0 if not on cooldown) */
+  getSkillCooldown(sessionId: string, skillId: string): number {
+    return this.playerCooldowns.get(sessionId)?.skillCooldowns.get(skillId) ?? 0;
+  }
+
   // ── Per-tick update (auto-attack + timers) ───────────────────────────────
 
   update(

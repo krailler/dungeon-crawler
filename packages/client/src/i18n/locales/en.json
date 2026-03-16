@@ -157,6 +157,13 @@
     "title": "Inventory",
     "clickToUse": "Click to use"
   },
+  "feedback": {
+    "dead": "You are dead",
+    "noTarget": "No enemy in range",
+    "onCooldown": "Not ready yet",
+    "noItem": "You don't have that item",
+    "alreadyFull": "Already at full health"
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",
