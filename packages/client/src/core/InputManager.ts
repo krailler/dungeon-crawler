@@ -64,6 +64,7 @@ export class InputManager {
   // Bound handlers for cleanup
   private handlePointerDown: (ev: PointerEvent) => void;
   private handlePointerUp: (ev: PointerEvent) => void;
+  private handlePointerMove: () => void;
   private handlePointerLeave: () => void;
   private handleContextMenu: (ev: Event) => void;
   private handleKeyDown: (ev: KeyboardEvent) => void;
@@ -72,6 +73,8 @@ export class InputManager {
   private renderObserver: Observer<Scene> | null = null;
   /** Whether the client is requesting sprint (Shift held) */
   private sprintActive: boolean = false;
+  /** Current cursor style applied to the canvas */
+  private currentCursor: string = "";
 
   constructor(deps: InputManagerDeps) {
     this.scene = deps.scene;
@@ -114,7 +117,11 @@ export class InputManager {
     this.handlePointerLeave = () => {
       this.isHolding = false;
       this.cursorWorldPoint = null;
+      this.setCursor("");
     };
+
+    // Update cursor style on pointer move (must run AFTER Babylon's internal handler)
+    this.handlePointerMove = () => this.updateCursorStyle();
 
     // Prevent browser context menu on the game canvas
     this.handleContextMenu = (ev: Event) => ev.preventDefault();
@@ -142,6 +149,7 @@ export class InputManager {
 
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerup", this.handlePointerUp);
+    this.canvas.addEventListener("pointermove", this.handlePointerMove);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("contextmenu", this.handleContextMenu);
     window.addEventListener("keydown", this.handleKeyDown);
@@ -281,6 +289,31 @@ export class InputManager {
     return true;
   }
 
+  /** Update the canvas cursor based on what's under the pointer. */
+  private updateCursorStyle(): void {
+    if (this.isHolding || !this.interactable) {
+      this.setCursor("");
+      return;
+    }
+    const meshes = this.interactable.getMeshes();
+    if (meshes.length === 0) {
+      this.setCursor("");
+      return;
+    }
+    const meshSet = new Set(meshes);
+    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
+      meshSet.has(mesh),
+    );
+    this.setCursor(pick?.hit ? "pointer" : "");
+  }
+
+  private setCursor(cursor: string): void {
+    if (this.currentCursor === cursor) return;
+    this.currentCursor = cursor;
+    this.scene.defaultCursor = cursor;
+    this.canvas.style.cursor = cursor;
+  }
+
   /** Each frame, check if a pending interaction target is now within range. */
   private checkPendingInteract(): void {
     if (!this.pendingInteract || !this.interactable) return;
@@ -301,8 +334,10 @@ export class InputManager {
   }
 
   dispose(): void {
+    this.setCursor("");
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
     this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+    this.canvas.removeEventListener("pointermove", this.handlePointerMove);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
     window.removeEventListener("keydown", this.handleKeyDown);
