@@ -16,6 +16,8 @@ type HudPanelProps = {
   panelId?: string;
   /** Default position when no saved position exists */
   defaultPosition?: { x: number; y: number };
+  /** Whether to persist the dragged position in localStorage (default true) */
+  persistPosition?: boolean;
 };
 
 export const HudPanel = ({
@@ -25,8 +27,9 @@ export const HudPanel = ({
   className = "",
   panelId,
   defaultPosition,
+  persistPosition,
 }: HudPanelProps): JSX.Element => {
-  const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 });
+  const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 }, persistPosition);
 
   // Close on Escape
   useEffect(() => {

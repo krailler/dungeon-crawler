@@ -33,6 +33,7 @@ export const LootBagPanel = (): JSX.Element | null => {
       onClose={handleClose}
       panelId="loot"
       defaultPosition={{ x: window.innerWidth / 2 - 100, y: window.innerHeight / 3 }}
+      persistPosition={false}
       className="w-[200px]"
     >
       <div className="grid grid-cols-4 gap-1.5">

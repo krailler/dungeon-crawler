@@ -1,6 +1,8 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { TileType, TILE_SIZE } from "@dungeon/shared";
 import { minimapStore } from "../stores/minimapStore";
+import { HudPanel } from "../components/HudPanel";
 
 /** Pixels per tile on the minimap canvas */
 const PX = 6;
@@ -19,11 +21,13 @@ const PLAYER_DOT_RADIUS = 4;
 const CREATURE_DOT_RADIUS = 3;
 
 export const MinimapOverlay = (): JSX.Element | null => {
+  const { t } = useTranslation();
   const { visible, version } = useSyncExternalStore(
     minimapStore.subscribe,
     minimapStore.getSnapshot,
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const handleClose = useCallback(() => minimapStore.toggle(), []);
 
   useEffect(() => {
     if (!visible) return;
@@ -121,11 +125,14 @@ export const MinimapOverlay = (): JSX.Element | null => {
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="overflow-hidden rounded-lg bg-black/70 p-2 ring-1 ring-white/20">
-        <canvas ref={canvasRef} className="block opacity-90" />
-      </div>
-    </div>
+    <HudPanel
+      header={<h3 className="text-sm font-bold text-slate-100">{t("hud.map")}</h3>}
+      onClose={handleClose}
+      panelId="minimap"
+      defaultPosition={{ x: window.innerWidth / 2 - 150, y: window.innerHeight / 2 - 150 }}
+    >
+      <canvas ref={canvasRef} className="block opacity-90" />
+    </HudPanel>
   );
 };
 

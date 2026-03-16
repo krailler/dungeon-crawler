@@ -41,6 +41,7 @@ function savePosition(panelId: string, pos: Position): void {
 export function useDraggable(
   panelId: string | undefined,
   defaultPosition: Position,
+  persistPosition = true,
 ): {
   position: Position;
   handleRef: React.RefObject<HTMLDivElement>;
@@ -56,6 +57,7 @@ export function useDraggable(
 
   const [position, setPosition] = useState<Position>(() => {
     if (!enabled) return defaultPosition;
+    if (!persistPosition) return defaultPosition;
     return loadPosition(panelId) ?? defaultPosition;
   });
   const [isDragging, setIsDragging] = useState(false);
@@ -99,7 +101,7 @@ export function useDraggable(
       draggingRef.current = false;
       setIsDragging(false);
       handleRef.current?.releasePointerCapture(e.pointerId);
-      if (panelId) {
+      if (panelId && persistPosition) {
         setPosition((pos) => {
           savePosition(panelId, pos);
           return pos;
