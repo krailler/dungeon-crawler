@@ -69,6 +69,7 @@ export class SoundManager {
       ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"],
       ATTACK_VOLUME,
     );
+    this.registerAnimSound("heavy_punch", ["/audio/sfx/heavy_strike.ogg"], ATTACK_VOLUME);
 
     // One-shot SFX
     this.registerSfx("gold_pickup", "/audio/sfx/gold_pickup.ogg", SFX_VOLUME);

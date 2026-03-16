@@ -54,7 +54,8 @@ export class AnimationController {
     this.crossfadeTimer = CROSSFADE_DURATION;
   }
 
-  /** Play a one-shot animation (e.g. attack) — interrupts looping. */
+  /** Play a one-shot animation (e.g. attack) — interrupts looping.
+   *  If no animation exists for `name`, falls back to "punch" but keeps `name` for the sound. */
   playOneShot(name: AnimName): void {
     if (this.isPlayingOneShot) return;
 
@@ -63,7 +64,7 @@ export class AnimationController {
       current?.stop();
     }
 
-    const anim = this.animations.get(name);
+    const anim = this.animations.get(name) ?? this.animations.get("punch");
     if (anim) {
       this.isPlayingOneShot = true;
       anim.start(false);

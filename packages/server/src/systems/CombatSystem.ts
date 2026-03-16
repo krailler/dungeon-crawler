@@ -1,6 +1,6 @@
 import type { PlayerState } from "../state/PlayerState";
 import type { EnemyState } from "../state/EnemyState";
-import { ATTACK_ANIM_DURATION, computeDamage, SKILL_DEFS } from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, computeDamage, SKILL_DEFS, SkillId } from "@dungeon/shared";
 import type { SkillIdValue } from "@dungeon/shared";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
@@ -96,12 +96,13 @@ export class CombatSystem {
     player: PlayerState,
     target: TargetResult,
     damage: number,
+    animState: string = "punch",
   ): void {
     // Face the enemy
     player.rotY = Math.atan2(target.enemy.x - player.x, target.enemy.z - player.z);
 
-    // Trigger punch animation — damage applied after delay at animation peak
-    player.animState = "punch";
+    // Trigger attack animation — damage applied after delay at animation peak
+    player.animState = animState;
     combat.animTimer = ATTACK_ANIM_DURATION;
     combat.damageTimer = DAMAGE_DELAY;
     combat.damageTarget = target.enemy;
@@ -150,7 +151,8 @@ export class CombatSystem {
     const baseDamage = computeDamage(player.attackDamage, target.enemy.defense);
     const finalDamage = Math.max(1, Math.round(baseDamage * (def.damageMultiplier ?? 1)));
 
-    this.scheduleHit(combat, player, target, finalDamage);
+    const skillAnim = skillId === SkillId.HEAVY_STRIKE ? "heavy_punch" : "punch";
+    this.scheduleHit(combat, player, target, finalDamage, skillAnim);
 
     // Reset auto-attack cooldown so heavy strike doesn't "waste" the next auto
     combat.attackCooldown = player.attackCooldown;
