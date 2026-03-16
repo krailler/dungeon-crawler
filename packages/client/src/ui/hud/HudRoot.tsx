@@ -207,6 +207,11 @@ export const HudRoot = (): JSX.Element => {
 
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
+      <div className="absolute inset-x-0 top-3 flex justify-center">
+        <span className="rounded-full bg-amber-500/10 px-4 py-1 text-[11px] font-medium text-amber-400/70 backdrop-blur-sm">
+          {t("devBanner")}
+        </span>
+      </div>
       {isAdmin && <DebugPanel />}
       <PauseMenu />
       <GateHint />
