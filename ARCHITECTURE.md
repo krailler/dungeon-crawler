@@ -172,7 +172,7 @@
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
 - `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick
-- `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies/gates, tileMapData, tickRate, dungeonLevel, dungeonVersion)
+- `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies/gates, tileMapData, tickRate, dungeonLevel, dungeonVersion, serverRuntime)
 - `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats, gold, xp, xpToNext, level synced) + server-only (path, combat data, characterId) + `addXp()`, `setLevel()`, `applyDerivedStats()`
 - `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle, session migration, `savePlayerProgress()` (gold + xp + level + stats), leader reassignment
 - `state/EnemyState.ts` — Enemy Schema (position, health, isDead, enemyType, level) + server-only AI/combat data
@@ -208,7 +208,7 @@
 - `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, xp, xpToNext, online), FPS, ping, connection
 - `ui/stores/chatStore.ts` — Chat pub-sub: message history, input, commands
 - `ui/stores/debugStore.ts` — Debug toggles, persisted localStorage
-- `ui/stores/adminStore.ts` — Admin state: room ref, seed, tickRate, actions
+- `ui/stores/adminStore.ts` — Admin state: room ref, seed, tickRate, runtime, actions
 - `ui/stores/loadingStore.ts` — Loading screen phases + fade-out
 - `ui/stores/minimapStore.ts` — Minimap: tile map, player/enemy positions, fog discovery
 - `ui/stores/gateStore.ts` — Gate state: positions, open state, nearest interactable

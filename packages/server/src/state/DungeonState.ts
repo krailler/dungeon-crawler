@@ -12,9 +12,12 @@ export class DungeonState extends Schema {
   @type("string") wallVariantData: string = "";
   @type("uint16") mapWidth: number = 0;
   @type("uint16") mapHeight: number = 0;
-  @type("uint32") dungeonSeed: number = 0;
   /** Incremented on each dungeon regeneration to force client re-render */
   @type("uint32") dungeonVersion: number = 0;
   @type("int16") dungeonLevel: number = 1;
-  @type("float32") tickRate: number = 0;
+
+  // ── Admin-only fields (sent via ADMIN_DEBUG_INFO message, not synced to all clients) ──
+  dungeonSeed: number = 0;
+  tickRate: number = 0;
+  serverRuntime: string = "";
 }

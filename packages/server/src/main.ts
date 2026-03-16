@@ -26,7 +26,13 @@ server.define("dungeon", DungeonRoom);
 
 server.listen(port).then(() => {
   logger.info(
-    { port, protocolVersion: PROTOCOL_VERSION, minClientVersion: MIN_PROTOCOL_VERSION },
+    {
+      port,
+      protocolVersion: PROTOCOL_VERSION,
+      minClientVersion: MIN_PROTOCOL_VERSION,
+      runtime: `Bun ${Bun.version}`,
+      arch: process.arch,
+    },
     "Game server listening",
   );
 });

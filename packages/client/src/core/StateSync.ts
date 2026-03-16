@@ -31,7 +31,7 @@ import {
   INTERACT_RANGE,
 } from "@dungeon/shared";
 import { t } from "../i18n/i18n";
-import type { SkillCooldownMessage } from "@dungeon/shared";
+import type { SkillCooldownMessage, AdminDebugInfoMessage } from "@dungeon/shared";
 
 export interface StateSyncDeps {
   readonly scene: Scene;
@@ -71,12 +71,9 @@ export class StateSync {
       hudStore.setSkillCooldown(data.skillId, data.duration);
     });
 
-    // Track dungeon seed + tick rate for admin panel
-    state$.listen("dungeonSeed", (value: number) => {
-      adminStore.setSeed(value);
-    });
-    state$.listen("tickRate", (value: number) => {
-      adminStore.setTickRate(value);
+    // Admin debug info (seed, tick rate, runtime) — sent only to admin clients
+    room.onMessage(MessageType.ADMIN_DEBUG_INFO, (data: AdminDebugInfoMessage) => {
+      adminStore.setDebugInfo(data);
     });
 
     // Gate state listeners (MapSchema<GateState>)

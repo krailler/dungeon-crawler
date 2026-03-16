@@ -25,6 +25,7 @@ export type {
   TutorialDismissMessage,
   StatAllocateMessage,
   SprintMessage,
+  AdminDebugInfoMessage,
 } from "./protocol.js";
 
 export {

@@ -12,7 +12,7 @@
 - **Multiplayer**: Colyseus 0.17.x (server) + @colyseus/sdk 0.17.x (client)
 - **Language**: TypeScript 5.9 (strict mode)
 - **Bundler**: Vite 8.x (client)
-- **Server runtime**: tsx (esbuild, watch mode)
+- **Server runtime**: Bun (native TypeScript, watch mode)
 - **Database**: PostgreSQL + Drizzle ORM (server)
 - **Pathfinding**: Grid-based A\* on TileMap (server-side)
 - **UI**: React + Tailwind CSS overlay for HUD, Babylon.js GUI only for in-world UI (floating bars)

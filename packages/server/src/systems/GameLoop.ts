@@ -19,7 +19,12 @@ import {
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
 } from "@dungeon/shared";
-import type { TileMap, CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
+import type {
+  TileMap,
+  CombatLogMessage,
+  DebugPathEntry,
+  AdminDebugInfoMessage,
+} from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 
@@ -56,7 +61,13 @@ export class GameLoop {
       this.tickAccum += now - this.lastTickTime;
       this.tickCount++;
       if (this.tickAccum >= 1000) {
-        this.bridge.state.tickRate = Math.round((this.tickCount / this.tickAccum) * 1000);
+        const rate = Math.round((this.tickCount / this.tickAccum) * 1000);
+        this.bridge.state.tickRate = rate;
+        this.bridge.broadcastToAdmins(MessageType.ADMIN_DEBUG_INFO, {
+          seed: this.bridge.state.dungeonSeed,
+          tickRate: rate,
+          runtime: this.bridge.state.serverRuntime,
+        } satisfies AdminDebugInfoMessage);
         this.tickAccum = 0;
         this.tickCount = 0;
       }

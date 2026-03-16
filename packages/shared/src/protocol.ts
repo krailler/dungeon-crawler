@@ -22,6 +22,7 @@ export const MessageType = {
   TUTORIAL_RESET: "tutorial:reset",
   STAT_ALLOCATE: "stat:allocate",
   SPRINT: "sprint",
+  ADMIN_DEBUG_INFO: "admin:debug_info",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -191,6 +192,12 @@ export interface StatAllocateMessage {
 /** Client → Server: toggle sprint on/off */
 export interface SprintMessage {
   active: boolean;
+}
+
+export interface AdminDebugInfoMessage {
+  seed: number;
+  tickRate: number;
+  runtime: string;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

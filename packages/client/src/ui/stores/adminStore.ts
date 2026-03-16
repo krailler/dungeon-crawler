@@ -1,14 +1,15 @@
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
-import type { AdminRestartMessage } from "@dungeon/shared";
+import type { AdminRestartMessage, AdminDebugInfoMessage } from "@dungeon/shared";
 
 type AdminSnapshot = {
   seed: number;
   tickRate: number;
+  runtime: string;
 };
 
 let room: Room | null = null;
-let snapshot: AdminSnapshot = { seed: 0, tickRate: 0 };
+let snapshot: AdminSnapshot = { seed: 0, tickRate: 0, runtime: "" };
 let listeners: Set<() => void> = new Set();
 
 function emit(): void {
@@ -21,15 +22,11 @@ export const adminStore = {
   },
   clearRoom(): void {
     room = null;
-    snapshot = { seed: 0, tickRate: 0 };
+    snapshot = { seed: 0, tickRate: 0, runtime: "" };
     emit();
   },
-  setSeed(s: number): void {
-    snapshot = { ...snapshot, seed: s };
-    emit();
-  },
-  setTickRate(value: number): void {
-    snapshot = { ...snapshot, tickRate: value };
+  setDebugInfo(data: AdminDebugInfoMessage): void {
+    snapshot = { seed: data.seed, tickRate: data.tickRate, runtime: data.runtime };
     emit();
   },
   subscribe(fn: () => void): () => void {

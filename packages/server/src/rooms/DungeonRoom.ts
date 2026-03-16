@@ -55,6 +55,7 @@ import type {
   TutorialDismissMessage,
   StatAllocateMessage,
   SprintMessage,
+  AdminDebugInfoMessage,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
@@ -86,6 +87,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.autoDispose = false;
 
     this.state = new DungeonState();
+    this.state.serverRuntime = `Bun ${Bun.version} (${process.arch})`;
 
     // Generate dungeon (also creates pathfinder, AI, combat systems)
     const seed = DUNGEON_SEED ?? Date.now();
@@ -539,6 +541,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.view = new StateView();
       }
       client.view.add(player.secret);
+    }
+    // Send debug info to admin clients
+    const auth = client.auth as { role?: string } | undefined;
+    if (auth?.role === Role.ADMIN) {
+      client.send(MessageType.ADMIN_DEBUG_INFO, {
+        seed: this.state.dungeonSeed,
+        tickRate: this.state.tickRate,
+        runtime: this.state.serverRuntime,
+      } satisfies AdminDebugInfoMessage);
     }
   }
 

@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "experimentalDecorators": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "types": ["bun-types"]
   },
   "include": ["src"]
 }
