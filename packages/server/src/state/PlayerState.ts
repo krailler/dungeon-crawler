@@ -156,9 +156,14 @@ export class PlayerState extends Schema {
    */
   allocateStat(stat: AllocatableStatValue): boolean {
     if (this.statPoints <= 0) return false;
+    const oldMaxHealth = this.maxHealth;
     this[stat]++;
     this.statPoints--;
     this.applyDerivedStats();
+    // Grant the extra HP from vitality so current health increases too
+    if (this.maxHealth > oldMaxHealth) {
+      this.health = Math.min(this.health + (this.maxHealth - oldMaxHealth), this.maxHealth);
+    }
     return true;
   }
 
