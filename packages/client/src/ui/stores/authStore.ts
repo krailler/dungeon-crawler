@@ -94,7 +94,9 @@ export const authStore = {
       update({ isAuthenticated: true, loading: false });
       return true;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
+      const raw = err instanceof Error ? err.message : String(err);
+      // Network errors (server down) produce "Failed to fetch" — show user-friendly message
+      const msg = raw.includes("Failed to fetch") ? "login.connectionError" : raw;
       update({ loading: false, error: msg });
       return false;
     }

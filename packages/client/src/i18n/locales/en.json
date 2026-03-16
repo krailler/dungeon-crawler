@@ -7,7 +7,8 @@
     "loading": "Logging in...",
     "devMode": "Dev Mode",
     "devAdmin": "Login as Admin",
-    "devPlayer": "Login as Player"
+    "devPlayer": "Login as Player",
+    "connectionError": "Could not reach the server."
   },
   "loading": {
     "title": "Dungeon Crawler",

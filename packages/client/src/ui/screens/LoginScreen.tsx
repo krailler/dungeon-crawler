@@ -86,7 +86,7 @@ export const LoginScreen = (): JSX.Element | null => {
           {auth.loading ? t("login.loading") : t("login.submit")}
         </button>
 
-        {auth.error && <p className="text-center text-xs text-red-400">{auth.error}</p>}
+        {auth.error && <p className="text-center text-xs text-red-400">{t(auth.error)}</p>}
       </form>
 
       {/* Dev quick-login */}
