@@ -179,6 +179,10 @@ body {
   .animate-feedback-float {
     animation: feedback-float 1.5s ease-out forwards;
   }
+
+  .animate-low-hp {
+    animation: low-hp-pulse 1.6s ease-in-out infinite;
+  }
 }
 
 @keyframes feedback-float {
@@ -192,5 +196,17 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-20px);
+  }
+}
+
+@keyframes low-hp-pulse {
+  0%,
+  100% {
+    border-color: rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.1);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.25);
   }
 }
