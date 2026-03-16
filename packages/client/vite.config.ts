@@ -3,39 +3,23 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 /**
- * Vite plugin that forces a full page reload when certain modules are edited.
- *
- * Stores (module-level singletons), core classes (Babylon engine, Colyseus room),
- * and audio managers hold live state that cannot be safely hot-replaced.
- * Attempting HMR on these files leads to stale references and a broken UI.
- * Instead, we invalidate these modules so Vite triggers a clean full reload.
+ * Force a full page reload for every non-style file change.
+ * HMR is only kept for CSS/Tailwind — everything else reloads cleanly
+ * to avoid stale singleton state (Babylon engine, Colyseus room, stores).
  */
-function forceReloadPlugin(): Plugin {
-  // Patterns (relative to src/) that should force a full reload
-  const RELOAD_PATTERNS = [
-    /\/stores\//, // all pub-sub stores (hudStore, authStore, etc.)
-    /\/core\//, // ClientGame, StateSync, InputManager, ClientUpdateLoop
-    /\/audio\//, // SoundManager, uiSfx (AudioContext singletons)
-    /\/systems\//, // WallOcclusionSystem, FogOfWarSystem (instantiated once)
-  ];
-
+function fullReloadPlugin(): Plugin {
   return {
-    name: "force-reload-stateful-modules",
+    name: "full-reload-non-styles",
     handleHotUpdate({ file, server }) {
-      // Only apply to our source files
-      if (!file.includes("/packages/client/src/")) return;
-
-      const shouldReload = RELOAD_PATTERNS.some((re) => re.test(file));
-      if (shouldReload) {
-        server.ws.send({ type: "full-reload" });
-        return []; // Prevent default HMR processing
-      }
+      if (/\.(css|scss|less|styl|postcss)$/.test(file)) return; // let Vite HMR handle styles
+      server.ws.send({ type: "full-reload" });
+      return [];
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), forceReloadPlugin()],
+  plugins: [react(), fullReloadPlugin()],
   resolve: {
     alias: {
       react: path.resolve(__dirname, "node_modules/react"),
