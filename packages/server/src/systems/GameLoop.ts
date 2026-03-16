@@ -12,8 +12,10 @@ import {
   MAX_LEVEL,
   TILE_SIZE,
   ENTITY_COLLISION_RADIUS,
+  WALL_MARGIN,
 } from "@dungeon/shared";
 import type { TileMap, CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
+import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 
 export interface GameLoopBridge {
@@ -22,6 +24,7 @@ export interface GameLoopBridge {
   readonly combatSystem: CombatSystem;
   readonly chatSystem: ChatSystem;
   readonly tileMap: TileMap;
+  readonly pathfinder: Pathfinder;
   broadcastToAdmins(type: string, message: unknown): void;
   sendToClient(sessionId: string, type: string, message: unknown): void;
   readonly clock: ClockTimer;
@@ -120,6 +123,14 @@ export class GameLoop {
 
     // Resolve entity-to-entity collisions (push overlapping entities apart)
     this.resolveEntityCollisions();
+
+    // Enforce wall margin for all entities (after AI movement + collision pushback)
+    this.bridge.state.players.forEach((player: PlayerState) => {
+      if (player.health > 0) this.enforceWallMargin(player);
+    });
+    this.bridge.state.enemies.forEach((enemy: EnemyState) => {
+      if (!enemy.isDead) this.enforceWallMargin(enemy);
+    });
 
     // Debug: send path data to subscribed admin clients
     if (this.debugPathClients.size > 0) {
@@ -241,6 +252,56 @@ export class GameLoop {
     if (entity.currentPathIndex >= entity.path.length) {
       entity.isMoving = false;
     }
+
+    // Push entity away from nearby walls so it doesn't clip against them
+    this.enforceWallMargin(entity);
+  }
+
+  /**
+   * Slide the entity away from adjacent non-walkable tiles (walls + blocked tiles like closed gates).
+   * For each of the 4 cardinal directions, if the neighbouring tile is not walkable,
+   * enforce a minimum distance from that tile's edge.
+   */
+  private enforceWallMargin(entity: { x: number; z: number }): void {
+    const pf = this.bridge.pathfinder;
+    const half = TILE_SIZE / 2;
+
+    // Current tile (grid coords)
+    const tx = Math.round(entity.x / TILE_SIZE);
+    const tz = Math.round(entity.z / TILE_SIZE);
+
+    // Tile center in world coords
+    const cx = tx * TILE_SIZE;
+    const cz = tz * TILE_SIZE;
+
+    // Check +X neighbour
+    if (!pf.isWalkable(tx + 1, tz)) {
+      const edge = cx + half;
+      if (entity.x > edge - WALL_MARGIN) {
+        entity.x = edge - WALL_MARGIN;
+      }
+    }
+    // Check -X neighbour
+    if (!pf.isWalkable(tx - 1, tz)) {
+      const edge = cx - half;
+      if (entity.x < edge + WALL_MARGIN) {
+        entity.x = edge + WALL_MARGIN;
+      }
+    }
+    // Check +Z neighbour
+    if (!pf.isWalkable(tx, tz + 1)) {
+      const edge = cz + half;
+      if (entity.z > edge - WALL_MARGIN) {
+        entity.z = edge - WALL_MARGIN;
+      }
+    }
+    // Check -Z neighbour
+    if (!pf.isWalkable(tx, tz - 1)) {
+      const edge = cz - half;
+      if (entity.z < edge + WALL_MARGIN) {
+        entity.z = edge + WALL_MARGIN;
+      }
+    }
   }
 
   // ── Entity collision resolution ──────────────────────────────────────
@@ -339,7 +400,7 @@ export class GameLoop {
   private isWalkable(worldX: number, worldZ: number): boolean {
     const tx = Math.round(worldX / TILE_SIZE);
     const tz = Math.round(worldZ / TILE_SIZE);
-    return this.bridge.tileMap.isFloor(tx, tz);
+    return this.bridge.pathfinder.isWalkable(tx, tz);
   }
 
   setDebugPaths(sessionId: string, enabled: boolean): void {

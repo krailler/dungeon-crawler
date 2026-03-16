@@ -182,6 +182,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       get tileMap() {
         return self.tileMap;
       },
+      get pathfinder() {
+        return self.pathfinder;
+      },
       broadcastToAdmins: (type, message) => self.broadcastToAdmins(type, message),
       sendToClient: (sessionId, type, message) => {
         const client = self.clients.find((c) => c.sessionId === sessionId);

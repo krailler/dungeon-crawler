@@ -13,5 +13,8 @@ export const WALL_DEPTH = 0.2;
 // Entity collision
 export const ENTITY_COLLISION_RADIUS = 0.45; // world units — slightly under half a tile
 
+// Wall margin — minimum distance an entity keeps from wall tile edges
+export const WALL_MARGIN = 0.35; // world units
+
 // Minimap
 export const MINIMAP_DISCOVERY_RADIUS = 4; // tiles revealed around player

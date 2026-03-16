@@ -64,6 +64,7 @@ export class InputManager {
   private handlePointerDown: (ev: PointerEvent) => void;
   private handlePointerUp: (ev: PointerEvent) => void;
   private handlePointerLeave: () => void;
+  private handleContextMenu: (ev: Event) => void;
   private renderObserver: Observer<Scene> | null = null;
 
   constructor(deps: InputManagerDeps) {
@@ -75,14 +76,24 @@ export class InputManager {
     this.canvas = this.scene.getEngine().getRenderingCanvas()!;
 
     this.handlePointerDown = (ev: PointerEvent) => {
-      if (ev.button !== 0) return;
       if (this.isOverUi(ev)) return;
 
-      // Check interactable click first (gates, chests, etc.)
-      if (this.tryInteractableClick()) return;
+      // Right-click → interact with objects (gates, chests, etc.)
+      if (ev.button === 2) {
+        if (this.tryInteractableClick()) return;
+        return;
+      }
 
-      // Any other click cancels a pending interaction
+      // Left-click → move
+      if (ev.button !== 0) return;
+
+      // Left-click cancels any pending interaction
       this.pendingInteract = null;
+
+      // If clicking on an interactable mesh, walk toward it (but don't interact)
+      if (this.tryWalkToInteractable()) {
+        return;
+      }
 
       this.isHolding = true;
       this.trySendMove();
@@ -99,9 +110,13 @@ export class InputManager {
       this.cursorWorldPoint = null;
     };
 
+    // Prevent browser context menu on the game canvas
+    this.handleContextMenu = (ev: Event) => ev.preventDefault();
+
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerup", this.handlePointerUp);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
+    this.canvas.addEventListener("contextmenu", this.handleContextMenu);
 
     // While holding, update cursor position each frame and throttle MOVE sends
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
@@ -170,8 +185,29 @@ export class InputManager {
   }
 
   /**
-   * Pick against interactable meshes.
-   * If in range → trigger immediately. If out of range → walk toward it.
+   * Left-click on an interactable: walk toward it without triggering the interaction.
+   * Returns true if an interactable mesh was picked.
+   */
+  private tryWalkToInteractable(): boolean {
+    if (!this.interactable) return false;
+    const meshes = this.interactable.getMeshes();
+    if (meshes.length === 0) return false;
+
+    const meshSet = new Set(meshes);
+    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
+      meshSet.has(mesh),
+    );
+    if (!pick?.hit || !pick.pickedMesh) return false;
+
+    const meshPos = pick.pickedMesh.getAbsolutePosition();
+    this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
+    this.lastSendTime = performance.now();
+    return true;
+  }
+
+  /**
+   * Right-click on an interactable: interact with the object.
+   * If in range → trigger immediately. If out of range → walk toward it and interact on arrival.
    * Returns true if an interactable was picked (regardless of range).
    */
   private tryInteractableClick(): boolean {
@@ -238,6 +274,7 @@ export class InputManager {
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
     this.canvas.removeEventListener("pointerup", this.handlePointerUp);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
+    this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
     if (this.renderObserver) {
       this.scene.onBeforeRenderObservable.remove(this.renderObserver);
       this.renderObserver = null;

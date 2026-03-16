@@ -35,8 +35,8 @@ export class Pathfinder {
     this.blockedTiles.delete(this.tileKey(x, y));
   }
 
-  /** Check if a tile is walkable (floor and not blocked) */
-  private isWalkable(x: number, y: number): boolean {
+  /** Check if a tile is walkable (floor and not blocked by objects like closed gates) */
+  isWalkable(x: number, y: number): boolean {
     return this.map.isFloor(x, y) && !this.blockedTiles.has(this.tileKey(x, y));
   }
 
