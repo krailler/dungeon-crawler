@@ -1,5 +1,5 @@
 import type { PlayerState } from "../state/PlayerState";
-import type { EnemyState } from "../state/EnemyState";
+import type { CreatureState } from "../state/CreatureState";
 import { ATTACK_ANIM_DURATION, computeDamage, SKILL_DEFS, SkillId } from "@dungeon/shared";
 import type { SkillIdValue } from "@dungeon/shared";
 
@@ -7,7 +7,7 @@ const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
 export interface CombatHitEvent {
   sessionId: string;
-  enemyId: string;
+  creatureId: string;
   attackDamage: number;
   targetDefense: number;
   finalDamage: number;
@@ -30,7 +30,7 @@ interface PlayerCombat {
   animTimer: number;
   /** Pending damage: timer counts down, applies damage at 0 */
   damageTimer: number;
-  damageTarget: EnemyState | null;
+  damageTarget: CreatureState | null;
   damageTargetId: string;
   damageAmount: number;
   damageAttack: number;
@@ -39,10 +39,10 @@ interface PlayerCombat {
   skillCooldowns: Map<string, number>;
 }
 
-/** Result of finding the closest alive enemy in range */
+/** Result of finding the closest alive creature in range */
 interface TargetResult {
-  enemy: EnemyState;
-  enemyId: string;
+  creature: CreatureState;
+  creatureId: string;
 }
 
 export class CombatSystem {
@@ -69,28 +69,31 @@ export class CombatSystem {
 
   // ── Shared helpers ───────────────────────────────────────────────────────
 
-  /** Find the closest alive enemy within player's attack range. */
-  private findTarget(player: PlayerState, enemies: Map<string, EnemyState>): TargetResult | null {
-    let closest: EnemyState | null = null;
+  /** Find the closest alive creature within player's attack range. */
+  private findTarget(
+    player: PlayerState,
+    creatures: Map<string, CreatureState>,
+  ): TargetResult | null {
+    let closest: CreatureState | null = null;
     let closestId = "";
     let closestDist = Infinity;
 
-    for (const [enemyId, enemy] of enemies) {
-      if (enemy.isDead) continue;
-      const dx = enemy.x - player.x;
-      const dz = enemy.z - player.z;
+    for (const [creatureId, creature] of creatures) {
+      if (creature.isDead) continue;
+      const dx = creature.x - player.x;
+      const dz = creature.z - player.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist <= player.attackRange && dist < closestDist) {
-        closest = enemy;
-        closestId = enemyId;
+        closest = creature;
+        closestId = creatureId;
         closestDist = dist;
       }
     }
 
-    return closest ? { enemy: closest, enemyId: closestId } : null;
+    return closest ? { creature: closest, creatureId: closestId } : null;
   }
 
-  /** Schedule a delayed hit: face enemy, play punch anim, damage after delay. */
+  /** Schedule a delayed hit: face creature, play punch anim, damage after delay. */
   private scheduleHit(
     combat: PlayerCombat,
     player: PlayerState,
@@ -98,18 +101,18 @@ export class CombatSystem {
     damage: number,
     animState: string = "punch",
   ): void {
-    // Face the enemy
-    player.rotY = Math.atan2(target.enemy.x - player.x, target.enemy.z - player.z);
+    // Face the creature
+    player.rotY = Math.atan2(target.creature.x - player.x, target.creature.z - player.z);
 
     // Trigger attack animation — damage applied after delay at animation peak
     player.animState = animState;
     combat.animTimer = ATTACK_ANIM_DURATION;
     combat.damageTimer = DAMAGE_DELAY;
-    combat.damageTarget = target.enemy;
-    combat.damageTargetId = target.enemyId;
+    combat.damageTarget = target.creature;
+    combat.damageTargetId = target.creatureId;
     combat.damageAmount = damage;
     combat.damageAttack = player.attackDamage;
-    combat.damageDefense = target.enemy.defense;
+    combat.damageDefense = target.creature.defense;
   }
 
   // ── Active skill usage ───────────────────────────────────────────────────
@@ -122,7 +125,7 @@ export class CombatSystem {
     sessionId: string,
     skillId: SkillIdValue,
     player: PlayerState,
-    enemies: Map<string, EnemyState>,
+    creatures: Map<string, CreatureState>,
   ): SkillCooldownEvent | null {
     const combat = this.playerCooldowns.get(sessionId);
     if (!combat) return null;
@@ -141,14 +144,14 @@ export class CombatSystem {
     if (!hasSkill) return null;
 
     // Need a target in range
-    const target = this.findTarget(player, enemies);
+    const target = this.findTarget(player, creatures);
     if (!target) return null;
 
     // Put skill on cooldown
     combat.skillCooldowns.set(skillId, def.cooldown);
 
     // Compute damage with multiplier
-    const baseDamage = computeDamage(player.attackDamage, target.enemy.defense);
+    const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
     const finalDamage = Math.max(1, Math.round(baseDamage * (def.damageMultiplier ?? 1)));
 
     const skillAnim = skillId === SkillId.HEAVY_STRIKE ? "heavy_punch" : "punch";
@@ -175,7 +178,7 @@ export class CombatSystem {
   update(
     dt: number,
     players: Map<string, PlayerState>,
-    enemies: Map<string, EnemyState>,
+    creatures: Map<string, CreatureState>,
     onHit?: (event: CombatHitEvent) => void,
   ): void {
     for (const [sessionId, combat] of this.playerCooldowns) {
@@ -212,7 +215,7 @@ export class CombatSystem {
           if (onHit) {
             onHit({
               sessionId,
-              enemyId: combat.damageTargetId,
+              creatureId: combat.damageTargetId,
               attackDamage: combat.damageAttack,
               targetDefense: combat.damageDefense,
               finalDamage: combat.damageAmount,
@@ -233,10 +236,10 @@ export class CombatSystem {
       // Skip auto-attack if player has it disabled
       if (!player.autoAttackEnabled) continue;
 
-      const target = this.findTarget(player, enemies);
+      const target = this.findTarget(player, creatures);
       if (target) {
         combat.attackCooldown = player.attackCooldown;
-        const damage = computeDamage(player.attackDamage, target.enemy.defense);
+        const damage = computeDamage(player.attackDamage, target.creature.defense);
         this.scheduleHit(combat, player, target, damage);
       }
     }

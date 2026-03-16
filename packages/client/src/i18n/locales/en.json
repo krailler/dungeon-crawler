@@ -8,7 +8,11 @@
     "devMode": "Dev Mode",
     "devAdmin": "Login as Admin",
     "devPlayer": "Login as Player",
-    "connectionError": "Could not reach the server."
+    "connectionError": "Could not reach the server.",
+    "invalidCredentials": "Invalid email or password.",
+    "emailMalformed": "Please enter a valid email address.",
+    "passwordTooShort": "Password is too short.",
+    "unknownError": "Something went wrong. Please try again."
   },
   "loading": {
     "title": "Dungeon Crawler",

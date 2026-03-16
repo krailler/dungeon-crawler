@@ -9,5 +9,4 @@ export type ItemDef = {
   readonly cooldown: number;
   readonly effectType: string;
   readonly effectParams: Record<string, unknown>;
-  readonly dropWeight: number;
 };

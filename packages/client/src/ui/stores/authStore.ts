@@ -109,7 +109,15 @@ export const authStore = {
       return true;
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      const msg = raw.includes("Failed to fetch") ? "login.connectionError" : raw;
+      const msg = raw.includes("Failed to fetch")
+        ? "login.connectionError"
+        : raw.includes("invalid_credentials")
+          ? "login.invalidCredentials"
+          : raw.includes("email_malformed")
+            ? "login.emailMalformed"
+            : raw.includes("password_too_short") || raw.includes("Password must be at least")
+              ? "login.passwordTooShort"
+              : "login.unknownError";
       update({ loading: false, error: msg });
       return false;
     }

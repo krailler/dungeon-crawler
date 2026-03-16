@@ -121,8 +121,8 @@ export interface ChatEntry {
 /** A single entity path for debug visualization */
 export interface DebugPathEntry {
   id: string;
-  /** "player" or "enemy" */
-  kind: "player" | "enemy";
+  /** "player" or "creature" */
+  kind: "player" | "creature";
   /** Current position */
   x: number;
   z: number;
@@ -202,13 +202,13 @@ export interface SprintMessage {
   active: boolean;
 }
 
-/** Server → Client: damage dealt by this player to an enemy (for floating combat text) */
+/** Server → Client: damage dealt by this player to a creature (for floating combat text) */
 export interface DamageDealtMessage {
-  /** Enemy ID that was hit */
-  enemyId: string;
+  /** Creature ID that was hit */
+  creatureId: string;
   /** Final damage applied */
   dmg: number;
-  /** Whether this hit killed the enemy */
+  /** Whether this hit killed the creature */
   kill: boolean;
 }
 

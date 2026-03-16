@@ -22,7 +22,6 @@ export async function loadItemRegistry(): Promise<void> {
       cooldown: row.cooldown,
       effectType: row.effectType,
       effectParams: row.effectParams as Record<string, unknown>,
-      dropWeight: row.dropWeight,
     });
   }
 
@@ -60,8 +59,4 @@ export function getAllItemDefs(): ItemDef[] {
 
 export function getItemRegistryVersion(): number {
   return registryVersion;
-}
-
-export function getDroppableItems(): ItemDef[] {
-  return getAllItemDefs().filter((item) => item.dropWeight > 0);
 }

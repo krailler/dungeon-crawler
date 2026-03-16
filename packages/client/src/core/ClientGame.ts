@@ -71,7 +71,7 @@ export class ClientGame {
   private room: Room | null = null;
 
   private playerLoader: CharacterAssetLoader;
-  private enemyLoader: CharacterAssetLoader;
+  private creatureLoader: CharacterAssetLoader;
   private soundManager: SoundManager;
 
   // Extracted modules
@@ -98,7 +98,7 @@ export class ClientGame {
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.playerLoader = new CharacterAssetLoader(this.scene, "/models/characters/player");
-    this.enemyLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
+    this.creatureLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
@@ -109,7 +109,7 @@ export class ClientGame {
       isoCamera: this.isoCamera,
       dungeonRenderer: this.dungeonRenderer,
       playerLoader: this.playerLoader,
-      enemyLoader: this.enemyLoader,
+      creatureLoader: this.creatureLoader,
       soundManager: this.soundManager,
       fogOfWar: this.fogOfWar,
       guiTexture: this.guiTexture,
@@ -128,7 +128,7 @@ export class ClientGame {
       dungeonRenderer: this.dungeonRenderer,
       scene: this.scene,
       getPlayers: () => self.stateSync.players,
-      getEnemies: () => self.stateSync.enemies,
+      getCreatures: () => self.stateSync.creatures,
       getLocalSessionId: () => self.stateSync.localSessionId,
       getInputManager: () => self.stateSync.inputManager,
       getWallOcclusion: () => self.stateSync.wallOcclusion,
@@ -164,7 +164,7 @@ export class ClientGame {
       // Pre-load character models + audio while connecting
       await Promise.all([
         this.playerLoader.load(),
-        this.enemyLoader.load(),
+        this.creatureLoader.load(),
         this.soundManager.load(),
       ]);
 
@@ -289,9 +289,9 @@ export class ClientGame {
 
       // Floating damage text — sent only to the player who dealt the damage
       room.onMessage(MessageType.DAMAGE_DEALT, (msg: DamageDealtMessage) => {
-        const enemy = this.stateSync.enemies.get(msg.enemyId);
-        if (enemy) {
-          enemy.showDamageText(msg.dmg, msg.kill);
+        const creature = this.stateSync.creatures.get(msg.creatureId);
+        if (creature) {
+          creature.showDamageText(msg.dmg, msg.kill);
         }
       });
 
@@ -431,7 +431,7 @@ export class ClientGame {
     minimapStore.reset();
     this.soundManager.dispose();
     this.playerLoader.dispose();
-    this.enemyLoader.dispose();
+    this.creatureLoader.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();
     this.guiTexture.dispose();

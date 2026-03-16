@@ -1,1 +1,0 @@
-ALTER TABLE "characters" ADD COLUMN "gold" integer DEFAULT 0 NOT NULL;

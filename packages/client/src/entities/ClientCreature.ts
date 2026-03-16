@@ -19,10 +19,10 @@ import type { SoundManager } from "../audio/SoundManager";
 const LERP_FACTOR = 12;
 const HIT_FLASH_DURATION = 0.12;
 
-/** Distance threshold to consider the enemy "moving" */
+/** Distance threshold to consider the creature "moving" */
 const MOVE_THRESHOLD = 0.05;
 
-export class ClientEnemy {
+export class ClientCreature {
   /** Invisible anchor mesh used for positioning */
   public mesh: Mesh;
   /** GLB model root — child of mesh */
@@ -72,25 +72,25 @@ export class ClientEnemy {
     this.previousHealth = initialHealth;
 
     // Invisible anchor for position/rotation
-    this.mesh = MeshBuilder.CreateGround(`enemy_${id}`, { width: 0.1, height: 0.1 }, scene);
+    this.mesh = MeshBuilder.CreateGround(`creature_${id}`, { width: 0.1, height: 0.1 }, scene);
     this.mesh.visibility = 0;
     this.mesh.isPickable = false;
     this.mesh.position.y = 0;
 
     // White PBR material for hit flash
-    this.hitMaterial = new PBRMaterial(`enemyHitMat_${id}`, scene);
+    this.hitMaterial = new PBRMaterial(`creatureHitMat_${id}`, scene);
     this.hitMaterial.albedoColor = new Color3(1, 1, 1);
     this.hitMaterial.metallic = 0;
     this.hitMaterial.roughness = 1;
 
     // Anchor node at head height (matches player name anchor)
-    this.barAnchor = new TransformNode(`enemyBarAnchor_${id}`, scene);
+    this.barAnchor = new TransformNode(`creatureBarAnchor_${id}`, scene);
     this.barAnchor.parent = this.mesh;
     this.barAnchor.position.y = 2.2;
 
     // --- Floating health bar + level label ---
     // Container for both label and health bar
-    this.healthBarContainer = new Rectangle(`enemyHpContainer_${id}`);
+    this.healthBarContainer = new Rectangle(`creatureHpContainer_${id}`);
     this.healthBarContainer.widthInPixels = 70;
     this.healthBarContainer.heightInPixels = 24;
     this.healthBarContainer.thickness = 0;
@@ -99,7 +99,7 @@ export class ClientEnemy {
     this.healthBarContainer.isVisible = false;
 
     // Level label above the bar
-    this.levelLabel = new TextBlock(`enemyLvl_${id}`, "Lv.1");
+    this.levelLabel = new TextBlock(`creatureLvl_${id}`, "Lv.1");
     this.levelLabel.color = "#ccc";
     this.levelLabel.fontSize = 10;
     this.levelLabel.heightInPixels = 14;
@@ -107,7 +107,7 @@ export class ClientEnemy {
     this.levelLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this.healthBarContainer.addControl(this.levelLabel);
 
-    this.healthBarBg = new Rectangle(`enemyHpBg_${id}`);
+    this.healthBarBg = new Rectangle(`creatureHpBg_${id}`);
     this.healthBarBg.widthInPixels = 60;
     this.healthBarBg.heightInPixels = 8;
     this.healthBarBg.cornerRadius = 2;
@@ -116,7 +116,7 @@ export class ClientEnemy {
     this.healthBarBg.background = "#222";
     this.healthBarBg.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
 
-    this.healthBarFill = new Rectangle(`enemyHpFill_${id}`);
+    this.healthBarFill = new Rectangle(`creatureHpFill_${id}`);
     this.healthBarFill.width = 1;
     this.healthBarFill.height = 1;
     this.healthBarFill.thickness = 0;
@@ -155,7 +155,7 @@ export class ClientEnemy {
     this.animController.startIdle();
   }
 
-  /** Set enemy level (updates label) */
+  /** Set creature level (updates label) */
   setLevel(level: number): void {
     this.levelLabel.text = `Lv.${level}`;
   }
@@ -196,7 +196,7 @@ export class ClientEnemy {
     }
   }
 
-  /** Whether enemy is moving or attacking (for minimap visibility) */
+  /** Whether creature is moving or attacking (for minimap visibility) */
   get isActive(): boolean {
     if (this.isDead) return false;
     const dx = this.targetX - this.mesh.position.x;
@@ -304,7 +304,7 @@ export class ClientEnemy {
     }
   }
 
-  /** Show a floating damage number above the enemy */
+  /** Show a floating damage number above the creature */
   showDamageText(damage: number, isKill: boolean): void {
     if (this.isDead) return;
 
@@ -314,7 +314,7 @@ export class ClientEnemy {
     const color = isKill ? "#ff4444" : isHeavy ? "#ff8800" : "#ffdd44";
     const duration = isKill ? 1.2 : 0.9;
 
-    // Create anchor at enemy position (will float upward in update())
+    // Create anchor at creature position (will float upward in update())
     const scene = this.mesh.getScene();
     const anchor = new TransformNode(`dmgAnchor_${Date.now()}`, scene);
     anchor.parent = this.mesh;

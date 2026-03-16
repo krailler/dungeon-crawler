@@ -8,7 +8,7 @@ import type { Room } from "@colyseus/sdk";
 import type { IsometricCamera } from "../camera/IsometricCamera";
 import type { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import type { ClientPlayer } from "../entities/ClientPlayer";
-import type { ClientEnemy } from "../entities/ClientEnemy";
+import type { ClientCreature } from "../entities/ClientCreature";
 import type { InputManager } from "./InputManager";
 import type { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import type { FogOfWarSystem } from "../systems/FogOfWarSystem";
@@ -35,7 +35,7 @@ export interface UpdateLoopDeps {
   readonly dungeonRenderer: DungeonRenderer;
   readonly scene: Scene;
   getPlayers(): Map<string, ClientPlayer>;
-  getEnemies(): Map<string, ClientEnemy>;
+  getCreatures(): Map<string, ClientCreature>;
   getLocalSessionId(): string;
   getInputManager(): InputManager | null;
   getWallOcclusion(): WallOcclusionSystem | null;
@@ -45,7 +45,7 @@ export interface UpdateLoopDeps {
 export class ClientUpdateLoop {
   private deps: UpdateLoopDeps;
   private lastDebug: DebugSnapshot = debugStore.getSnapshot();
-  private activeEnemiesMap: Map<string, { x: number; z: number }> = new Map();
+  private activeCreaturesMap: Map<string, { x: number; z: number }> = new Map();
   private debugPathLines: Map<string, LinesMesh> = new Map();
 
   constructor(deps: UpdateLoopDeps) {
@@ -57,7 +57,7 @@ export class ClientUpdateLoop {
     this.applyDebugFlags();
 
     const players = this.deps.getPlayers();
-    const enemies = this.deps.getEnemies();
+    const creatures = this.deps.getCreatures();
     const localSessionId = this.deps.getLocalSessionId();
 
     // Interpolate all entities toward server state
@@ -65,8 +65,8 @@ export class ClientUpdateLoop {
       player.update(dt);
     }
 
-    for (const [, enemy] of enemies) {
-      enemy.update(dt);
+    for (const [, creature] of creatures) {
+      creature.update(dt);
     }
 
     // Local player faces cursor while holding click
@@ -149,15 +149,15 @@ export class ClientUpdateLoop {
       minimapStore.updatePlayerPosition(sessionId, p.x, p.z);
     }
 
-    // Minimap: update active enemy positions (moving or attacking only)
-    this.activeEnemiesMap.clear();
-    for (const [id, enemy] of enemies) {
-      if (enemy.isActive) {
-        const ep = enemy.getWorldPosition();
-        this.activeEnemiesMap.set(id, { x: ep.x, z: ep.z });
+    // Minimap: update active creature positions (moving or attacking only)
+    this.activeCreaturesMap.clear();
+    for (const [id, creature] of creatures) {
+      if (creature.isActive) {
+        const ep = creature.getWorldPosition();
+        this.activeCreaturesMap.set(id, { x: ep.x, z: ep.z });
       }
     }
-    minimapStore.setActiveEnemies(this.activeEnemiesMap);
+    minimapStore.setActiveCreatures(this.activeCreaturesMap);
 
     // Single batched emit per frame (only when minimap is visible)
     minimapStore.flush();

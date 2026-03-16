@@ -1,7 +1,7 @@
-import type { EnemyState } from "../state/EnemyState";
+import type { CreatureState } from "../state/CreatureState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder, WorldPos } from "../navigation/Pathfinder";
-import { ATTACK_ANIM_DURATION, ENEMY_REPATH_INTERVAL, computeDamage } from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, CREATURE_REPATH_INTERVAL, computeDamage } from "@dungeon/shared";
 
 const AIState = {
   IDLE: 0,
@@ -28,16 +28,16 @@ const THREAT_DECAY_RATE = 10;
 const THREAT_EPSILON = 0.1;
 
 export interface AIHitEvent {
-  enemyId: string;
+  creatureId: string;
   sessionId: string;
   attackDamage: number;
   targetDefense: number;
   finalDamage: number;
 }
 
-interface EnemyAI {
-  enemy: EnemyState;
-  enemyId: string;
+interface CreatureAI {
+  creature: CreatureState;
+  creatureId: string;
   state: AIStateType;
   repathTimer: number;
   attackTimer: number;
@@ -57,18 +57,18 @@ interface EnemyAI {
 }
 
 export class AISystem {
-  private entries: EnemyAI[] = [];
-  private entryById: Map<string, EnemyAI> = new Map();
+  private entries: CreatureAI[] = [];
+  private entryById: Map<string, CreatureAI> = new Map();
   private pathfinder: Pathfinder;
 
   constructor(pathfinder: Pathfinder) {
     this.pathfinder = pathfinder;
   }
 
-  register(enemy: EnemyState, enemyId: string, leashRange: number): void {
-    const entry: EnemyAI = {
-      enemy,
-      enemyId,
+  register(creature: CreatureState, creatureId: string, leashRange: number): void {
+    const entry: CreatureAI = {
+      creature,
+      creatureId,
       state: AIState.IDLE,
       repathTimer: 0,
       attackTimer: 0,
@@ -78,26 +78,26 @@ export class AISystem {
       damageAmount: 0,
       damageAttack: 0,
       damageDefense: 0,
-      spawnX: enemy.x,
-      spawnZ: enemy.z,
+      spawnX: creature.x,
+      spawnZ: creature.z,
       leashRange,
       threatTable: new Map(),
     };
     this.entries.push(entry);
-    this.entryById.set(enemyId, entry);
+    this.entryById.set(creatureId, entry);
   }
 
-  /** Remove an enemy from the AI system (e.g. after death cleanup). */
-  unregister(enemyId: string): void {
-    const idx = this.entries.findIndex((e) => e.enemyId === enemyId);
+  /** Remove a creature from the AI system (e.g. after death cleanup). */
+  unregister(creatureId: string): void {
+    const idx = this.entries.findIndex((e) => e.creatureId === creatureId);
     if (idx !== -1) this.entries.splice(idx, 1);
-    this.entryById.delete(enemyId);
+    this.entryById.delete(creatureId);
   }
 
   /** Add threat from an external source (e.g. player dealing damage). */
-  addThreat(enemyId: string, sessionId: string, amount: number): void {
-    const entry = this.entryById.get(enemyId);
-    if (!entry || entry.enemy.isDead) return;
+  addThreat(creatureId: string, sessionId: string, amount: number): void {
+    const entry = this.entryById.get(creatureId);
+    if (!entry || entry.creature.isDead) return;
     // Don't accept threat while leashing
     if (entry.state === AIState.LEASH) return;
     const current = entry.threatTable.get(sessionId) ?? 0;
@@ -118,13 +118,13 @@ export class AISystem {
     onHit?: (event: AIHitEvent) => void,
   ): void {
     for (const entry of this.entries) {
-      if (entry.enemy.isDead) continue;
+      if (entry.creature.isDead) continue;
 
       // Tick down anim timer and clear animState when done
       if (entry.animTimer > 0) {
         entry.animTimer -= dt;
         if (entry.animTimer <= 0) {
-          entry.enemy.animState = "";
+          entry.creature.animState = "";
         }
       }
 
@@ -135,7 +135,7 @@ export class AISystem {
           onPlayerHit(entry.damageSessionId, entry.damageAmount);
           if (onHit) {
             onHit({
-              enemyId: entry.enemyId,
+              creatureId: entry.creatureId,
               sessionId: entry.damageSessionId,
               attackDamage: entry.damageAttack,
               targetDefense: entry.damageDefense,
@@ -148,7 +148,7 @@ export class AISystem {
 
       // ── Leash check ──────────────────────────────────────────────────────
       if (entry.state !== AIState.LEASH) {
-        const distSqToSpawn = this.distanceSq(entry.enemy, {
+        const distSqToSpawn = this.distanceSq(entry.creature, {
           x: entry.spawnX,
           z: entry.spawnZ,
         });
@@ -172,13 +172,13 @@ export class AISystem {
 
       if (!target) {
         entry.state = AIState.IDLE;
-        entry.enemy.isMoving = false;
+        entry.creature.isMoving = false;
         continue;
       }
 
       const { sessionId: targetSessionId, player: targetPlayer } = target;
-      const distSqToTarget = this.distanceSq(entry.enemy, targetPlayer);
-      const attackRangeSq = entry.enemy.attackRange * entry.enemy.attackRange;
+      const distSqToTarget = this.distanceSq(entry.creature, targetPlayer);
+      const attackRangeSq = entry.creature.attackRange * entry.creature.attackRange;
 
       entry.repathTimer -= dt;
       entry.attackTimer -= dt;
@@ -186,26 +186,29 @@ export class AISystem {
       if (distSqToTarget <= attackRangeSq) {
         // ── Attack ─────────────────────────────────────────────────────
         entry.state = AIState.ATTACK;
-        entry.enemy.isMoving = false;
-        entry.enemy.path = [];
+        entry.creature.isMoving = false;
+        entry.creature.path = [];
 
         // Face the player
-        const angle = Math.atan2(targetPlayer.x - entry.enemy.x, targetPlayer.z - entry.enemy.z);
-        entry.enemy.rotY = angle;
+        const angle = Math.atan2(
+          targetPlayer.x - entry.creature.x,
+          targetPlayer.z - entry.creature.z,
+        );
+        entry.creature.rotY = angle;
 
         if (entry.attackTimer <= 0) {
-          entry.attackTimer = entry.enemy.attackCooldown;
-          entry.enemy.animState = "punch";
+          entry.attackTimer = entry.creature.attackCooldown;
+          entry.creature.animState = "punch";
           entry.animTimer = ATTACK_ANIM_DURATION;
           entry.damageTimer = DAMAGE_DELAY;
           entry.damageSessionId = targetSessionId;
-          entry.damageAmount = computeDamage(entry.enemy.attackDamage, targetPlayer.defense);
-          entry.damageAttack = entry.enemy.attackDamage;
+          entry.damageAmount = computeDamage(entry.creature.attackDamage, targetPlayer.defense);
+          entry.damageAttack = entry.creature.attackDamage;
           entry.damageDefense = targetPlayer.defense;
 
           // Attacking generates threat too (keeps aggro sticky)
           this.addThreat(
-            entry.enemyId,
+            entry.creatureId,
             targetSessionId,
             entry.damageAmount * THREAT_PER_DAMAGE * 0.5,
           );
@@ -215,21 +218,21 @@ export class AISystem {
         entry.state = AIState.CHASE;
 
         if (entry.repathTimer <= 0) {
-          entry.repathTimer = ENEMY_REPATH_INTERVAL;
-          const enemyPos: WorldPos = { x: entry.enemy.x, z: entry.enemy.z };
+          entry.repathTimer = CREATURE_REPATH_INTERVAL;
+          const creaturePos: WorldPos = { x: entry.creature.x, z: entry.creature.z };
           const playerPos: WorldPos = {
             x: targetPlayer.x,
             z: targetPlayer.z,
           };
-          const path = this.pathfinder.findPath(enemyPos, playerPos);
+          const path = this.pathfinder.findPath(creaturePos, playerPos);
           if (path.length > 0) {
-            entry.enemy.path = path;
-            entry.enemy.currentPathIndex = 0;
-            entry.enemy.isMoving = true;
+            entry.creature.path = path;
+            entry.creature.currentPathIndex = 0;
+            entry.creature.isMoving = true;
           }
         }
 
-        this.moveEnemy(entry.enemy, dt);
+        this.moveCreature(entry.creature, dt);
       }
     }
   }
@@ -242,7 +245,11 @@ export class AISystem {
    * - Players outside detection range have their threat decayed
    * - Dead players are purged
    */
-  private updateThreatTable(entry: EnemyAI, dt: number, players: Map<string, PlayerState>): void {
+  private updateThreatTable(
+    entry: CreatureAI,
+    dt: number,
+    players: Map<string, PlayerState>,
+  ): void {
     // Passive proximity threat for players in range
     for (const [sessionId, player] of players) {
       if (player.health <= 0) {
@@ -250,8 +257,8 @@ export class AISystem {
         continue;
       }
 
-      const distSq = this.distanceSq(entry.enemy, player);
-      const detectionRangeSq = entry.enemy.detectionRange * entry.enemy.detectionRange;
+      const distSq = this.distanceSq(entry.creature, player);
+      const detectionRangeSq = entry.creature.detectionRange * entry.creature.detectionRange;
 
       if (distSq <= detectionRangeSq) {
         const current = entry.threatTable.get(sessionId);
@@ -286,7 +293,7 @@ export class AISystem {
 
   /** Find the alive player with the highest threat value. */
   private getHighestThreatTarget(
-    entry: EnemyAI,
+    entry: CreatureAI,
     players: Map<string, PlayerState>,
   ): { sessionId: string; player: PlayerState } | null {
     let bestSessionId: string | null = null;
@@ -310,40 +317,40 @@ export class AISystem {
 
   // ── Leash ───────────────────────────────────────────────────────────────────
 
-  private startLeash(entry: EnemyAI): void {
+  private startLeash(entry: CreatureAI): void {
     entry.state = AIState.LEASH;
     entry.threatTable.clear();
-    entry.enemy.animState = "";
+    entry.creature.animState = "";
     entry.damageTimer = 0;
     entry.damageSessionId = null;
 
     // Path back to spawn
-    const enemyPos: WorldPos = { x: entry.enemy.x, z: entry.enemy.z };
+    const creaturePos: WorldPos = { x: entry.creature.x, z: entry.creature.z };
     const spawnPos: WorldPos = { x: entry.spawnX, z: entry.spawnZ };
-    const path = this.pathfinder.findPath(enemyPos, spawnPos);
+    const path = this.pathfinder.findPath(creaturePos, spawnPos);
     if (path.length > 0) {
-      entry.enemy.path = path;
-      entry.enemy.currentPathIndex = 0;
-      entry.enemy.isMoving = true;
+      entry.creature.path = path;
+      entry.creature.currentPathIndex = 0;
+      entry.creature.isMoving = true;
     }
 
     // Heal to full on leash
-    entry.enemy.health = entry.enemy.maxHealth;
+    entry.creature.health = entry.creature.maxHealth;
   }
 
-  private updateLeash(entry: EnemyAI, dt: number): void {
-    this.moveEnemy(entry.enemy, dt);
+  private updateLeash(entry: CreatureAI, dt: number): void {
+    this.moveCreature(entry.creature, dt);
 
-    const distSqToSpawn = this.distanceSq(entry.enemy, {
+    const distSqToSpawn = this.distanceSq(entry.creature, {
       x: entry.spawnX,
       z: entry.spawnZ,
     });
 
     // Arrived back at spawn — return to idle (0.5^2 = 0.25)
-    if (distSqToSpawn < 0.25 || !entry.enemy.isMoving) {
+    if (distSqToSpawn < 0.25 || !entry.creature.isMoving) {
       entry.state = AIState.IDLE;
-      entry.enemy.isMoving = false;
-      entry.enemy.path = [];
+      entry.creature.isMoving = false;
+      entry.creature.path = [];
       entry.repathTimer = 0;
       entry.attackTimer = 0;
     }
@@ -351,33 +358,33 @@ export class AISystem {
 
   // ── Movement ────────────────────────────────────────────────────────────────
 
-  private moveEnemy(enemy: EnemyState, dt: number): void {
-    if (!enemy.isMoving || enemy.currentPathIndex >= enemy.path.length) {
-      enemy.isMoving = false;
+  private moveCreature(creature: CreatureState, dt: number): void {
+    if (!creature.isMoving || creature.currentPathIndex >= creature.path.length) {
+      creature.isMoving = false;
       return;
     }
 
-    const target = enemy.path[enemy.currentPathIndex];
-    const dx = target.x - enemy.x;
-    const dz = target.z - enemy.z;
+    const target = creature.path[creature.currentPathIndex];
+    const dx = target.x - creature.x;
+    const dz = target.z - creature.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     if (dist < 0.15) {
-      enemy.currentPathIndex++;
-      if (enemy.currentPathIndex >= enemy.path.length) {
-        enemy.isMoving = false;
+      creature.currentPathIndex++;
+      if (creature.currentPathIndex >= creature.path.length) {
+        creature.isMoving = false;
       }
       return;
     }
 
     const ndx = dx / dist;
     const ndz = dz / dist;
-    const step = Math.min(enemy.speed * dt, dist);
+    const step = Math.min(creature.speed * dt, dist);
 
-    enemy.x += ndx * step;
-    enemy.z += ndz * step;
+    creature.x += ndx * step;
+    creature.z += ndz * step;
 
-    enemy.rotY = Math.atan2(ndx, ndz);
+    creature.rotY = Math.atan2(ndx, ndz);
   }
 
   /** Squared distance — use for range comparisons to avoid sqrt */

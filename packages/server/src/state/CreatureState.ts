@@ -1,8 +1,8 @@
 import { Schema, type } from "@colyseus/schema";
 import type { DerivedStats } from "@dungeon/shared";
-import { scaleEnemyDerivedStats } from "@dungeon/shared";
+import { scaleCreatureDerivedStats } from "@dungeon/shared";
 
-export class EnemyState extends Schema {
+export class CreatureState extends Schema {
   @type("float32") x: number = 0;
   @type("float32") z: number = 0;
   @type("float32") rotY: number = 0;
@@ -10,7 +10,7 @@ export class EnemyState extends Schema {
   @type("int16") maxHealth: number = 0;
   @type("boolean") isDead: boolean = false;
   @type("string") animState: string = "";
-  @type("string") enemyType: string = "zombie";
+  @type("string") creatureType: string = "zombie";
   @type("int16") level: number = 1;
 
   // Server-only (not synced)
@@ -26,7 +26,7 @@ export class EnemyState extends Schema {
 
   /** Apply scaled stats from base derived stats at a given level */
   applyStats(baseDerived: DerivedStats, level: number): void {
-    const derived = scaleEnemyDerivedStats(baseDerived, level);
+    const derived = scaleCreatureDerivedStats(baseDerived, level);
     this.level = level;
     this.maxHealth = derived.maxHealth;
     this.health = derived.maxHealth;

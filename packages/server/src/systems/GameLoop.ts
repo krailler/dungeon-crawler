@@ -1,7 +1,7 @@
 import type { ClockTimer } from "@colyseus/timer";
 import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
-import type { EnemyState } from "../state/EnemyState";
+import type { CreatureState } from "../state/CreatureState";
 import type { AISystem } from "./AISystem";
 import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
@@ -18,7 +18,6 @@ import {
   STAMINA_DRAIN_PER_SEC,
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
-  LOOT_DROP_CHANCE,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -29,7 +28,7 @@ import type {
 } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
-import { getDroppableItems } from "../items/ItemRegistry";
+import { getCreatureLoot } from "../creatures/CreatureTypeRegistry";
 import { LootBagState } from "../state/LootBagState";
 import { InventorySlotState } from "../state/InventorySlotState";
 
@@ -52,7 +51,7 @@ export class GameLoop {
   private tickCount: number = 0;
   // Pre-allocated maps reused each tick to avoid GC pressure
   private tickPlayersMap: Map<string, PlayerState> = new Map();
-  private tickEnemiesMap: Map<string, EnemyState> = new Map();
+  private tickCreaturesMap: Map<string, CreatureState> = new Map();
   /** Clients subscribed to debug path visualization */
   private debugPathClients: Set<string> = new Set();
 
@@ -96,7 +95,7 @@ export class GameLoop {
       this.moveEntity(player, dtSec);
     }
 
-    // AI system: enemies chase and attack players
+    // AI system: creatures chase and attack players
     this.tickPlayersMap.clear();
     this.bridge.state.players.forEach((player: PlayerState, sessionId: string) => {
       this.tickPlayersMap.set(sessionId, player);
@@ -120,12 +119,12 @@ export class GameLoop {
         }
       },
       (event) => {
-        const enemy = this.bridge.state.enemies.get(event.enemyId);
+        const creature = this.bridge.state.creatures.get(event.creatureId);
         const player = this.bridge.state.players.get(event.sessionId);
         if (!player) return;
         const msg: CombatLogMessage = {
           dir: "e2p",
-          src: `${enemy?.enemyType ?? "enemy"}[${event.enemyId}]`,
+          src: `${creature?.creatureType ?? "creature"}[${event.creatureId}]`,
           tgt: player.characterName || event.sessionId.slice(0, 6),
           atk: event.attackDamage,
           def: event.targetDefense,
@@ -139,12 +138,12 @@ export class GameLoop {
     );
 
     // Combat system: player auto-attack
-    this.tickEnemiesMap.clear();
-    this.bridge.state.enemies.forEach((enemy: EnemyState, id: string) => {
-      this.tickEnemiesMap.set(id, enemy);
+    this.tickCreaturesMap.clear();
+    this.bridge.state.creatures.forEach((creature: CreatureState, id: string) => {
+      this.tickCreaturesMap.set(id, creature);
     });
 
-    this.bridge.combatSystem.update(dtSec, this.tickPlayersMap, this.tickEnemiesMap, (event) => {
+    this.bridge.combatSystem.update(dtSec, this.tickPlayersMap, this.tickCreaturesMap, (event) => {
       this.handleCombatHit(event);
     });
 
@@ -155,8 +154,8 @@ export class GameLoop {
     this.bridge.state.players.forEach((player: PlayerState) => {
       if (player.health > 0) this.enforceWallMargin(player);
     });
-    this.bridge.state.enemies.forEach((enemy: EnemyState) => {
-      if (!enemy.isDead) this.enforceWallMargin(enemy);
+    this.bridge.state.creatures.forEach((creature: CreatureState) => {
+      if (!creature.isDead) this.enforceWallMargin(creature);
     });
 
     // Debug: send path data to subscribed admin clients
@@ -168,13 +167,13 @@ export class GameLoop {
   /** Handle a combat hit event — shared between auto-attack and active skills. */
   handleCombatHit(event: CombatHitEvent): void {
     // Player hit generates threat on the enemy
-    this.bridge.aiSystem.addThreat(event.enemyId, event.sessionId, event.finalDamage);
+    this.bridge.aiSystem.addThreat(event.creatureId, event.sessionId, event.finalDamage);
 
     const player = this.bridge.state.players.get(event.sessionId);
     const msg: CombatLogMessage = {
       dir: "p2e",
       src: player?.characterName || event.sessionId.slice(0, 6),
-      tgt: `zombie[${event.enemyId}]`,
+      tgt: `${this.bridge.state.creatures.get(event.creatureId)?.creatureType ?? "creature"}[${event.creatureId}]`,
       atk: event.attackDamage,
       def: event.targetDefense,
       dmg: event.finalDamage,
@@ -186,17 +185,17 @@ export class GameLoop {
 
     // Notify the attacking player of damage dealt (for floating combat text)
     const dmgMsg: DamageDealtMessage = {
-      enemyId: event.enemyId,
+      creatureId: event.creatureId,
       dmg: event.finalDamage,
       kill: event.killed,
     };
     this.bridge.sendToClient(event.sessionId, MessageType.DAMAGE_DEALT, dmgMsg);
 
-    // Remove dead enemy from state after a short delay so clients see the death
+    // Remove dead creature from state after a short delay so clients see the death
     if (event.killed) {
       // Distribute gold to alive party members
-      const killedEnemy = this.bridge.state.enemies.get(event.enemyId);
-      if (killedEnemy) {
+      const killedCreature = this.bridge.state.creatures.get(event.creatureId);
+      if (killedCreature) {
         let aliveCount = 0;
         let levelSum = 0;
         this.bridge.state.players.forEach((p: PlayerState) => {
@@ -206,7 +205,7 @@ export class GameLoop {
           }
         });
         const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
-        const goldPerPlayer = computeGoldDrop(killedEnemy.level, avgPartyLevel, aliveCount);
+        const goldPerPlayer = computeGoldDrop(killedCreature.level, avgPartyLevel, aliveCount);
 
         this.bridge.state.players.forEach((p: PlayerState) => {
           if (p.health > 0) {
@@ -217,15 +216,15 @@ export class GameLoop {
         // Broadcast gold earned in chat
         this.bridge.chatSystem.broadcastSystemI18n(
           "chat.goldGained",
-          { amount: goldPerPlayer, enemy: killedEnemy.enemyType },
-          `+${goldPerPlayer} gold from ${killedEnemy.enemyType}!`,
+          { amount: goldPerPlayer, enemy: killedCreature.creatureType },
+          `+${goldPerPlayer} gold from ${killedCreature.creatureType}!`,
         );
 
         // Distribute XP to alive players (not split — each player gets full XP)
         this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
           if (p.health <= 0 || p.level >= MAX_LEVEL) return;
 
-          const xpGain = computeXpDrop(killedEnemy.level, p.level);
+          const xpGain = computeXpDrop(killedCreature.level, p.level);
           const levelUps = p.addXp(xpGain);
 
           if (levelUps.length > 0) {
@@ -239,30 +238,33 @@ export class GameLoop {
           }
         });
 
-        // Drop loot bag on the ground
-        const droppable = getDroppableItems();
-        if (droppable.length > 0) {
+        // Drop loot bag on the ground (per-creature loot table)
+        const lootEntries = getCreatureLoot(killedCreature.creatureType);
+        if (lootEntries.length > 0) {
           const bag = new LootBagState();
           let slotIndex = 0;
-          for (const item of droppable) {
-            if (Math.random() < LOOT_DROP_CHANCE) {
+          for (const entry of lootEntries) {
+            if (Math.random() < entry.dropChance) {
+              const qty =
+                entry.minQuantity +
+                Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1));
               const slot = new InventorySlotState();
-              slot.itemId = item.id;
-              slot.quantity = 1;
+              slot.itemId = entry.itemId;
+              slot.quantity = qty;
               bag.items.set(String(slotIndex++), slot);
             }
           }
           if (bag.items.size > 0) {
-            bag.x = killedEnemy.x;
-            bag.z = killedEnemy.z;
-            this.bridge.state.lootBags.set(`loot_${event.enemyId}_${Date.now()}`, bag);
+            bag.x = killedCreature.x;
+            bag.z = killedCreature.z;
+            this.bridge.state.lootBags.set(`loot_${event.creatureId}_${Date.now()}`, bag);
           }
         }
       }
 
       this.bridge.clock.setTimeout(() => {
-        this.bridge.state.enemies.delete(event.enemyId);
-        this.bridge.aiSystem.unregister(event.enemyId);
+        this.bridge.state.creatures.delete(event.creatureId);
+        this.bridge.aiSystem.unregister(event.creatureId);
       }, 1000);
     }
   }
@@ -437,18 +439,18 @@ export class GameLoop {
       });
     });
 
-    this.bridge.state.enemies.forEach((enemy: EnemyState) => {
-      if (enemy.isDead) return;
+    this.bridge.state.creatures.forEach((creature: CreatureState) => {
+      if (creature.isDead) return;
       entities.push({
         get x() {
-          return enemy.x;
+          return creature.x;
         },
         get z() {
-          return enemy.z;
+          return creature.z;
         },
         setPos(x, z) {
-          enemy.x = x;
-          enemy.z = z;
+          creature.x = x;
+          creature.z = z;
         },
       });
     });
@@ -534,14 +536,14 @@ export class GameLoop {
       }
     });
 
-    this.bridge.state.enemies.forEach((enemy: EnemyState, enemyId: string) => {
-      if (enemy.path.length > 0 && enemy.currentPathIndex < enemy.path.length) {
+    this.bridge.state.creatures.forEach((creature: CreatureState, creatureId: string) => {
+      if (creature.path.length > 0 && creature.currentPathIndex < creature.path.length) {
         paths.push({
-          id: enemyId,
-          kind: "enemy",
-          x: enemy.x,
-          z: enemy.z,
-          path: enemy.path.slice(enemy.currentPathIndex),
+          id: creatureId,
+          kind: "creature",
+          x: creature.x,
+          z: creature.z,
+          path: creature.path.slice(creature.currentPathIndex),
         });
       }
     });

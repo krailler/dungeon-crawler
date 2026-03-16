@@ -62,7 +62,6 @@ async function seed() {
       cooldown: 10,
       effectType: "heal",
       effectParams: { amount: 50 },
-      dropWeight: 1.0,
     })
     .onConflictDoNothing();
   console.log("World items seeded.");

@@ -12,7 +12,7 @@ const listeners = new Set<Listener>();
 let tileMap: TileMap | null = null;
 let discovered: Set<number> = new Set();
 let playerPositions: Map<string, { x: number; z: number }> = new Map();
-let enemyPositions: Map<string, { x: number; z: number }> = new Map();
+let creaturePositions: Map<string, { x: number; z: number }> = new Map();
 let localSessionId: string = "";
 let visible = false;
 let version = 0;
@@ -82,9 +82,9 @@ export const minimapStore = {
     dirty = true;
   },
 
-  /** Replace active enemy positions each frame (only active enemies are passed) */
-  setActiveEnemies(active: Map<string, { x: number; z: number }>): void {
-    enemyPositions = active;
+  /** Replace active creature positions each frame (only active creatures are passed) */
+  setActiveCreatures(active: Map<string, { x: number; z: number }>): void {
+    creaturePositions = active;
     dirty = true;
   },
 
@@ -136,8 +136,8 @@ export const minimapStore = {
     return localSessionId;
   },
 
-  getEnemyPositions(): Map<string, { x: number; z: number }> {
-    return enemyPositions;
+  getCreaturePositions(): Map<string, { x: number; z: number }> {
+    return creaturePositions;
   },
 
   revealAll(): void {
@@ -155,7 +155,7 @@ export const minimapStore = {
     gatePositions = new Map();
     discovered = new Set();
     playerPositions = new Map();
-    enemyPositions = new Map();
+    creaturePositions = new Map();
     localSessionId = "";
     visible = false;
     version = 0;

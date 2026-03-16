@@ -64,13 +64,8 @@ export {
 } from "./Stats.js";
 export type { AllocatableStatValue, BaseStats, DerivedStats, StatScaling } from "./Stats.js";
 
-export {
-  EnemyTypeId,
-  ENEMY_TYPES,
-  computeEnemyDerivedStats,
-  scaleEnemyDerivedStats,
-} from "./EnemyTypes.js";
-export type { EnemyTypeIdValue, EnemyTypeDefinition } from "./EnemyTypes.js";
+export { computeCreatureDerivedStats, scaleCreatureDerivedStats } from "./CreatureTypes.js";
+export type { CreatureTypeDefinition, CreatureLootEntry } from "./CreatureTypes.js";
 
 export { computeGoldDrop } from "./Economy.js";
 

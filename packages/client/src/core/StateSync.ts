@@ -8,7 +8,7 @@ import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTe
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { ClientPlayer } from "../entities/ClientPlayer";
-import { ClientEnemy } from "../entities/ClientEnemy";
+import { ClientCreature } from "../entities/ClientCreature";
 import { ClientLootBag } from "../entities/ClientLootBag";
 import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { InputManager } from "./InputManager";
@@ -41,7 +41,7 @@ export interface StateSyncDeps {
   readonly isoCamera: IsometricCamera;
   readonly dungeonRenderer: DungeonRenderer;
   readonly playerLoader: CharacterAssetLoader;
-  readonly enemyLoader: CharacterAssetLoader;
+  readonly creatureLoader: CharacterAssetLoader;
   readonly soundManager: SoundManager;
   readonly fogOfWar: FogOfWarSystem;
   readonly guiTexture: AdvancedDynamicTexture;
@@ -51,7 +51,7 @@ export interface StateSyncDeps {
 
 export class StateSync {
   players: Map<string, ClientPlayer> = new Map();
-  enemies: Map<string, ClientEnemy> = new Map();
+  creatures: Map<string, ClientCreature> = new Map();
   lootBags: Map<string, ClientLootBag> = new Map();
   inputManager: InputManager | null = null;
   wallOcclusion: WallOcclusionSystem | null = null;
@@ -433,55 +433,55 @@ export class StateSync {
       minimapStore.removePlayer(sessionId);
     });
 
-    // Enemies added
-    state$.enemies.onAdd((enemy: any, id: string) => {
-      const clientEnemy = new ClientEnemy(
+    // Creatures added
+    state$.creatures.onAdd((creature: any, id: string) => {
+      const clientCreature = new ClientCreature(
         this.deps.scene,
         id,
-        enemy.health,
+        creature.health,
         this.deps.guiTexture,
         this.deps.soundManager,
       );
-      clientEnemy.snapToPosition(enemy.x, enemy.z);
-      clientEnemy.setLevel(enemy.level);
-      clientEnemy.setServerState(
-        enemy.x,
-        enemy.z,
-        enemy.rotY,
-        enemy.health,
-        enemy.maxHealth,
-        enemy.isDead,
-        enemy.animState,
+      clientCreature.snapToPosition(creature.x, creature.z);
+      clientCreature.setLevel(creature.level);
+      clientCreature.setServerState(
+        creature.x,
+        creature.z,
+        creature.rotY,
+        creature.health,
+        creature.maxHealth,
+        creature.isDead,
+        creature.animState,
       );
-      // Attach zombie GLB model
-      const enemyInstance = this.deps.enemyLoader.instantiate(`enemy_${id}`);
-      clientEnemy.attachModel(enemyInstance);
+      // Attach creature GLB model
+      const creatureInstance = this.deps.creatureLoader.instantiate(`creature_${id}`);
+      clientCreature.attachModel(creatureInstance);
 
-      this.enemies.set(id, clientEnemy);
-      for (const m of clientEnemy.modelMeshes) {
+      this.creatures.set(id, clientCreature);
+      for (const m of clientCreature.modelMeshes) {
         this.deps.addShadowCaster(m);
       }
 
-      // Listen to changes on this enemy
-      $(enemy).onChange(() => {
-        clientEnemy.setServerState(
-          enemy.x,
-          enemy.z,
-          enemy.rotY,
-          enemy.health,
-          enemy.maxHealth,
-          enemy.isDead,
-          enemy.animState,
+      // Listen to changes on this creature
+      $(creature).onChange(() => {
+        clientCreature.setServerState(
+          creature.x,
+          creature.z,
+          creature.rotY,
+          creature.health,
+          creature.maxHealth,
+          creature.isDead,
+          creature.animState,
         );
       });
     });
 
-    // Enemies removed
-    state$.enemies.onRemove((_enemy: any, id: string) => {
-      const clientEnemy = this.enemies.get(id);
-      if (clientEnemy) {
-        clientEnemy.dispose();
-        this.enemies.delete(id);
+    // Creatures removed
+    state$.creatures.onRemove((_creature: any, id: string) => {
+      const clientCreature = this.creatures.get(id);
+      if (clientCreature) {
+        clientCreature.dispose();
+        this.creatures.delete(id);
       }
     });
 
@@ -583,10 +583,10 @@ export class StateSync {
       player.dispose();
     }
     this.players.clear();
-    for (const [, enemy] of this.enemies) {
-      enemy.dispose();
+    for (const [, creature] of this.creatures) {
+      creature.dispose();
     }
-    this.enemies.clear();
+    this.creatures.clear();
     for (const [, drop] of this.lootBags) {
       drop.dispose();
     }

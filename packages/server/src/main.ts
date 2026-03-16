@@ -3,6 +3,7 @@ import { Encoder } from "@colyseus/schema";
 import { DungeonRoom } from "./rooms/DungeonRoom";
 import { initDatabase } from "./db/database";
 import { loadItemRegistry } from "./items/ItemRegistry";
+import { loadCreatureTypeRegistry } from "./creatures/CreatureTypeRegistry";
 import { logger } from "./logger";
 import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
@@ -18,6 +19,7 @@ const server = new Server({
   beforeListen: async () => {
     await initDatabase();
     await loadItemRegistry();
+    await loadCreatureTypeRegistry();
   },
   express: (app) => {
     app.use("/auth", auth.routes());
@@ -38,11 +40,3 @@ server.listen(port).then(() => {
     "Game server listening",
   );
 });
-
-// Graceful shutdown — release the port before tsx watch restarts
-function shutdown() {
-  logger.info("Shutting down…");
-  server.gracefullyShutdown(false).finally(() => process.exit(0));
-}
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);

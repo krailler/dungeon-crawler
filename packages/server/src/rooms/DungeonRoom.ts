@@ -8,7 +8,7 @@ import { getDb } from "../db/database";
 import { accounts, characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
-import { EnemyState } from "../state/EnemyState";
+import { CreatureState } from "../state/CreatureState";
 import { GateState } from "../state/GateState";
 import { DungeonGenerator } from "../dungeon/DungeonGenerator";
 import type { Room as DungeonRoomDef } from "../dungeon/DungeonGenerator";
@@ -24,6 +24,7 @@ import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
 import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
 import { executeEffect } from "../items/EffectHandlers";
+import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
@@ -34,8 +35,7 @@ import {
   generateFloorVariants,
   generateWallVariants,
   assignRoomSets,
-  ENEMY_TYPES,
-  computeEnemyDerivedStats,
+  computeCreatureDerivedStats,
   GOLD_SAVE_INTERVAL,
   CloseCode,
   SkillId,
@@ -273,14 +273,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
         return;
       }
-      // Build enemies map for combat system
-      const enemiesMap = new Map<string, EnemyState>();
-      this.state.enemies.forEach((e: EnemyState, id: string) => enemiesMap.set(id, e));
+      // Build creatures map for combat system
+      const creaturesMap = new Map<string, CreatureState>();
+      this.state.creatures.forEach((c: CreatureState, id: string) => creaturesMap.set(id, c));
       const result = this.combatSystem.useSkill(
         client.sessionId,
         data.skillId as SkillIdValue,
         player,
-        enemiesMap,
+        creaturesMap,
       );
       if (result) {
         client.send(MessageType.SKILL_COOLDOWN, {
@@ -519,10 +519,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
 
     const spawnRng = mulberry32(seed ^ 0x454e454d);
-    this.spawnEnemies(rooms, spawnRng, dungeonLevel);
+    this.spawnCreatures(rooms, spawnRng, dungeonLevel);
 
     this.log.info(
-      { seed, rooms: rooms.length, enemies: this.state.enemies.size },
+      { seed, rooms: rooms.length, creatures: this.state.creatures.size },
       "Dungeon generated",
     );
   }
@@ -537,8 +537,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const seed = data.seed ?? this.state.dungeonSeed;
     this.log.warn({ seed }, "Admin restart requested");
 
-    // Clear all enemies and loot bags
-    this.state.enemies.clear();
+    // Clear all creatures and loot bags
+    this.state.creatures.clear();
     this.state.lootBags.clear();
 
     // Regenerate dungeon
@@ -738,41 +738,44 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
   }
 
-  private spawnEnemies(rooms: DungeonRoomDef[], rng: () => number, dungeonLevel: number): void {
-    const typeDef = ENEMY_TYPES.zombie;
-    const baseDerived = computeEnemyDerivedStats(typeDef);
+  private spawnCreatures(rooms: DungeonRoomDef[], rng: () => number, dungeonLevel: number): void {
+    const availableTypes = getCreatureTypesForLevel(dungeonLevel);
+    if (availableTypes.length === 0) return;
 
-    let enemyId = 0;
+    let creatureId = 0;
     // Skip first room (player spawn)
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      // More enemies per room at higher dungeon levels
-      const minEnemies = 1 + Math.floor(dungeonLevel / 10);
-      const enemyCount = minEnemies + Math.floor(rng() * 2);
+      // More creatures per room at higher dungeon levels
+      const minCreatures = 1 + Math.floor(dungeonLevel / 10);
+      const creatureCount = minCreatures + Math.floor(rng() * 2);
 
-      for (let j = 0; j < enemyCount; j++) {
+      for (let j = 0; j < creatureCount; j++) {
+        const typeDef = availableTypes[Math.floor(rng() * availableTypes.length)];
+        const baseDerived = computeCreatureDerivedStats(typeDef);
+
         const tileX = room.x + 1 + Math.floor(rng() * (room.w - 2));
         const tileY = room.y + 1 + Math.floor(rng() * (room.h - 2));
 
-        // Assign enemy level in range [dungeonLevel - 1, dungeonLevel + 2] (min 1)
+        // Assign creature level in range [dungeonLevel - 1, dungeonLevel + 2] (min 1)
         const levelOffset = Math.floor(rng() * 4) - 1; // -1 to +2
-        const enemyLevel = Math.max(1, dungeonLevel + levelOffset);
+        const creatureLevel = Math.max(1, dungeonLevel + levelOffset);
 
-        const enemy = new EnemyState();
-        enemy.x = tileX * TILE_SIZE;
-        enemy.z = tileY * TILE_SIZE;
-        enemy.enemyType = typeDef.id;
-        enemy.detectionRange = typeDef.detectionRange;
-        enemy.applyStats(baseDerived, enemyLevel);
+        const creature = new CreatureState();
+        creature.x = tileX * TILE_SIZE;
+        creature.z = tileY * TILE_SIZE;
+        creature.creatureType = typeDef.id;
+        creature.detectionRange = typeDef.detectionRange;
+        creature.applyStats(baseDerived, creatureLevel);
 
-        const id = `enemy_${enemyId++}`;
-        this.state.enemies.set(id, enemy);
-        this.aiSystem.register(enemy, id, typeDef.leashRange);
+        const id = `creature_${creatureId++}`;
+        this.state.creatures.set(id, creature);
+        this.aiSystem.register(creature, id, typeDef.leashRange);
       }
     }
   }
 
-  /** Recalculate dungeon level from current party and re-scale all enemies */
+  /** Recalculate dungeon level from current party and re-scale all creatures */
   private recalcDungeonLevel(): void {
     let levelSum = 0;
     let playerCount = 0;
@@ -786,13 +789,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const oldLevel = this.state.dungeonLevel;
     this.state.dungeonLevel = newLevel;
 
-    // Re-scale all existing enemies to match the new dungeon level
-    const typeDef = ENEMY_TYPES.zombie;
-    const baseDerived = computeEnemyDerivedStats(typeDef);
-    this.state.enemies.forEach((enemy: EnemyState) => {
-      const levelOffset = enemy.level - oldLevel;
-      const enemyLevel = Math.max(1, newLevel + levelOffset);
-      enemy.applyStats(baseDerived, enemyLevel);
+    // Re-scale all existing creatures to match the new dungeon level
+    this.state.creatures.forEach((creature: CreatureState) => {
+      const typeDef = getCreatureTypeDef(creature.creatureType);
+      if (!typeDef) return;
+      const baseDerived = computeCreatureDerivedStats(typeDef);
+      const levelOffset = creature.level - oldLevel;
+      const creatureLevel = Math.max(1, newLevel + levelOffset);
+      creature.applyStats(baseDerived, creatureLevel);
     });
 
     this.log.info({ dungeonLevel: newLevel, playerCount }, "Recalculated dungeon level");

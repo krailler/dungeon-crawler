@@ -3,7 +3,7 @@ import {
   XP_CURVE_BASE,
   XP_CURVE_EXPONENT,
   BASE_XP_PER_KILL,
-  XP_PER_ENEMY_LEVEL,
+  XP_PER_CREATURE_LEVEL,
   LEVEL_DIFF_PENALTY_PER_LEVEL,
   LEVEL_DIFF_BONUS_PER_LEVEL,
   LEVEL_DIFF_MIN_MODIFIER,
@@ -21,21 +21,21 @@ export function xpToNextLevel(level: number): number {
 }
 
 /**
- * Compute XP earned per player when an enemy is killed.
+ * Compute XP earned per player when a creature is killed.
  *
  * Unlike gold, XP is NOT split among party members — each alive player
  * gets the full amount. The incentive for grouping is survivability,
  * not XP per kill.
  *
  * Level difference modifier (same as gold):
- * - Killing much lower enemies (>5 levels below): 10% XP (anti-farming)
- * - Killing lower enemies: -10% per level below
- * - Killing higher enemies: +5% per level above (risk/reward)
+ * - Killing much lower creatures (>5 levels below): 10% XP (anti-farming)
+ * - Killing lower creatures: -10% per level below
+ * - Killing higher creatures: +5% per level above (risk/reward)
  */
-export function computeXpDrop(enemyLevel: number, playerLevel: number): number {
-  const baseXp = BASE_XP_PER_KILL + enemyLevel * XP_PER_ENEMY_LEVEL;
+export function computeXpDrop(creatureLevel: number, playerLevel: number): number {
+  const baseXp = BASE_XP_PER_KILL + creatureLevel * XP_PER_CREATURE_LEVEL;
 
-  const levelDiff = enemyLevel - playerLevel;
+  const levelDiff = creatureLevel - playerLevel;
   let modifier: number;
   if (levelDiff < -5) {
     modifier = LEVEL_DIFF_MIN_MODIFIER;

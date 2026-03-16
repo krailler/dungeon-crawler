@@ -1,1 +1,0 @@
-ALTER TABLE "characters" ADD COLUMN "tutorials_completed" text DEFAULT '[]' NOT NULL;
