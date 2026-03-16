@@ -1,7 +1,39 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { playUiSfx } from "../../audio/uiSfx";
 import { useDraggable } from "../hooks/useDraggable";
+
+/** Global z-index counter — increments each time a panel is opened or clicked */
+let zCounter = 10;
+
+// ── Panel stack: single Escape listener closes the topmost panel ────────────
+
+type PanelEntry = { z: number; close: () => void };
+const panelStack = new Map<symbol, PanelEntry>();
+
+function handleEscape(e: KeyboardEvent): void {
+  if (e.key !== "Escape") return;
+  if (panelStack.size === 0) return;
+
+  // Find the entry with the highest z-index
+  let topKey: symbol | null = null;
+  let topZ = -Infinity;
+  for (const [key, entry] of panelStack) {
+    if (entry.z > topZ) {
+      topZ = entry.z;
+      topKey = key;
+    }
+  }
+  if (!topKey) return;
+
+  e.stopImmediatePropagation();
+  panelStack.get(topKey)!.close();
+}
+
+// Register listener once (capture phase — fires before PauseMenu)
+window.addEventListener("keydown", handleEscape, true);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 type HudPanelProps = {
   /** Header content (left side) — typically a title or title + subtitle */
@@ -30,15 +62,18 @@ export const HudPanel = ({
   persistPosition,
 }: HudPanelProps): JSX.Element => {
   const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 }, persistPosition);
+  const [zIndex, setZIndex] = useState(() => ++zCounter);
+  const bringToFront = useCallback(() => setZIndex(++zCounter), []);
+  const idRef = useRef(Symbol());
 
-  // Close on Escape
+  // Register in panel stack (update z + close ref on every render)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onClose();
+    const id = idRef.current;
+    panelStack.set(id, { z: zIndex, close: onClose });
+    return () => {
+      panelStack.delete(id);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [zIndex, onClose]);
 
   return (
     <div
@@ -46,9 +81,10 @@ export const HudPanel = ({
       className={`pointer-events-auto animate-rise-in ${className}`}
       style={
         drag.enabled
-          ? { position: "absolute", left: drag.position.x, top: drag.position.y }
-          : undefined
+          ? { position: "absolute", left: drag.position.x, top: drag.position.y, zIndex }
+          : { zIndex }
       }
+      onPointerDown={bringToFront}
     >
       <div className="rounded-2xl border border-[color:var(--ui-panel-border)] bg-[color:var(--ui-panel)] p-4 shadow-xl shadow-black/40 backdrop-blur-md">
         {/* Header — drag handle when panelId is set */}
