@@ -5,6 +5,7 @@
 export const TutorialStep = {
   START_DUNGEON: "start_dungeon",
   ALLOCATE_STATS: "allocate_stats",
+  SPRINT: "sprint",
 } as const;
 
 export type TutorialStepValue = (typeof TutorialStep)[keyof typeof TutorialStep];

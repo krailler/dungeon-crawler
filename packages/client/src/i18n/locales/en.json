@@ -135,7 +135,8 @@
   },
   "tutorial": {
     "startDungeon": "You are the party leader! Right-click the gate or press F nearby to start the dungeon.",
-    "allocateStats": "You have attribute points! Press C to open the character panel and assign them."
+    "allocateStats": "You have attribute points! Press C to open the character panel and assign them.",
+    "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!"
   },
   "reconnect": {
     "title": "Connection Lost",

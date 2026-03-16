@@ -130,6 +130,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       chatSystem: this.chatSystem,
       clock: this.clock,
       log: this.log,
+      sendToClient: (sessionId: string, type: string, message: unknown) => {
+        const c = self.clients.find((cl) => cl.sessionId === sessionId);
+        if (c) c.send(type, message);
+      },
     });
 
     // Setup session manager

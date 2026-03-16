@@ -5,8 +5,15 @@ import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import type { ChatSystem } from "../chat/ChatSystem";
-import { TILE_SIZE, INTERACT_RANGE, GATE_COUNTDOWN_SECONDS, GateType } from "@dungeon/shared";
-import type { GateInteractMessage } from "@dungeon/shared";
+import {
+  TILE_SIZE,
+  INTERACT_RANGE,
+  GATE_COUNTDOWN_SECONDS,
+  GateType,
+  MessageType,
+  TutorialStep,
+} from "@dungeon/shared";
+import type { GateInteractMessage, TutorialHintMessage } from "@dungeon/shared";
 
 export interface GateSystemDeps {
   state: DungeonState;
@@ -14,6 +21,7 @@ export interface GateSystemDeps {
   chatSystem: ChatSystem;
   clock: ClockTimer;
   log: Logger;
+  sendToClient: (sessionId: string, type: string, message: unknown) => void;
 }
 
 export class GateSystem {
@@ -22,6 +30,7 @@ export class GateSystem {
   private chatSystem: ChatSystem;
   private clock: ClockTimer;
   private log: Logger;
+  private sendToClient: (sessionId: string, type: string, message: unknown) => void;
   private gateCountdowns: Set<string> = new Set();
 
   constructor(deps: GateSystemDeps) {
@@ -30,10 +39,11 @@ export class GateSystem {
     this.chatSystem = deps.chatSystem;
     this.clock = deps.clock;
     this.log = deps.log;
+    this.sendToClient = deps.sendToClient;
   }
 
   /** Reset countdowns (called on dungeon regeneration). */
-  reset(deps: Omit<GateSystemDeps, "clock" | "log">): void {
+  reset(deps: Omit<GateSystemDeps, "clock" | "log" | "sendToClient">): void {
     this.gateCountdowns.clear();
     this.state = deps.state;
     this.pathfinder = deps.pathfinder;
@@ -130,5 +140,17 @@ export class GateSystem {
         this.gateCountdowns.delete(id);
       }
     });
+
+    // Send sprint tutorial hint to all players after a short delay
+    this.clock.setTimeout(() => {
+      this.state.players.forEach((p: PlayerState, sid: string) => {
+        if (!p.online || p.health <= 0) return;
+        if (p.tutorialsCompleted.has(TutorialStep.SPRINT)) return;
+        this.sendToClient(sid, MessageType.TUTORIAL_HINT, {
+          step: TutorialStep.SPRINT,
+          i18nKey: "tutorial.sprint",
+        } satisfies TutorialHintMessage);
+      });
+    }, 5000);
   }
 }
