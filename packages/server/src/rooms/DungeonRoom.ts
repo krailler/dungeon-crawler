@@ -57,7 +57,7 @@ import type {
   SprintMessage,
   AdminDebugInfoMessage,
 } from "@dungeon/shared";
-import { mulberry32 } from "@dungeon/shared";
+import { mulberry32, generateRoomName } from "@dungeon/shared";
 
 const TICK_RATE = 64; // ms between simulation ticks
 
@@ -329,6 +329,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   private generateDungeon(seed: number): void {
     this.state.dungeonSeed = seed;
+    this.state.roomName = generateRoomName(seed);
     this.state.dungeonVersion++;
 
     // Calculate dungeon level from average party level (default 1 if no players yet)

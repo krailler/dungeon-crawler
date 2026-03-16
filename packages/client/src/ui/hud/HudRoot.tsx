@@ -224,7 +224,9 @@ export const HudRoot = (): JSX.Element => {
             <div className="text-xs uppercase tracking-[0.4em] text-slate-400">
               {t("party.title")}
             </div>
-            <div className="text-sm font-semibold text-slate-100">{t("party.subtitle")}</div>
+            <div className="text-sm font-semibold text-slate-100">
+              {snapshot.roomName || t("party.subtitle")}
+            </div>
           </div>
         </div>
         <div className="flex flex-col gap-3">
@@ -241,11 +243,6 @@ export const HudRoot = (): JSX.Element => {
           {snapshot.connectionStatus === "connected" && members.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-500/40 bg-slate-900/30 px-3 py-3 text-xs text-slate-400">
               {t("party.waiting")}
-            </div>
-          )}
-          {snapshot.connectionStatus === "connected" && snapshot.connectionInfo && (
-            <div className="rounded-2xl border border-slate-500/20 bg-slate-900/20 px-3 py-1.5 text-[10px] text-slate-500">
-              {snapshot.connectionInfo}
             </div>
           )}
           {members.map((member) => (

@@ -15,6 +15,7 @@ export class DungeonState extends Schema {
   /** Incremented on each dungeon regeneration to force client re-render */
   @type("uint32") dungeonVersion: number = 0;
   @type("int16") dungeonLevel: number = 1;
+  @type("string") roomName: string = "";
 
   // ── Admin-only fields (sent via ADMIN_DEBUG_INFO message, not synced to all clients) ──
   dungeonSeed: number = 0;

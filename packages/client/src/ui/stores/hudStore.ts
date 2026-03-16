@@ -59,6 +59,7 @@ export type HudSnapshot = {
   localCoords: { x: number; z: number } | null;
   /** Active skill cooldowns, keyed by skill ID */
   skillCooldowns: Map<string, SkillCooldownState>;
+  roomName: string;
 };
 
 type Listener = () => void;
@@ -78,6 +79,7 @@ let connectionStatus: ConnectionStatus = "connecting";
 let connectionInfo: string = "";
 let localCoords: { x: number; z: number } | null = null;
 const skillCooldowns: Map<string, SkillCooldownState> = new Map();
+let roomName = "";
 
 let cachedSnapshot: HudSnapshot = {
   members: [],
@@ -87,6 +89,7 @@ let cachedSnapshot: HudSnapshot = {
   connectionInfo: "",
   localCoords: null,
   skillCooldowns: new Map(),
+  roomName: "",
 };
 
 const rebuildSnapshot = (): void => {
@@ -98,6 +101,7 @@ const rebuildSnapshot = (): void => {
     connectionInfo,
     localCoords,
     skillCooldowns: new Map(skillCooldowns),
+    roomName,
   };
 };
 
@@ -192,6 +196,7 @@ export const hudStore = {
     connectionStatus = "connecting";
     connectionInfo = "";
     localCoords = null;
+    roomName = "";
     room = null;
     skillCooldowns.clear();
     rebuildSnapshot();
@@ -234,6 +239,12 @@ export const hudStore = {
     if (!room) return;
     const msg: StatAllocateMessage = { stat };
     room.send(MessageType.STAT_ALLOCATE, msg);
+  },
+  setRoomName(name: string): void {
+    if (roomName === name) return;
+    roomName = name;
+    rebuildSnapshot();
+    emit();
   },
   setSkillCooldown(skillId: string, duration: number): void {
     skillCooldowns.set(skillId, { duration, startedAt: Date.now() });

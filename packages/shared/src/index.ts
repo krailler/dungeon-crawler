@@ -45,6 +45,8 @@ export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
 
 export { mulberry32 } from "./random.js";
 
+export { generateRoomName } from "./RoomNames.js";
+
 export {
   AllocatableStat,
   ALLOCATABLE_STATS,

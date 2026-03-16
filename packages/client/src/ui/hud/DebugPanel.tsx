@@ -89,6 +89,16 @@ export const DebugPanel = (): JSX.Element => {
                 Server
               </span>
               <div className="mt-1.5 flex flex-col gap-0.5 text-[10px] text-slate-500">
+                {admin.roomId && (
+                  <div>
+                    Room: <span className="font-mono text-slate-400">{admin.roomId}</span>
+                  </div>
+                )}
+                {admin.sessionId && (
+                  <div>
+                    Session: <span className="font-mono text-slate-400">{admin.sessionId}</span>
+                  </div>
+                )}
                 {admin.runtime && (
                   <div>
                     Runtime: <span className="font-mono text-slate-400">{admin.runtime}</span>

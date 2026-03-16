@@ -106,6 +106,11 @@ export class StateSync {
       this.deps.dungeonRenderer.removeGate(gateId);
     });
 
+    // Listen for room name changes (fires on join and every restart)
+    state$.listen("roomName", (name: string) => {
+      hudStore.setRoomName(name);
+    });
+
     // Listen for dungeon version (fires on join and every restart, even same-seed)
     state$.listen("dungeonVersion", () => {
       const tileMapData = (room.state as any).tileMapData as string;

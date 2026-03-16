@@ -6,10 +6,12 @@ type AdminSnapshot = {
   seed: number;
   tickRate: number;
   runtime: string;
+  roomId: string;
+  sessionId: string;
 };
 
 let room: Room | null = null;
-let snapshot: AdminSnapshot = { seed: 0, tickRate: 0, runtime: "" };
+let snapshot: AdminSnapshot = { seed: 0, tickRate: 0, runtime: "", roomId: "", sessionId: "" };
 let listeners: Set<() => void> = new Set();
 
 function emit(): void {
@@ -19,14 +21,16 @@ function emit(): void {
 export const adminStore = {
   setRoom(r: Room): void {
     room = r;
+    snapshot = { ...snapshot, roomId: r.roomId, sessionId: r.sessionId };
+    emit();
   },
   clearRoom(): void {
     room = null;
-    snapshot = { seed: 0, tickRate: 0, runtime: "" };
+    snapshot = { seed: 0, tickRate: 0, runtime: "", roomId: "", sessionId: "" };
     emit();
   },
   setDebugInfo(data: AdminDebugInfoMessage): void {
-    snapshot = { seed: data.seed, tickRate: data.tickRate, runtime: data.runtime };
+    snapshot = { ...snapshot, seed: data.seed, tickRate: data.tickRate, runtime: data.runtime };
     emit();
   },
   subscribe(fn: () => void): () => void {
