@@ -46,6 +46,7 @@ import type {
   ChatSendPayload,
   PromoteLeaderMessage,
   PartyKickMessage,
+  SkillIdValue,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
@@ -246,7 +247,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.state.enemies.forEach((e: EnemyState, id: string) => enemiesMap.set(id, e));
       const result = this.combatSystem.useSkill(
         client.sessionId,
-        data.skillId as import("@dungeon/shared").SkillIdValue,
+        data.skillId as SkillIdValue,
         player,
         enemiesMap,
       );

@@ -1,5 +1,7 @@
+import type { Client } from "colyseus";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
+import type { PlayerState } from "../state/PlayerState";
 import { MAX_LEVEL } from "@dungeon/shared";
 
 /**
@@ -74,7 +76,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     description: "Heal a player to full HP (self if omitted)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      let target: { player: import("../state/PlayerState").PlayerState; sessionId: string };
+      let target: { player: PlayerState; sessionId: string };
       if (ctx.args[0]) {
         const found = bridge.findPlayerByName(ctx.args[0]);
         if (!found) {
@@ -224,10 +226,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 }
 
 /** Find a Colyseus Client by sessionId from the room's clients list. */
-function findClient(
-  bridge: ChatRoomBridge,
-  sessionId: string,
-): import("colyseus").Client | undefined {
+function findClient(bridge: ChatRoomBridge, sessionId: string): Client | undefined {
   for (const client of bridge.getClients()) {
     if (client.sessionId === sessionId) return client;
   }

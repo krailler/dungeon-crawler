@@ -1,3 +1,5 @@
+import type { SkillIdValue } from "./Skills.js";
+
 /** Message types for client ↔ server communication */
 export const MessageType = {
   MOVE: "move",
@@ -139,17 +141,17 @@ export interface GateInteractMessage {
 
 /** Client → Server: toggle a skill on/off */
 export interface SkillToggleMessage {
-  skillId: import("./Skills.js").SkillIdValue;
+  skillId: SkillIdValue;
 }
 
 /** Client → Server: use an active skill */
 export interface SkillUseMessage {
-  skillId: import("./Skills.js").SkillIdValue;
+  skillId: SkillIdValue;
 }
 
 /** Server → Client: skill cooldown started (for UI overlay) */
 export interface SkillCooldownMessage {
-  skillId: import("./Skills.js").SkillIdValue;
+  skillId: SkillIdValue;
   /** Total cooldown duration in seconds */
   duration: number;
   /** Remaining cooldown in seconds */

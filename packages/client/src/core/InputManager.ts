@@ -1,5 +1,6 @@
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
 
@@ -21,7 +22,7 @@ export class InputManager {
   private handlePointerDown: (ev: PointerEvent) => void;
   private handlePointerUp: (ev: PointerEvent) => void;
   private handlePointerLeave: () => void;
-  private renderObserver: import("@babylonjs/core/Misc/observable").Observer<Scene> | null = null;
+  private renderObserver: Observer<Scene> | null = null;
 
   constructor(scene: Scene, floorMeshes: AbstractMesh[], room: Room) {
     this.scene = scene;
