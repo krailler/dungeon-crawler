@@ -70,6 +70,8 @@ export const ConsumableSlots = (): JSX.Element => {
   // Always show at least the first consumable slot (health potion = Q)
   const firstEntry = consumables[0] ?? null;
   const hasPotion = firstEntry !== null;
+  const firstDef = hasPotion ? itemDefs.get(firstEntry.itemId) : undefined;
+  const clickToUse = t("inventory.clickToUse");
 
   return (
     <div className="flex items-center gap-1.5">
@@ -78,73 +80,38 @@ export const ConsumableSlots = (): JSX.Element => {
         variant="red"
         size="md"
         active={hasPotion}
-        icon={
-          <span className={hasPotion ? "text-rose-300" : "text-slate-600"}>
-            <PotionIcon className="h-6 w-6" />
-          </span>
-        }
+        icon={<PotionIcon />}
         onClick={hasPotion ? () => handleUse(firstEntry.itemId) : undefined}
         keybind="Q"
         quantity={hasPotion ? firstEntry.totalQty : undefined}
         quantityPosition="top-right"
         cooldown={hasPotion ? (snapshot.itemCooldowns.get(firstEntry.itemId) ?? null) : null}
-        tooltip={
-          hasPotion
-            ? (() => {
-                const def = itemDefs.get(firstEntry.itemId);
-                return def ? (
-                  <>
-                    <div className="text-[11px] font-semibold text-slate-100">{t(def.name)}</div>
-                    <div className="mt-0.5 text-[10px] text-slate-400">
-                      {t(def.description, def.effectParams)}
-                    </div>
-                    <div className="mt-1 text-[10px] text-emerald-400/80">
-                      {t("inventory.clickToUse")}
-                    </div>
-                  </>
-                ) : undefined;
-              })()
-            : undefined
-        }
+        tooltipName={firstDef?.name}
+        tooltipDesc={firstDef?.description}
+        tooltipDescParams={firstDef?.effectParams}
+        tooltipHint={firstDef ? clickToUse : undefined}
       />
 
       {/* Extra consumable slots (if more than one type) */}
       {consumables.slice(1).map((entry, i) => {
         const IconComponent = ITEM_ICON_MAP[entry.icon];
+        const def = itemDefs.get(entry.itemId);
         return (
           <ActionSlot
             key={entry.itemId}
             variant="red"
             size="md"
             active
-            icon={
-              IconComponent ? (
-                <span className="text-rose-300">
-                  <IconComponent className="h-6 w-6" />
-                </span>
-              ) : (
-                <span className="text-[16px]">?</span>
-              )
-            }
+            icon={IconComponent ? <IconComponent /> : <span className="text-[16px]">?</span>}
             onClick={() => handleUse(entry.itemId)}
             keybind={String(i + 2)}
             quantity={entry.totalQty}
             quantityPosition="top-right"
             cooldown={snapshot.itemCooldowns.get(entry.itemId) ?? null}
-            tooltip={(() => {
-              const def = itemDefs.get(entry.itemId);
-              return def ? (
-                <>
-                  <div className="text-[11px] font-semibold text-slate-100">{t(def.name)}</div>
-                  <div className="mt-0.5 text-[10px] text-slate-400">
-                    {t(def.description, def.effectParams)}
-                  </div>
-                  <div className="mt-1 text-[10px] text-emerald-400/80">
-                    {t("inventory.clickToUse")}
-                  </div>
-                </>
-              ) : undefined;
-            })()}
+            tooltipName={def?.name}
+            tooltipDesc={def?.description}
+            tooltipDescParams={def?.effectParams}
+            tooltipHint={def ? clickToUse : undefined}
           />
         );
       })}

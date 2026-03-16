@@ -14,31 +14,6 @@ const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => JSX.Eleme
   potion_red: PotionIcon,
 };
 
-// ── Inventory tooltip ────────────────────────────────────────────────────────
-
-const InventoryTooltip = ({
-  name,
-  description,
-  descriptionParams,
-  consumable,
-}: {
-  name: string;
-  description: string;
-  descriptionParams?: Record<string, unknown>;
-  consumable: boolean;
-}): JSX.Element => {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="text-[11px] font-semibold text-slate-100">{t(name)}</div>
-      <div className="mt-0.5 text-[10px] text-slate-400">{t(description, descriptionParams)}</div>
-      {consumable && (
-        <div className="mt-1 text-[10px] text-emerald-400/80">{t("inventory.clickToUse")}</div>
-      )}
-    </>
-  );
-};
-
 // ── InventoryPanel ───────────────────────────────────────────────────────────
 
 export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Element | null => {
@@ -71,6 +46,8 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
     hudStore.useItem(itemId);
   };
 
+  const clickToUse = t("inventory.clickToUse");
+
   return (
     <HudPanel
       onClose={onClose}
@@ -91,11 +68,9 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
               active={!!slot}
               icon={
                 IconComponent ? (
-                  <span className="text-rose-300">
-                    <IconComponent className="h-5 w-5" />
-                  </span>
+                  <IconComponent />
                 ) : slot ? (
-                  <span className="text-[14px] text-slate-400">?</span>
+                  <span className="text-[14px]">?</span>
                 ) : (
                   <></>
                 )
@@ -105,16 +80,10 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
               quantityMin={2}
               quantityPosition="bottom-right"
               cooldown={slot ? (snapshot.itemCooldowns.get(slot.itemId) ?? null) : null}
-              tooltip={
-                def ? (
-                  <InventoryTooltip
-                    name={def.name}
-                    description={def.description}
-                    descriptionParams={def.effectParams}
-                    consumable={!!isConsumable}
-                  />
-                ) : undefined
-              }
+              tooltipName={def?.name}
+              tooltipDesc={def?.description}
+              tooltipDescParams={def?.effectParams}
+              tooltipHint={isConsumable ? clickToUse : undefined}
             />
           );
         })}

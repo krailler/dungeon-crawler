@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { SkillCooldownState } from "../stores/hudStore";
 
 // ── Cooldown overlay ────────────────────────────────────────────────────────
@@ -69,6 +70,9 @@ const VARIANT_COLORS: Record<
     readyBg: string;
     keybindActive: string;
     keybindEmpty: string;
+    iconActive: string;
+    iconDisabled: string;
+    iconEmpty: string;
   }
 > = {
   default: {
@@ -81,6 +85,9 @@ const VARIANT_COLORS: Record<
     readyBg: "bg-sky-400/20",
     keybindActive: "bg-slate-800/80 text-slate-400",
     keybindEmpty: "bg-slate-800/60 text-slate-600",
+    iconActive: "text-sky-300",
+    iconDisabled: "text-slate-500",
+    iconEmpty: "text-slate-600",
   },
   red: {
     active:
@@ -91,6 +98,9 @@ const VARIANT_COLORS: Record<
     readyBg: "bg-rose-400/20",
     keybindActive: "bg-slate-800/80 text-slate-400",
     keybindEmpty: "bg-slate-800/60 text-slate-600",
+    iconActive: "text-rose-300",
+    iconDisabled: "text-slate-500",
+    iconEmpty: "text-slate-600",
   },
   empty: {
     active:
@@ -101,6 +111,9 @@ const VARIANT_COLORS: Record<
     readyBg: "bg-slate-400/20",
     keybindActive: "",
     keybindEmpty: "",
+    iconActive: "text-slate-300",
+    iconDisabled: "text-slate-500",
+    iconEmpty: "text-slate-600",
   },
 };
 
@@ -137,7 +150,15 @@ export type ActionSlotProps = {
   cooldown?: SkillCooldownState | null;
   /** External activation counter — drives click pulse from keyboard shortcuts */
   activationCount?: number;
-  /** Tooltip content rendered on hover (null = no tooltip) */
+  /** Structured tooltip: i18n name key */
+  tooltipName?: string;
+  /** Structured tooltip: i18n description key */
+  tooltipDesc?: string;
+  /** Structured tooltip: interpolation params for description */
+  tooltipDescParams?: Record<string, unknown>;
+  /** Structured tooltip: hint text shown below description (e.g. "Click to use") */
+  tooltipHint?: string;
+  /** Custom tooltip content — overrides structured tooltip props */
   tooltip?: ReactNode;
 };
 
@@ -155,10 +176,16 @@ export const ActionSlot = ({
   quantityPosition = "top-right",
   cooldown = null,
   activationCount = 0,
+  tooltipName,
+  tooltipDesc,
+  tooltipDescParams,
+  tooltipHint,
   tooltip,
 }: ActionSlotProps): JSX.Element => {
+  const { t } = useTranslation();
   const colors = VARIANT_COLORS[variant];
   const sizeClass = size === "md" ? "h-12 w-12" : "h-11 w-11";
+  const iconSize = size === "md" ? "[&>svg]:h-6 [&>svg]:w-6" : "[&>svg]:h-5 [&>svg]:w-5";
   const cdTextSize = size === "md" ? "text-[14px]" : "text-[11px]";
 
   const [hovered, setHovered] = useState(false);
@@ -212,9 +239,21 @@ export const ActionSlot = ({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Tooltip */}
-      {hovered && tooltip && (
+      {hovered && (tooltip || tooltipName) && (
         <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 z-50 whitespace-nowrap rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2 text-center shadow-xl backdrop-blur-sm">
-          {tooltip}
+          {tooltip ?? (
+            <>
+              <div className="text-[11px] font-semibold text-slate-100">{t(tooltipName!)}</div>
+              {tooltipDesc && (
+                <div className="mt-0.5 text-[10px] text-slate-400">
+                  {t(tooltipDesc, tooltipDescParams)}
+                </div>
+              )}
+              {tooltipHint && (
+                <div className="mt-1 text-[10px] text-emerald-400/80">{tooltipHint}</div>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -233,7 +272,11 @@ export const ActionSlot = ({
         }}
       >
         {/* Icon */}
-        {icon}
+        <span
+          className={`${iconSize} ${!active ? colors.iconEmpty : disabled ? colors.iconDisabled : colors.iconActive}`}
+        >
+          {icon}
+        </span>
 
         {/* Disabled slash overlay (passive skills) */}
         {disabledSlash && (

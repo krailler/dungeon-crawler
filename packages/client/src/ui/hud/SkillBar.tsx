@@ -126,15 +126,7 @@ export const SkillBar = (): JSX.Element => {
               active={!!skill}
               disabled={skill ? !active : false}
               disabledSlash={!!skill?.passive && !active}
-              icon={
-                IconComponent ? (
-                  <span className={active ? "text-slate-200" : "text-slate-500"}>
-                    <IconComponent />
-                  </span>
-                ) : (
-                  <LockIcon className="h-4 w-4 text-slate-600" />
-                )
-              }
+              icon={IconComponent ? <IconComponent /> : <LockIcon className="h-4 w-4" />}
               onClick={skill ? () => activateSlot(i) : undefined}
               keybind={String(i + 1)}
               cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}
