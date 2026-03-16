@@ -32,6 +32,7 @@ import {
   MessageType,
   GateType,
   INTERACT_RANGE,
+  TutorialStep,
 } from "@dungeon/shared";
 import { t } from "../i18n/i18n";
 import type { SkillCooldownMessage, AdminDebugInfoMessage } from "@dungeon/shared";
@@ -540,7 +541,7 @@ export class StateSync {
           confirmLabel: t("gate.promptAccept"),
           cancelLabel: t("gate.promptCancel"),
           onConfirm: () => {
-            tutorialStore.dismiss();
+            tutorialStore.dismiss(TutorialStep.START_DUNGEON);
             gateStore.confirmOpenGate(id);
           },
         });

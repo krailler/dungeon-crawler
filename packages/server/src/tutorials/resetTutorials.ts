@@ -12,12 +12,13 @@ export function resetTutorials(
   player: PlayerState,
   sessionId: string,
   sendToClient: (sessionId: string, type: string, message: unknown) => void,
+  dungeonStarted: boolean,
 ): number {
   const count = player.tutorialsCompleted.size;
   player.tutorialsCompleted.clear();
 
   // Re-send tutorial hints that now apply
-  if (player.isLeader) {
+  if (player.isLeader && !dungeonStarted) {
     sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
       step: TutorialStep.START_DUNGEON,
       i18nKey: "tutorial.startDungeon",

@@ -129,6 +129,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.sessionManager.removePlayerFromAllSystems(sessionId);
         this.sessionManager.reassignLeader();
       },
+      isDungeonStarted: () => this.isDungeonStarted(),
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
@@ -309,9 +310,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.TUTORIAL_RESET, (client: Client) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
-      resetTutorials(player, client.sessionId, (_sid, type, msg) => {
-        client.send(type, msg);
-      });
+      resetTutorials(
+        player,
+        client.sessionId,
+        (_sid, type, msg) => {
+          client.send(type, msg);
+        },
+        this.isDungeonStarted(),
+      );
     });
     // Stats: allocate a stat point to a base stat
     this.onMessage(MessageType.STAT_ALLOCATE, (client: Client, data: StatAllocateMessage) => {
@@ -327,6 +333,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.health <= 0) return;
       player.sprintRequested = data.active;
+      // Auto-complete the sprint tutorial on first use
+      if (data.active) {
+        player.tutorialsCompleted.add(TutorialStep.SPRINT);
+      }
     });
 
     // Item use: consume an item from inventory

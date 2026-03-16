@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { AllocatableStat } from "@dungeon/shared";
+import { AllocatableStat, TutorialStep } from "@dungeon/shared";
 import type { AllocatableStatValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
@@ -58,7 +58,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
 
   const handleAllocate = (stat: AllocatableStatValue): void => {
     playUiSfx("ui_click");
-    tutorialStore.dismiss();
+    tutorialStore.dismiss(TutorialStep.ALLOCATE_STATS);
     hudStore.allocateStat(stat);
   };
 

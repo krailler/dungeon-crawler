@@ -258,6 +258,7 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         target.player,
         target.sessionId,
         bridge.sendToClient.bind(bridge),
+        bridge.isDungeonStarted(),
       );
 
       ctx.reply(

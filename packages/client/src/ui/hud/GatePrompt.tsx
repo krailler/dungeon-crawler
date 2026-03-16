@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
+import { TutorialStep } from "@dungeon/shared";
 import { gateStore } from "../stores/gateStore";
 import { promptStore } from "../stores/promptStore";
 import { tutorialStore } from "../stores/tutorialStore";
@@ -28,7 +29,7 @@ export const GateHint = (): JSX.Element | null => {
         confirmLabel: t("gate.promptAccept"),
         cancelLabel: t("gate.promptCancel"),
         onConfirm: () => {
-          tutorialStore.dismiss();
+          tutorialStore.dismiss(TutorialStep.START_DUNGEON);
           gateStore.confirmOpenNearest();
         },
       });

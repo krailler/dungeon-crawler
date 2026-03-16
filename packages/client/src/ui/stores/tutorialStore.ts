@@ -51,8 +51,10 @@ export const tutorialStore = {
     playUiSfx("ui_tutorial");
   },
 
-  dismiss(): void {
+  /** Dismiss the current hint. If `expectedStep` is provided, only dismiss if it matches. */
+  dismiss(expectedStep?: string): void {
     if (!currentHint) return;
+    if (expectedStep && currentHint.step !== expectedStep) return;
     const step = currentHint.step;
     currentHint = null;
     rebuildSnapshot();

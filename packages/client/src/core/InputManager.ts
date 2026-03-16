@@ -2,8 +2,9 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Room } from "@colyseus/sdk";
-import { MessageType } from "@dungeon/shared";
+import { MessageType, TutorialStep } from "@dungeon/shared";
 import type { SprintMessage } from "@dungeon/shared";
+import { tutorialStore } from "../ui/stores/tutorialStore";
 
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
@@ -131,6 +132,7 @@ export class InputManager {
       if (ev.key === "Shift" && !this.sprintActive) {
         this.sprintActive = true;
         this.room.send(MessageType.SPRINT, { active: true } satisfies SprintMessage);
+        tutorialStore.dismiss(TutorialStep.SPRINT);
       }
     };
     this.handleKeyUp = (ev: KeyboardEvent) => {

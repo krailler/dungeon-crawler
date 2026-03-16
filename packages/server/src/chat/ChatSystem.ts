@@ -23,6 +23,8 @@ export interface ChatRoomBridge {
   sendToClient(sessionId: string, type: string, message: unknown): void;
   /** Remove a player from all room systems (state, combat, AI, etc.) */
   kickPlayer(sessionId: string): void;
+  /** Whether the dungeon expedition has started (lobby gate opened) */
+  isDungeonStarted(): boolean;
 }
 
 export class ChatSystem {
