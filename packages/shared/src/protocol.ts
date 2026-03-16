@@ -23,6 +23,7 @@ export const MessageType = {
   STAT_ALLOCATE: "stat:allocate",
   SPRINT: "sprint",
   ADMIN_DEBUG_INFO: "admin:debug_info",
+  DAMAGE_DEALT: "combat:damage",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -192,6 +193,16 @@ export interface StatAllocateMessage {
 /** Client → Server: toggle sprint on/off */
 export interface SprintMessage {
   active: boolean;
+}
+
+/** Server → Client: damage dealt by this player to an enemy (for floating combat text) */
+export interface DamageDealtMessage {
+  /** Enemy ID that was hit */
+  enemyId: string;
+  /** Final damage applied */
+  dmg: number;
+  /** Whether this hit killed the enemy */
+  kill: boolean;
 }
 
 export interface AdminDebugInfoMessage {

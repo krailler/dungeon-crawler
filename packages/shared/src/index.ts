@@ -26,6 +26,7 @@ export type {
   StatAllocateMessage,
   SprintMessage,
   AdminDebugInfoMessage,
+  DamageDealtMessage,
 } from "./protocol.js";
 
 export {

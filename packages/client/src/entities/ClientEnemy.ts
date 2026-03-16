@@ -51,6 +51,15 @@ export class ClientEnemy {
   private healthBarFill: Rectangle;
   private levelLabel: TextBlock;
 
+  // Floating damage text
+  private guiTexture: AdvancedDynamicTexture;
+  private damageTexts: {
+    label: TextBlock;
+    anchor: TransformNode;
+    age: number;
+    duration: number;
+  }[] = [];
+
   constructor(
     scene: Scene,
     id: string,
@@ -59,6 +68,7 @@ export class ClientEnemy {
     soundManager?: SoundManager,
   ) {
     this.animController = new AnimationController(soundManager ?? null);
+    this.guiTexture = guiTexture;
     this.previousHealth = initialHealth;
 
     // Invisible anchor for position/rotation
@@ -243,6 +253,27 @@ export class ClientEnemy {
         this.restoreMaterials();
       }
     }
+
+    // Animate floating damage texts
+    for (let i = this.damageTexts.length - 1; i >= 0; i--) {
+      const entry = this.damageTexts[i];
+      entry.age += dt;
+      const progress = entry.age / entry.duration;
+      if (progress >= 1) {
+        entry.label.dispose();
+        entry.anchor.dispose();
+        this.damageTexts.splice(i, 1);
+        continue;
+      }
+      // Rise upward
+      entry.anchor.position.y = 1.4 + progress * 1.2;
+      // Fade out in last 40%
+      entry.label.alpha = progress > 0.6 ? 1 - (progress - 0.6) / 0.4 : 1;
+      // Scale down slightly at end
+      const scale = progress > 0.7 ? 1 - (progress - 0.7) * 0.5 : 1;
+      entry.label.scaleX = scale;
+      entry.label.scaleY = scale;
+    }
   }
 
   private updateHealthBar(health: number, maxHealth: number): void {
@@ -273,7 +304,46 @@ export class ClientEnemy {
     }
   }
 
+  /** Show a floating damage number above the enemy */
+  showDamageText(damage: number, isKill: boolean): void {
+    if (this.isDead) return;
+
+    // Determine visual style based on damage magnitude
+    const isHeavy = damage >= 15;
+    const fontSize = isKill ? 22 : isHeavy ? 18 : 14;
+    const color = isKill ? "#ff4444" : isHeavy ? "#ff8800" : "#ffdd44";
+    const duration = isKill ? 1.2 : 0.9;
+
+    // Create anchor at enemy position (will float upward in update())
+    const scene = this.mesh.getScene();
+    const anchor = new TransformNode(`dmgAnchor_${Date.now()}`, scene);
+    anchor.parent = this.mesh;
+    // Offset horizontally to spread multiple hits
+    const spread = (Math.random() - 0.5) * 0.6;
+    anchor.position.set(spread, 1.4, 0);
+
+    const label = new TextBlock(`dmgText_${Date.now()}`, `${damage}`);
+    label.color = color;
+    label.fontSize = fontSize;
+    label.fontWeight = isHeavy || isKill ? "bold" : "600";
+    label.outlineWidth = 2;
+    label.outlineColor = "#000000";
+    label.resizeToFit = true;
+    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+
+    this.guiTexture.addControl(label);
+    label.linkWithMesh(anchor);
+    label.linkOffsetY = -20;
+
+    this.damageTexts.push({ label, anchor, age: 0, duration });
+  }
+
   dispose(): void {
+    for (const entry of this.damageTexts) {
+      entry.label.dispose();
+      entry.anchor.dispose();
+    }
+    this.damageTexts.length = 0;
     this.healthBarContainer.dispose();
     this.barAnchor.dispose();
     if (!this.isDead) {

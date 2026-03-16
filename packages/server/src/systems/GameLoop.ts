@@ -24,6 +24,7 @@ import type {
   CombatLogMessage,
   DebugPathEntry,
   AdminDebugInfoMessage,
+  DamageDealtMessage,
 } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
@@ -175,6 +176,14 @@ export class GameLoop {
       kill: event.killed,
     };
     this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+    // Notify the attacking player of damage dealt (for floating combat text)
+    const dmgMsg: DamageDealtMessage = {
+      enemyId: event.enemyId,
+      dmg: event.finalDamage,
+      kill: event.killed,
+    };
+    this.bridge.sendToClient(event.sessionId, MessageType.DAMAGE_DEALT, dmgMsg);
 
     // Remove dead enemy from state after a short delay so clients see the death
     if (event.killed) {

@@ -36,6 +36,7 @@ import type {
   CommandInfo,
   DebugPathsMessage,
   TutorialHintMessage,
+  DamageDealtMessage,
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -280,6 +281,14 @@ export class ClientGame {
               ? "color: #60a5fa"
               : "color: #fbbf24",
         );
+      });
+
+      // Floating damage text — sent only to the player who dealt the damage
+      room.onMessage(MessageType.DAMAGE_DEALT, (msg: DamageDealtMessage) => {
+        const enemy = this.stateSync.enemies.get(msg.enemyId);
+        if (enemy) {
+          enemy.showDamageText(msg.dmg, msg.kill);
+        }
       });
 
       // Debug: path visualization
