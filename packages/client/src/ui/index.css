@@ -54,6 +54,13 @@ body {
   inset: 0;
   z-index: 20;
   pointer-events: none;
+  user-select: none;
+}
+
+/* Allow text selection in input fields */
+#ui-root input,
+#ui-root textarea {
+  user-select: text;
 }
 
 @keyframes rise-in {

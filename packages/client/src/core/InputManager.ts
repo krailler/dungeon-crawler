@@ -7,6 +7,44 @@ import { MessageType } from "@dungeon/shared";
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
 
+/**
+ * Metadata placed on any mesh that the player can click to interact with.
+ * Future interactables (chests, NPCs, …) reuse the same shape.
+ */
+export interface InteractableMetadata {
+  interactType: string; // e.g. "gate", "chest"
+  interactId: string; // unique id within that type
+}
+
+/** Configuration for the generic interactable-click system. */
+export interface InteractableConfig {
+  /** Returns all interactable meshes currently in the scene */
+  getMeshes: () => AbstractMesh[];
+  /** Returns the local player's world position (for distance check) */
+  getPlayerPosition: () => { x: number; z: number } | null;
+  /** Max interaction distance (world units) */
+  range: number;
+  /** Called when an interactable mesh is clicked within range */
+  onClick: (type: string, id: string) => void;
+}
+
+export interface InputManagerDeps {
+  scene: Scene;
+  floorMeshes: AbstractMesh[];
+  room: Room;
+  /** Optional interactable click system (gates, chests, etc.) */
+  interactable?: InteractableConfig;
+}
+
+/** Tracks a click on an interactable that was out of range — player walks toward it */
+interface PendingInteract {
+  type: string;
+  id: string;
+  /** World position of the interactable mesh (XZ) */
+  x: number;
+  z: number;
+}
+
 export class InputManager {
   private scene: Scene;
   private floorMeshSet: Set<AbstractMesh>;
@@ -14,6 +52,10 @@ export class InputManager {
   private canvas: HTMLCanvasElement;
   private isHolding: boolean = false;
   private lastSendTime: number = 0;
+  private interactable: InteractableConfig | undefined;
+
+  /** Pending interaction — player is walking toward an interactable */
+  private pendingInteract: PendingInteract | null = null;
 
   /** Last raycast hit point on the floor while holding (world coords) */
   private cursorWorldPoint: { x: number; z: number } | null = null;
@@ -24,16 +66,24 @@ export class InputManager {
   private handlePointerLeave: () => void;
   private renderObserver: Observer<Scene> | null = null;
 
-  constructor(scene: Scene, floorMeshes: AbstractMesh[], room: Room) {
-    this.scene = scene;
-    this.floorMeshSet = new Set(floorMeshes);
-    this.room = room;
+  constructor(deps: InputManagerDeps) {
+    this.scene = deps.scene;
+    this.floorMeshSet = new Set(deps.floorMeshes);
+    this.room = deps.room;
+    this.interactable = deps.interactable;
 
     this.canvas = this.scene.getEngine().getRenderingCanvas()!;
 
     this.handlePointerDown = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
       if (this.isOverUi(ev)) return;
+
+      // Check interactable click first (gates, chests, etc.)
+      if (this.tryInteractableClick()) return;
+
+      // Any other click cancels a pending interaction
+      this.pendingInteract = null;
+
       this.isHolding = true;
       this.trySendMove();
     };
@@ -55,6 +105,9 @@ export class InputManager {
 
     // While holding, update cursor position each frame and throttle MOVE sends
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
+      // Check if pending interaction is now in range
+      this.checkPendingInteract();
+
       if (!this.isHolding) return;
       // Always update cursor world position for smooth facing
       this.updateCursorPosition();
@@ -114,6 +167,71 @@ export class InputManager {
   getHoldTarget(): { x: number; z: number } | null {
     if (!this.isHolding) return null;
     return this.cursorWorldPoint;
+  }
+
+  /**
+   * Pick against interactable meshes.
+   * If in range → trigger immediately. If out of range → walk toward it.
+   * Returns true if an interactable was picked (regardless of range).
+   */
+  private tryInteractableClick(): boolean {
+    if (!this.interactable) return false;
+    const meshes = this.interactable.getMeshes();
+    if (meshes.length === 0) return false;
+
+    const meshSet = new Set(meshes);
+    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
+      meshSet.has(mesh),
+    );
+    if (!pick?.hit || !pick.pickedMesh) return false;
+
+    const meta = pick.pickedMesh.metadata as InteractableMetadata | null;
+    if (!meta?.interactType || !meta?.interactId) return false;
+
+    const playerPos = this.interactable.getPlayerPosition();
+    if (!playerPos) return false;
+
+    const meshPos = pick.pickedMesh.getAbsolutePosition();
+    const dx = meshPos.x - playerPos.x;
+    const dz = meshPos.z - playerPos.z;
+    const distSq = dx * dx + dz * dz;
+    const rangeSq = this.interactable.range * this.interactable.range;
+
+    if (distSq <= rangeSq) {
+      // In range — interact immediately
+      this.pendingInteract = null;
+      this.interactable.onClick(meta.interactType, meta.interactId);
+    } else {
+      // Out of range — walk toward it, interact on arrival
+      this.pendingInteract = {
+        type: meta.interactType,
+        id: meta.interactId,
+        x: meshPos.x,
+        z: meshPos.z,
+      };
+      this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
+      this.lastSendTime = performance.now();
+    }
+    return true;
+  }
+
+  /** Each frame, check if a pending interaction target is now within range. */
+  private checkPendingInteract(): void {
+    if (!this.pendingInteract || !this.interactable) return;
+
+    const playerPos = this.interactable.getPlayerPosition();
+    if (!playerPos) return;
+
+    const dx = this.pendingInteract.x - playerPos.x;
+    const dz = this.pendingInteract.z - playerPos.z;
+    const distSq = dx * dx + dz * dz;
+    const rangeSq = this.interactable.range * this.interactable.range;
+
+    if (distSq <= rangeSq) {
+      const { type, id } = this.pendingInteract;
+      this.pendingInteract = null;
+      this.interactable.onClick(type, id);
+    }
   }
 
   dispose(): void {

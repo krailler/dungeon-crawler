@@ -5,7 +5,7 @@ import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import type { ChatSystem } from "../chat/ChatSystem";
-import { TILE_SIZE, GATE_INTERACT_RANGE, GATE_COUNTDOWN_SECONDS, GateType } from "@dungeon/shared";
+import { TILE_SIZE, INTERACT_RANGE, GATE_COUNTDOWN_SECONDS, GateType } from "@dungeon/shared";
 import type { GateInteractMessage } from "@dungeon/shared";
 
 export interface GateSystemDeps {
@@ -66,7 +66,7 @@ export class GateSystem {
     const gateWZ = gate.tileY * TILE_SIZE;
     const dx = player.x - gateWX;
     const dz = player.z - gateWZ;
-    if (dx * dx + dz * dz > GATE_INTERACT_RANGE * GATE_INTERACT_RANGE) return;
+    if (dx * dx + dz * dz > INTERACT_RANGE * INTERACT_RANGE) return;
 
     // Lobby gates use countdown; other types open immediately
     if (gate.gateType === GateType.LOBBY) {

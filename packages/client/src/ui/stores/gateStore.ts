@@ -109,11 +109,21 @@ export const gateStore = {
   /** Send gate interaction to server for the nearest interactable gate */
   confirmOpenNearest(): void {
     if (!room || !nearestInteractableId) return;
-    const msg: GateInteractMessage = { gateId: nearestInteractableId };
+    this.confirmOpenGate(nearestInteractableId);
+  },
+
+  /** Send gate interaction to server for a specific gate id */
+  confirmOpenGate(gateId: string): void {
+    if (!room) return;
+    const gate = gates.get(gateId);
+    if (!gate || gate.isOpen) return;
+    const msg: GateInteractMessage = { gateId };
     room.send(MessageType.GATE_INTERACT, msg);
     // Suppress hint while countdown is active
-    pendingGates.add(nearestInteractableId);
-    showInteractHint = false;
+    pendingGates.add(gateId);
+    if (nearestInteractableId === gateId) {
+      showInteractHint = false;
+    }
     emit();
   },
 

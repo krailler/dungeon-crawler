@@ -123,7 +123,7 @@
     "damage": "Damage: {{multiplier}}×"
   },
   "tutorial": {
-    "startDungeon": "You are the party leader! Walk to the gate and press F to start the dungeon."
+    "startDungeon": "You are the party leader! Click the gate or press F nearby to start the dungeon."
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

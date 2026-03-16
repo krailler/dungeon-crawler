@@ -18,9 +18,19 @@ import { hudStore } from "../ui/stores/hudStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
+import { tutorialStore } from "../ui/stores/tutorialStore";
+import { promptStore } from "../ui/stores/promptStore";
 import { minimapStore } from "../ui/stores/minimapStore";
 import { loadingStore, LoadingPhase } from "../ui/stores/loadingStore";
-import { TileMap, unpackSetId, tileSetNameFromId, MessageType, GateType } from "@dungeon/shared";
+import {
+  TileMap,
+  unpackSetId,
+  tileSetNameFromId,
+  MessageType,
+  GateType,
+  INTERACT_RANGE,
+} from "@dungeon/shared";
+import { t } from "../i18n/i18n";
 import type { SkillCooldownMessage } from "@dungeon/shared";
 
 export interface StateSyncDeps {
@@ -180,11 +190,22 @@ export class StateSync {
           }
 
           // Setup input after dungeon renders (sends move commands to server)
-          this.inputManager = new InputManager(
-            this.deps.scene,
-            this.deps.dungeonRenderer.getFloorMeshes(),
+          this.inputManager = new InputManager({
+            scene: this.deps.scene,
+            floorMeshes: this.deps.dungeonRenderer.getFloorMeshes(),
             room,
-          );
+            interactable: {
+              getMeshes: () => this.deps.dungeonRenderer.getInteractableMeshes(),
+              getPlayerPosition: () => {
+                const local = this.players.get(room.sessionId);
+                if (!local) return null;
+                const pos = local.getWorldPosition();
+                return { x: pos.x, z: pos.z };
+              },
+              range: INTERACT_RANGE,
+              onClick: (type, id) => this.handleInteractableClick(room, type, id),
+            },
+          });
 
           // Setup wall occlusion (with wall decoration map for toggling)
           this.wallOcclusion = new WallOcclusionSystem(
@@ -416,6 +437,37 @@ export class StateSync {
       }
     });
     /* eslint-enable @typescript-eslint/no-explicit-any */
+  }
+
+  /**
+   * Handle click on an interactable mesh.
+   * Dispatches by type — extend this switch for future interactables (chests, NPCs…).
+   */
+  private handleInteractableClick(room: Room, type: string, id: string): void {
+    switch (type) {
+      case "gate": {
+        const snap = gateStore.getSnapshot();
+        const info = snap.gates.get(id);
+        if (!info || info.isOpen) return;
+        // Only leader can open lobby gates
+        if (info.gateType === GateType.LOBBY) {
+          const player = room.state.players.get(room.sessionId);
+          if (!player?.isLeader) return;
+        }
+        promptStore.show({
+          title: t("gate.promptTitle"),
+          message: t("gate.promptMessage"),
+          confirmLabel: t("gate.promptAccept"),
+          cancelLabel: t("gate.promptCancel"),
+          onConfirm: () => {
+            tutorialStore.dismiss();
+            gateStore.confirmOpenGate(id);
+          },
+        });
+        break;
+      }
+      // Future: case "chest": { … break; }
+    }
   }
 
   dispose(): void {

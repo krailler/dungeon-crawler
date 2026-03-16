@@ -23,7 +23,7 @@ import {
   MessageType,
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
-  GATE_INTERACT_RANGE,
+  INTERACT_RANGE,
   GateType,
 } from "@dungeon/shared";
 import type { DebugPathsMessage } from "@dungeon/shared";
@@ -88,7 +88,7 @@ export class ClientUpdateLoop {
       const pPos = localPlayer.getWorldPosition();
       const localMember = hudStore.getSnapshot().members.find((m) => m.isLocal);
       const isLeader = localMember?.isLeader ?? false;
-      const rangeSq = GATE_INTERACT_RANGE * GATE_INTERACT_RANGE;
+      const rangeSq = INTERACT_RANGE * INTERACT_RANGE;
 
       let nearestId: string | null = null;
       let nearestDistSq = Infinity;

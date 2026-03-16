@@ -1,5 +1,5 @@
-// Gate (lobby door)
-export const GATE_INTERACT_RANGE = 4;
+// Interaction range (shared by gates, chests, etc.)
+export const INTERACT_RANGE = 2;
 export const GATE_COUNTDOWN_SECONDS = 5;
 
 // Announcements (center-screen messages)

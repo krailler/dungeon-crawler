@@ -174,6 +174,12 @@ export class DungeonRenderer {
     this.gates.delete(gateId);
   }
 
+  /** Returns all interactable meshes (gates, future chests, etc.) for click detection */
+  getInteractableMeshes(): AbstractMesh[] {
+    // Currently only gates — extend with chests, NPCs, etc. in the future
+    return [...this.gates.values()].map((e) => e.mesh);
+  }
+
   getGateWorldPositions(): Map<string, Vector3> {
     const positions = new Map<string, Vector3>();
     for (const [id, entry] of this.gates) {
@@ -458,15 +464,18 @@ export class DungeonRenderer {
     const gateWidth = TILE_SIZE * 0.9;
     const gateHeight = WALL_HEIGHT * 0.95;
 
-    // Parent mesh for the whole gate
+    // Parent mesh for the whole gate — also serves as a click hitbox
+    const hitWidth = isNS ? gateWidth : TILE_SIZE * 0.5;
+    const hitDepth = isNS ? TILE_SIZE * 0.5 : gateWidth;
     const gate = MeshBuilder.CreateBox(
       "gate",
-      { width: 0.01, height: 0.01, depth: 0.01 },
+      { width: hitWidth, height: gateHeight, depth: hitDepth },
       this.scene,
     );
-    gate.position.set(worldX, 0, worldZ);
-    gate.isPickable = false;
+    gate.position.set(worldX, gateHeight / 2, worldZ);
+    gate.isPickable = true;
     gate.visibility = 0;
+    gate.metadata = { interactType: "gate", interactId: gateId };
 
     // Vertical bars
     for (let i = 0; i < barCount; i++) {
@@ -478,7 +487,7 @@ export class DungeonRenderer {
       );
       bar.material = mat;
       bar.parent = gate;
-      bar.position.y = gateHeight / 2;
+      bar.position.y = 0;
       if (isNS) {
         bar.position.x = t * gateWidth;
       } else {
@@ -496,7 +505,7 @@ export class DungeonRenderer {
       );
       crossbar.material = mat;
       crossbar.parent = gate;
-      crossbar.position.y = yPos;
+      crossbar.position.y = yPos - gateHeight / 2;
       if (isNS) {
         crossbar.rotation.z = Math.PI / 2;
       } else {
