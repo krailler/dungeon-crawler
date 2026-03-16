@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
+import { PROTOCOL_VERSION } from "@dungeon/shared";
 
 export const LoginScreen = (): JSX.Element | null => {
   const { t } = useTranslation();
@@ -77,6 +78,11 @@ export const LoginScreen = (): JSX.Element | null => {
           </div>
         </div>
       )}
+
+      {/* Version */}
+      <span className="absolute bottom-3 right-4 text-[10px] text-slate-600">
+        Build Version: {PROTOCOL_VERSION}
+      </span>
     </div>
   );
 };

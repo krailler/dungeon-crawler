@@ -44,7 +44,8 @@
   "kick": {
     "duplicate": "You were disconnected because your account logged in from another session.",
     "kicked": "You have been kicked from the dungeon by an administrator.",
-    "dungeonStarted": "The dungeon expedition has already started. Wait for the next run."
+    "dungeonStarted": "The dungeon expedition has already started. Wait for the next run.",
+    "versionMismatch": "Your client is outdated. Please refresh the page to get the latest version."
   },
   "pause": {
     "title": "Paused",

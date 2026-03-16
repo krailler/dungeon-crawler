@@ -23,7 +23,13 @@ import { debugStore } from "../ui/stores/debugStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
-import { CloseCode, MessageType, AMBIENT_INTENSITY, ChatCategory } from "@dungeon/shared";
+import {
+  CloseCode,
+  MessageType,
+  AMBIENT_INTENSITY,
+  ChatCategory,
+  PROTOCOL_VERSION,
+} from "@dungeon/shared";
 import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -166,6 +172,8 @@ export class ClientGame {
       loadingStore.setPhase(LoadingPhase.SERVER);
 
       // Try to reconnect using a saved token (e.g. after page reload)
+      console.log(`[Client] Protocol version: ${PROTOCOL_VERSION}`);
+      const joinOptions = { protocolVersion: PROTOCOL_VERSION };
       let room: Room;
       const savedToken = localStorage.getItem("reconnectionToken");
       if (savedToken) {
@@ -176,10 +184,10 @@ export class ClientGame {
         } catch (err) {
           console.warn("[Client] Reconnection failed, joining new room:", err);
           localStorage.removeItem("reconnectionToken");
-          room = await this.client.joinOrCreate("dungeon");
+          room = await this.client.joinOrCreate("dungeon", joinOptions);
         }
       } else {
-        room = await this.client.joinOrCreate("dungeon");
+        room = await this.client.joinOrCreate("dungeon", joinOptions);
       }
 
       // Persist reconnection token (localStorage survives tab close)
@@ -301,7 +309,9 @@ export class ClientGame {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[Client] Failed to connect:", err);
-      if (msg.includes("DUNGEON_STARTED")) {
+      if (msg.includes("VERSION_MISMATCH")) {
+        authStore.kick(t("kick.versionMismatch"));
+      } else if (msg.includes("DUNGEON_STARTED")) {
         authStore.kick(t("kick.dungeonStarted"));
       } else {
         hudStore.setConnection("error", msg);

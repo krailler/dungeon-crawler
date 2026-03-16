@@ -3,6 +3,7 @@ import { Encoder } from "@colyseus/schema";
 import { DungeonRoom } from "./rooms/DungeonRoom";
 import { initDatabase } from "./db/database";
 import { logger } from "./logger";
+import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
 // Side-effect: configure auth callbacks before server starts
 import "./auth/authConfig";
@@ -24,7 +25,10 @@ const server = new Server({
 server.define("dungeon", DungeonRoom);
 
 server.listen(port).then(() => {
-  logger.info({ port }, "Game server listening");
+  logger.info(
+    { port, protocolVersion: PROTOCOL_VERSION, minClientVersion: MIN_PROTOCOL_VERSION },
+    "Game server listening",
+  );
 });
 
 // Graceful shutdown — release the port before tsx watch restarts

@@ -21,6 +21,7 @@ export const MessageType = {
 export const CloseCode = {
   KICKED_DUPLICATE: 4100,
   KICKED: 4101,
+  VERSION_MISMATCH: 4102,
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

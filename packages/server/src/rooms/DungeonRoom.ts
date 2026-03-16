@@ -39,6 +39,7 @@ import {
   SkillId,
   Role,
   GateType,
+  MIN_PROTOCOL_VERSION,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -395,7 +396,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   async onAuth(
     _client: Client,
-    _options: unknown,
+    options: { protocolVersion?: number },
     context: AuthContext,
   ): Promise<{
     accountId: string;
@@ -409,6 +410,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     gold: number;
     xp: number;
   }> {
+    // Check client protocol version
+    const clientVersion = options?.protocolVersion ?? 0;
+    if (clientVersion < MIN_PROTOCOL_VERSION) {
+      this.log.warn(
+        { clientVersion, minVersion: MIN_PROTOCOL_VERSION },
+        "Rejected client — outdated version",
+      );
+      throw new Error("VERSION_MISMATCH");
+    }
+
     if (!context.token) throw new Error("No auth token provided");
 
     const payload = (await JWT.verify(context.token)) as { accountId?: string };
