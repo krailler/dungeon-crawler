@@ -127,6 +127,14 @@
     "startDungeon": "You are the party leader! Click the gate or press F nearby to start the dungeon.",
     "allocateStats": "You have attribute points! Press C to open the character panel and assign them."
   },
+  "reconnect": {
+    "title": "Connection Lost",
+    "message": "Your session is still active on the server. You can try to reconnect.",
+    "button": "Reconnect",
+    "backToLogin": "Back to Login",
+    "asCharacter": "as {{name}}",
+    "failed": "Reconnection failed. Your session may have expired."
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",

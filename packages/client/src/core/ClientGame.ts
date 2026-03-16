@@ -178,9 +178,10 @@ export class ClientGame {
 
       loadingStore.setPhase(LoadingPhase.SERVER);
 
-      // Try to reconnect using a saved token (e.g. after page reload)
+      // Try to reconnect using a saved token (e.g. after page reload or "Reconnect" button)
       console.log(`[Client] Protocol version: ${PROTOCOL_VERSION}`);
       const joinOptions = { protocolVersion: PROTOCOL_VERSION };
+      const isReconnectAttempt = authStore.getSnapshot().canReconnect;
       let room: Room;
       const savedToken = localStorage.getItem("reconnectionToken");
       if (savedToken) {
@@ -189,16 +190,31 @@ export class ClientGame {
           room = await this.client.reconnect(savedToken);
           console.log("[Client] Reconnected to room:", room.sessionId);
         } catch (err) {
-          console.warn("[Client] Reconnection failed, joining new room:", err);
+          console.warn("[Client] Reconnection failed:", err);
           localStorage.removeItem("reconnectionToken");
+          if (isReconnectAttempt) {
+            // User clicked "Reconnect" but session expired — show login
+            authStore.reconnectFailed(t("reconnect.failed"));
+            return;
+          }
+          // Normal page-load reconnect failure — join new room
           room = await this.client.joinOrCreate("dungeon", joinOptions);
         }
       } else {
+        if (isReconnectAttempt) {
+          // No token available — session is gone
+          authStore.reconnectFailed(t("reconnect.failed"));
+          return;
+        }
         room = await this.client.joinOrCreate("dungeon", joinOptions);
       }
 
       // Persist reconnection token (localStorage survives tab close)
       localStorage.setItem("reconnectionToken", room.reconnectionToken);
+      // Clear reconnect state now that we've successfully joined
+      if (authStore.getSnapshot().canReconnect) {
+        authStore.clearReconnect();
+      }
 
       this.room = room;
       adminStore.setRoom(room);
@@ -316,7 +332,8 @@ export class ClientGame {
         } else if (code === CloseCode.KICKED) {
           authStore.kick(t("kick.kicked"));
         } else {
-          authStore.kick(t("connection.lost"));
+          // Connection lost — session may still be alive on server for 5 min
+          authStore.disconnect();
         }
       });
     } catch (err) {
@@ -369,7 +386,10 @@ export class ClientGame {
     promptStore.reset();
     announcementStore.reset();
     tutorialStore.reset();
-    localStorage.removeItem("reconnectionToken");
+    // Only clear reconnection token if NOT in reconnectable state
+    if (!authStore.getSnapshot().canReconnect) {
+      localStorage.removeItem("reconnectionToken");
+    }
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("resize", this.onResize);

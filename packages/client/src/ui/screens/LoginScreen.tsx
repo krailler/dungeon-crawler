@@ -17,6 +17,41 @@ export const LoginScreen = (): JSX.Element | null => {
     authStore.login(email, password);
   };
 
+  // ── Reconnect screen ──────────────────────────────────────────────────────
+  if (auth.canReconnect) {
+    return (
+      <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
+        <h1 className="mb-4 text-4xl font-bold tracking-widest text-slate-200">
+          {t("reconnect.title")}
+        </h1>
+        <p className="mb-8 max-w-sm text-center text-sm text-slate-400">{t("reconnect.message")}</p>
+        {auth.characterName && (
+          <p className="mb-6 text-xs text-slate-500">
+            {t("reconnect.asCharacter", { name: auth.characterName })}
+          </p>
+        )}
+        <button
+          onClick={() => authStore.attemptReconnect()}
+          className="rounded-lg bg-amber-600/90 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-500/90"
+        >
+          {t("reconnect.button")}
+        </button>
+        <button
+          onClick={() => authStore.kick("")}
+          className="mt-4 text-xs text-slate-500 transition-colors hover:text-slate-300"
+        >
+          {t("reconnect.backToLogin")}
+        </button>
+        {auth.error && <p className="mt-4 text-center text-xs text-red-400">{auth.error}</p>}
+
+        <span className="absolute bottom-3 right-4 text-[10px] text-slate-600">
+          Build Version: {PROTOCOL_VERSION}
+        </span>
+      </div>
+    );
+  }
+
+  // ── Login screen ──────────────────────────────────────────────────────────
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
       {/* Title */}

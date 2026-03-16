@@ -17,6 +17,8 @@ export type AuthSnapshot = {
   error: string | null;
   characterName: string | null;
   role: string | null;
+  /** True when connection was lost but session may still be alive on the server */
+  canReconnect: boolean;
 };
 
 const listeners = new Set<Listener>();
@@ -27,6 +29,7 @@ let snapshot: AuthSnapshot = {
   error: null,
   characterName: null,
   role: null,
+  canReconnect: false,
 };
 
 function emit(): void {
@@ -102,14 +105,48 @@ export const authStore = {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     const c = this.getClient();
     c.auth.signOut().catch(() => {});
-    update({ isAuthenticated: false, characterName: null, role: null, error: null });
+    update({
+      isAuthenticated: false,
+      characterName: null,
+      role: null,
+      error: null,
+      canReconnect: false,
+    });
   },
 
   /** Kicked by server — force logout and show reason on login screen */
   kick(reason: string): void {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem("reconnectionToken");
-    update({ isAuthenticated: false, characterName: null, role: null, error: reason });
+    update({
+      isAuthenticated: false,
+      characterName: null,
+      role: null,
+      error: reason,
+      canReconnect: false,
+    });
+  },
+
+  /** Connection lost (not kicked) — session may still be alive on server */
+  disconnect(): void {
+    // Keep auth token + reconnection token + characterName so user can reconnect
+    update({ isAuthenticated: false, error: null, canReconnect: true });
+  },
+
+  /** User clicked "Reconnect" — re-enter the game (ClientGame.init will use saved token) */
+  attemptReconnect(): void {
+    update({ isAuthenticated: true, error: null });
+  },
+
+  /** Reconnection attempt failed (token expired, server removed player) */
+  reconnectFailed(reason: string): void {
+    localStorage.removeItem("reconnectionToken");
+    update({ isAuthenticated: false, canReconnect: false, error: reason });
+  },
+
+  /** Clear reconnect flag after successful reconnection */
+  clearReconnect(): void {
+    update({ canReconnect: false });
   },
 
   setCharacterName(name: string): void {
