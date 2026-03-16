@@ -95,9 +95,24 @@
 - **XP formula**: `baseXp = 20 + enemyLevel * 6`, modified by level difference — NOT split among party (incentivizes grouping)
 - **XP curve**: `xpToNextLevel(level) = floor(50 × level²)` — exponential, MAX_LEVEL = 30
 - **Level-up**: +1 strength, +1 vitality, +1 agility per level; full heal; carry-over excess XP; chat announcement
-- **Persistence**: gold + xp + level + stats saved to DB on leave/disconnect + periodic auto-save every 60s (optimized: only writes when hash of `gold:xp:level:str:vit:agi` changes)
+- **Persistence**: gold + xp + level + stats + inventory saved to DB on leave/disconnect + periodic auto-save every 60s (optimized: only writes when hash of `gold:xp:level:str:vit:agi:tutorials:inventory` changes)
 - **Client display**: gold pill with floating "+amount" animation, XP bar (WoW-style, bottom center) with floating "+XP" text, level-up golden particle effect (all players), level label on enemy floating health bars
 - **Shared code**: `Economy.ts` (computeGoldDrop), `Leveling.ts` (xpToNextLevel, computeXpDrop), `constants/economy.ts` (tuning constants), `EnemyTypes.ts` (scaleEnemyDerivedStats)
+
+### Inventory & Items
+
+- **DB schemas**: `characters` schema (accounts, characters, character_inventory) and `world` schema (items) in same PostgreSQL DB
+- **Item definitions**: loaded from `world.items` table at server startup into `ItemRegistry` (in-memory `Map<string, ItemDef>`)
+- **Effect system**: `EffectHandlers` maps `effectType` string (e.g. "heal") to hardcoded functions; params from `effectParams` JSONB column
+- **Inventory state**: `MapSchema<InventorySlotState>` on `PlayerSecretState` (synced via `@view()` to owning client only)
+- **Persistence**: `character_inventory` table with upsert+transaction on save (not DELETE+INSERT); load on join with hash computed after async load
+- **Item drops**: on enemy kill, each alive player rolls `POTION_DROP_CHANCE` (25%) → `addItem()` stacks or fills empty slots (max `INVENTORY_MAX_SLOTS = 12`)
+- **Consumable use**: client sends `ITEM_USE`, server validates (alive, has item, no cooldown), executes effect, removes 1 qty, starts cooldown
+- **Cooldowns**: `itemCooldowns: Map<string, number>` on PlayerState (server-only), ticked down in GameLoop, client receives `ITEM_COOLDOWN` message
+- **Lazy item defs**: client requests defs on demand via `ITEM_DEFS_REQUEST`/`ITEM_DEFS_RESPONSE` with microtick batching (`queueMicrotask`), in-memory cache, version-based invalidation
+- **Client UI**: `ConsumableSlots` (Q hotkey, first consumable), `InventoryPanel` (B hotkey, grid of 12 slots), both use `ActionSlot` component
+- **Balance**: health potion heals 50 HP, 10s cooldown, max stack 10, drop weight 1.0
+- **Admin**: `/give <player> <itemId> [qty]` command
 
 ### Admin & Combat Log
 
@@ -113,7 +128,7 @@
 - Single `CHAT_SEND` message type from client; server parses `/commands` vs plain text
 - Single `CHAT_ENTRY` message type from server with `category` (PLAYER, SYSTEM, EMOTE, COMMAND, ERROR, ANNOUNCEMENT)
 - System events use i18n keys so clients can translate; fallback text for non-i18n clients
-- Slash commands registered via CommandRegistry with admin-only flag
+- Slash commands registered via CommandRegistry with admin-only flag (/give for items)
 - Client ChatPanel: Enter to open/send, Escape to close, message fade after 10s, hover to reveal
 - Command help overlay appears when input starts with `/`, Tab to autocomplete
 - Chat input history: arrow up/down navigates sent messages (max 50, draft preserved on ArrowUp, restored past end on ArrowDown)
@@ -158,7 +173,9 @@
 - `EnemyTypes.ts` — Enemy type definitions with baseStats + overrides, `computeEnemyDerivedStats()`, `scaleEnemyDerivedStats(derived, level)`
 - `Economy.ts` — `computeGoldDrop(enemyLevel, avgPartyLevel, aliveCount)` with anti-farming modifiers
 - `Leveling.ts` — `xpToNextLevel(level)`, `computeXpDrop(enemyLevel, playerLevel)` with level diff modifier
+- `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight)
 - `constants/economy.ts` — Economy + XP tuning constants (BASE_GOLD_PER_KILL, BASE_XP_PER_KILL, XP_CURVE_BASE, MAX_LEVEL, ENEMY_STAT_SCALE_PER_LEVEL, save interval)
+- `constants/items.ts` — Item balance constants (INVENTORY_MAX_SLOTS, POTION_DROP_CHANCE)
 - `FloorVariants.ts` — Deterministic floor tile variant generation with weighted random + per-room tile sets
 - `WallVariants.ts` — Deterministic wall decoration variant generation (3 variants, weighted: 40/45/15%)
 - `TileSets.ts` — Tile set definitions + name↔id mapping
@@ -167,14 +184,19 @@
 
 ### Server (`packages/server/src/`)
 
-- `main.ts` — Colyseus Server entry, defines "dungeon" room
-- `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save gold, reconnection with session migration + countdown warnings, gate system, party kick
+- `main.ts` — Colyseus Server entry, defines "dungeon" room, loads ItemRegistry at startup
+- `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save, reconnection with session migration + countdown warnings, gate system, party kick, ITEM_USE/ITEM_DEFS_REQUEST handlers
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
-- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick
+- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick, /give
+- `items/ItemRegistry.ts` — Loads item definitions from DB at startup, provides `getItemDef()`, `getDroppableItems()`, versioned cache
+- `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP)
 - `state/DungeonState.ts` — Root Schema state (MapSchema players/enemies/gates, tileMapData, tickRate, dungeonLevel, dungeonVersion, serverRuntime)
-- `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats, gold, xp, xpToNext, level synced) + server-only (path, combat data, characterId) + `addXp()`, `setLevel()`, `applyDerivedStats()`
-- `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle, session migration, `savePlayerProgress()` (gold + xp + level + stats), leader reassignment
+- `state/PlayerState.ts` — Player Schema (position, health, base stats, derived stats, gold, xp, xpToNext, level synced) + server-only (path, combat data, characterId, itemCooldowns) + `addXp()`, `setLevel()`, `applyDerivedStats()`, `addItem()`, `removeItem()`, `countItem()`
+- `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: gold, xp, skills, inventory (MapSchema\<InventorySlotState\>)
+- `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16)
+- `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle, session migration, `savePlayerProgress()` (stats + inventory upsert), `loadInventory()`, leader reassignment
+- `systems/GameLoop.ts` — 20-tick simulation: movement, sprint/stamina, item drops on kill, item cooldown ticking
 - `state/EnemyState.ts` — Enemy Schema (position, health, isDead, enemyType, level) + server-only AI/combat data
 - `state/GateState.ts` — Gate Schema (position, type, open state)
 - `systems/AISystem.ts` — Enemy AI: IDLE/CHASE/ATTACK, multi-player targeting (threat table), A\* repath, combat event callbacks
@@ -182,14 +204,15 @@
 - `dungeon/DungeonGenerator.ts` — Procedural dungeon (no Babylon deps)
 - `navigation/Pathfinder.ts` — A\* on TileMap (uses WorldPos, no Babylon deps)
 - `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
-- `db/schema.ts` — Drizzle ORM schema: accounts (id, email, password, role), characters (stats, level, gold, xp)
+- `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory), `world` schema (items)
 - `db/database.ts` — PostgreSQL connection + auto-migration
+- `db/seed.ts` — Seed data: health_potion item definition
 
 ### Client (`packages/client/src/`)
 
 - `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame, auth state watcher
-- `core/ClientGame.ts` — Colyseus client, render loop, reconnection, combat log, chat, debug paths
-- `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect), enemies (level), minimap sync
+- `core/ClientGame.ts` — Colyseus client, render loop, reconnection, combat log, chat, debug paths, itemDefStore connect
+- `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect, inventory sync), enemies (level), minimap sync, item def preloading
 - `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms)
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15
 - `entities/CharacterAssetLoader.ts` — Loads GLB character models per skin (basePath), instantiates with retargeted animations
@@ -205,7 +228,8 @@
 - `i18n/i18n.ts` — i18next initialization
 - `i18n/locales/en.json` — English translations (all UI strings)
 - `ui/stores/authStore.ts` — Auth state: login/logout/kick, token, role
-- `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, xp, xpToNext, online), FPS, ping, connection
+- `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, xp, xpToNext, online, inventory), FPS, ping, connection, item cooldowns
+- `ui/stores/itemDefStore.ts` — Lazy-loading item definition cache with microtick batching, version-based invalidation, async preloading
 - `ui/stores/chatStore.ts` — Chat pub-sub: message history, input, commands
 - `ui/stores/debugStore.ts` — Debug toggles, persisted localStorage
 - `ui/stores/adminStore.ts` — Admin state: room ref, seed, tickRate, runtime, actions
@@ -214,10 +238,13 @@
 - `ui/stores/gateStore.ts` — Gate state: positions, open state, nearest interactable
 - `ui/stores/promptStore.ts` — Confirmation prompt state
 - `ui/stores/announcementStore.ts` — Center-screen announcement overlay
-- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap buttons
+- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap/inventory buttons, SkillBar + ConsumableSlots
 - `ui/hud/XpBar.tsx` — WoW-style XP bar (bottom center, 60% width): purple gradient, level label, XP numbers, floating "+XP" animated text on gain
 - `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab, arrow up/down history navigation
-- `ui/hud/CharacterPanel.tsx` — Character sheet: name, level, health bar, gold display, base stats, derived stats
+- `ui/hud/CharacterPanel.tsx` — Character sheet: name, level, health bar, gold display, base stats, derived stats (uses HudPanel)
+- `ui/hud/SkillBar.tsx` — Skill slots (1-5 hotkeys) using ActionSlot component
+- `ui/hud/ConsumableSlots.tsx` — Quick consumable slot (Q hotkey), first consumable from inventory
+- `ui/hud/InventoryPanel.tsx` — 4x3 inventory grid (B hotkey) with item tooltips, click-to-use (uses HudPanel + ActionSlot)
 - `ui/hud/DebugPanel.tsx` — Debug toggles + admin section
 - `ui/hud/MinimapOverlay.tsx` — Minimap with fog, player/enemy dots
 - `ui/hud/PauseMenu.tsx` — Escape pause overlay
@@ -226,6 +253,8 @@
 - `ui/hud/AnnouncementOverlay.tsx` — Center-screen announcements
 - `ui/components/HudButton.tsx` — Reusable HUD button with icon + label + shortcut
 - `ui/components/HudPill.tsx` — Reusable HUD pill (default/amber variants)
-- `ui/icons/` — SVG icon components (CharacterIcon, MapIcon, StarIcon, CoinIcon)
+- `ui/components/ActionSlot.tsx` — Unified slot component for skills/consumables/inventory (variants: default/red/empty, sizes: md/sm, cooldown overlay, quantity badge, tooltip, keybind)
+- `ui/components/HudPanel.tsx` — Reusable panel with header + close button (used by CharacterPanel, InventoryPanel)
+- `ui/icons/` — SVG icon components (CharacterIcon, MapIcon, StarIcon, CoinIcon, PotionIcon, BackpackIcon)
 - `ui/screens/LoginScreen.tsx` — Login form + dev quick-login
 - `ui/screens/LoadingScreen.tsx` — Loading progress bar

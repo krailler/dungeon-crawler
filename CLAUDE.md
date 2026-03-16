@@ -33,7 +33,7 @@ npm run server:dev   # Start game server with watch (auto-restart)
 packages/
   shared/           # Code shared between client and server
     src/
-      constants/      # Game balance constants (economy.ts, etc.)
+      constants/      # Game balance constants (economy.ts, items.ts, etc.)
       Constants.ts    # Core constants (TILE_SIZE, PLAYER_*, ENEMY_*, etc.)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + CloseCode + all message interfaces
@@ -41,18 +41,20 @@ packages/
       EnemyTypes.ts   # Enemy type definitions + computeEnemyDerivedStats() + scaleEnemyDerivedStats()
       Economy.ts      # computeGoldDrop() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
+      Items.ts        # ItemDef type, InventorySlot type
       FloorVariants.ts, WallVariants.ts, TileSets.ts, random.ts
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
-      state/          # Schema state classes (PlayerState, EnemyState, DungeonState, GateState)
+      state/          # Schema state classes (PlayerState, EnemyState, DungeonState, GateState, InventorySlotState)
       rooms/          # DungeonRoom (game loop, economy, message handlers)
-      systems/        # AISystem, CombatSystem (server-side logic)
+      systems/        # AISystem, CombatSystem, GameLoop (server-side logic)
       chat/           # ChatSystem, CommandRegistry, commands
+      items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, etc.)
       dungeon/        # DungeonGenerator (procedural, no Babylon deps)
       navigation/     # Pathfinder (A* on TileMap)
       sessions/       # activeSessionRegistry (duplicate login detection)
-      db/             # Drizzle ORM schema + migrations (PostgreSQL)
+      db/             # Drizzle ORM schema + migrations (PostgreSQL, characters/world schemas)
       main.ts         # Server entry point
   client/           # Babylon.js renderer + Colyseus client
     src/
@@ -64,10 +66,10 @@ packages/
       audio/          # SoundManager
       i18n/           # i18next config + locales (en.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, PauseMenu, etc.)
-        components/   # Reusable UI (HudButton, HudPill)
-        icons/        # SVG icon components
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef)
+        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, etc.)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, HudPanel)
+        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
       main.ts         # Client entry point
 ```
@@ -136,7 +138,7 @@ packages/
 ### Chat
 
 - Server-side ChatSystem with rate limiting, command parsing, broadcasting
-- Slash commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick (admin)
+- Slash commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick, /give (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
 - Messages fade after 10s, hover to reveal all
