@@ -11,7 +11,7 @@ const activeSessions = new Map<string, Client>();
 /** Register a client for an account. Kicks any previous session for the same account. */
 export function registerSession(accountId: string, client: Client): void {
   const existing = activeSessions.get(accountId);
-  if (existing && existing !== client) {
+  if (existing && existing.sessionId !== client.sessionId) {
     logger.warn(
       { accountId, oldSession: existing.sessionId, newSession: client.sessionId },
       "Duplicate login — kicking previous session",
@@ -30,12 +30,14 @@ export function registerSession(accountId: string, client: Client): void {
 
 /** Remove a client from the registry (only if it's still the current one for that account). */
 export function unregisterSession(accountId: string, client: Client): void {
-  if (activeSessions.get(accountId) === client) {
+  const existing = activeSessions.get(accountId);
+  if (existing && existing.sessionId === client.sessionId) {
     activeSessions.delete(accountId);
   }
 }
 
 /** Check if this client is still the active session for its account. */
 export function isActiveSession(accountId: string, client: Client): boolean {
-  return activeSessions.get(accountId) === client;
+  const existing = activeSessions.get(accountId);
+  return !!existing && existing.sessionId === client.sessionId;
 }
