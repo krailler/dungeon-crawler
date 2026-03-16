@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
@@ -194,6 +194,7 @@ const PlayerSuggestOverlay = ({
   playerNames: string[];
   onSelect: (name: string) => void;
 }): JSX.Element | null => {
+  const { t } = useTranslation();
   const filtered = useMemo(() => {
     const lower = argPrefix.toLowerCase();
     return playerNames.filter((n) => n.toLowerCase().startsWith(lower)).slice(0, 8);
@@ -204,7 +205,7 @@ const PlayerSuggestOverlay = ({
   return (
     <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-slate-600/40 bg-slate-900/95 backdrop-blur-sm p-2 shadow-xl">
       <div className="px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-500 mb-1">
-        /{cmdName} &mdash; select player
+        /{cmdName} &mdash; {t("chat.selectPlayer")}
       </div>
       {filtered.map((name) => (
         <div
@@ -240,6 +241,7 @@ const PlayerSuggestOverlay = ({
 const HISTORY_MAX = 50;
 
 export const ChatPanel = (): JSX.Element => {
+  const { t } = useTranslation();
   const snapshot = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
   const hudSnapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
@@ -453,7 +455,7 @@ export const ChatPanel = (): JSX.Element => {
                 }
               }, 150);
             }}
-            placeholder="Type a message or /command..."
+            placeholder={t("chat.placeholder")}
             maxLength={200}
             className="w-full rounded-b-lg border border-slate-600/40 bg-slate-900/90 px-3 py-2 text-[13px] text-slate-200 placeholder-slate-500 outline-none backdrop-blur-sm focus:border-sky-500/50"
           />
@@ -463,11 +465,14 @@ export const ChatPanel = (): JSX.Element => {
       {/* Hint when chat is not open */}
       {!snapshot.inputOpen && snapshot.messages.length === 0 && (
         <div className="px-2 py-1 text-[11px] text-slate-600">
-          Press{" "}
-          <kbd className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500">
-            Enter
-          </kbd>{" "}
-          to chat
+          <Trans
+            i18nKey="chat.hintOpen"
+            components={{
+              kbd: (
+                <kbd className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500" />
+              ),
+            }}
+          />
         </div>
       )}
     </div>

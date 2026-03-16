@@ -93,7 +93,8 @@
   },
   "chat": {
     "placeholder": "Type a message or /command...",
-    "hintOpen": "Press Enter to chat",
+    "hintOpen": "Press <kbd>Enter</kbd> to chat",
+    "selectPlayer": "select player",
     "joined": "{{name}} joined the dungeon.",
     "left": "{{name}} left the dungeon.",
     "disconnected": "{{name}} disconnected.",
