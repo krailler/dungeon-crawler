@@ -107,6 +107,7 @@
     "gateLeaderOnly": "Only the party leader can open the gate.",
     "gateOpened": "The gate opens... The dungeon awaits!",
     "goldGained": "+{{amount}} gold from {{enemy}}!",
+    "itemPickup": "+{{amount}} $t({{item}})",
     "levelUp": "{{name}} reached level {{level}}!",
     "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign."
   },
@@ -147,6 +148,14 @@
     "asCharacter": "as {{name}}",
     "failed": "Reconnection failed. Your session may have expired."
   },
+  "items": {
+    "healthPotion": "Health Potion",
+    "healthPotionDesc": "Restores {{amount}} health"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "clickToUse": "Click to use"
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",
@@ -158,6 +167,11 @@
     "invalidLevel": "Level must be between 1 and {{max}}.",
     "setLevel": "Set {{name}} to level {{level}}.",
     "usageResettutorials": "Usage: /resettutorials <player_name>",
-    "resetTutorials": "Reset {{count}} tutorial(s) for {{name}}."
+    "resetTutorials": "Reset {{count}} tutorial(s) for {{name}}.",
+    "usageGive": "Usage: /give <player_name> <item_id> [quantity]",
+    "itemNotFound": "Unknown item: {{id}}",
+    "invalidQuantity": "Quantity must be a positive number.",
+    "inventoryFull": "{{name}}'s inventory is full.",
+    "gaveItem": "Gave {{amount}}× {{item}} to {{name}}."
   }
 }

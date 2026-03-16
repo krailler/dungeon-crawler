@@ -15,6 +15,7 @@ import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
+import { itemDefStore } from "../ui/stores/itemDefStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
@@ -168,7 +169,7 @@ export class StateSync {
         const wallSetNames = Array.from(usedWallSets);
         console.log("[Client] Loading floor tile sets:", floorSetNames);
         console.log("[Client] Loading wall tile sets:", wallSetNames);
-        this.deps.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(() => {
+        this.deps.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(async () => {
           loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
           console.log("[Client] Assets loaded, rendering dungeon");
           this.deps.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
@@ -227,6 +228,13 @@ export class StateSync {
           for (const mesh of this.deps.dungeonRenderer.getFloorMeshes()) {
             mesh.receiveShadows = true;
           }
+
+          // Wait for any pending item def requests before completing load (5s timeout)
+          const pendingItemIds = this.getLocalInventoryItemIds(room);
+          await Promise.race([
+            itemDefStore.ensureLoadedAsync(pendingItemIds),
+            new Promise<void>((r) => setTimeout(r, 5_000)),
+          ]);
 
           // Loading complete — fade out loading screen
           loadingStore.setPhase(LoadingPhase.COMPLETE);
@@ -323,6 +331,16 @@ export class StateSync {
         };
         $(secret).skills.onAdd(syncSkills);
         $(secret).skills.onRemove(syncSkills);
+
+        // Sync inventory MapSchema + lazy-fetch unknown item defs
+        // Also handles initial inventory on join (onAdd fires for existing items)
+        const rebuildInv = this.rebuildInventory.bind(this, sessionId, secret);
+
+        $(secret).inventory.onAdd((slot: any, _key: string) => {
+          $(slot).onChange(rebuildInv);
+          rebuildInv();
+        });
+        $(secret).inventory.onRemove(rebuildInv);
 
         // Track gold changes for pickup sound
         let prevGold = secret.gold as number;
@@ -480,6 +498,31 @@ export class StateSync {
       }
       // Future: case "chest": { … break; }
     }
+  }
+
+  /** Sync inventory from secret state to hudStore + lazy-fetch unknown item defs. */
+  private rebuildInventory(sessionId: string, secret: any): void {
+    const inv: { slot: number; itemId: string; quantity: number }[] = [];
+    secret.inventory.forEach((slot: any, key: string) => {
+      if (slot.quantity > 0) {
+        inv.push({ slot: Number(key), itemId: slot.itemId, quantity: slot.quantity });
+      }
+    });
+    hudStore.updateMember(sessionId, { inventory: inv });
+    if (inv.length > 0) {
+      itemDefStore.ensureLoaded(inv.map((s) => s.itemId));
+    }
+  }
+
+  /** Extract item ids from local player's inventory (for preloading defs). */
+  private getLocalInventoryItemIds(room: Room): string[] {
+    const player = room.state.players.get(room.sessionId) as any;
+    if (!player?.secret?.inventory) return [];
+    const ids: string[] = [];
+    player.secret.inventory.forEach((slot: any) => {
+      if (slot.itemId && !ids.includes(slot.itemId)) ids.push(slot.itemId);
+    });
+    return ids;
   }
 
   dispose(): void {

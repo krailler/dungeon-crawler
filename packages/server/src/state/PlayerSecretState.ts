@@ -1,6 +1,7 @@
-import { ArraySchema, Schema, type } from "@colyseus/schema";
+import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 import { DEFAULT_SKILLS, Role } from "@dungeon/shared";
 import type { RoleValue } from "@dungeon/shared";
+import { InventorySlotState } from "./InventorySlotState";
 
 /**
  * Private player data — only visible to the owning client via @view().
@@ -30,6 +31,9 @@ export class PlayerSecretState extends Schema {
 
   // Stamina (sprint resource — ephemeral, not persisted)
   @type("float32") stamina: number = 100;
+
+  // Inventory (slot index → item+qty)
+  @type({ map: InventorySlotState }) inventory = new MapSchema<InventorySlotState>();
 
   // Role (admin/user)
   @type("string") role: RoleValue = Role.USER;

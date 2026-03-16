@@ -36,6 +36,13 @@
       "when": 1774100000000,
       "tag": "0004_add_stat_points",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774200000000,
+      "tag": "0005_add_schemas_and_inventory",
+      "breakpoints": true
     }
   ]
 }

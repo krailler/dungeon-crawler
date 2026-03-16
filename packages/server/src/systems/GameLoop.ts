@@ -18,6 +18,7 @@ import {
   STAMINA_DRAIN_PER_SEC,
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
+  POTION_DROP_CHANCE,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -28,6 +29,7 @@ import type {
 } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
+import { getDroppableItems } from "../items/ItemRegistry";
 
 export interface GameLoopBridge {
   readonly state: DungeonState;
@@ -79,6 +81,9 @@ export class GameLoop {
 
     // Update sprint stamina before movement so speed is correct this tick
     this.updateStamina(dtSec);
+
+    // Tick item cooldowns
+    this.tickItemCooldowns(dtSec);
 
     // Move players along their paths
     for (const [, player] of this.bridge.state.players) {
@@ -231,6 +236,26 @@ export class GameLoop {
             );
           }
         });
+
+        // Drop items for alive players
+        const droppable = getDroppableItems();
+        if (droppable.length > 0) {
+          this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
+            if (p.health <= 0) return;
+            if (Math.random() < POTION_DROP_CHANCE) {
+              const item = droppable[Math.floor(Math.random() * droppable.length)];
+              const added = p.addItem(item.id, 1, item.maxStack);
+              if (added > 0) {
+                this.bridge.chatSystem.sendSystemI18nTo(
+                  sessionId,
+                  "chat.itemPickup",
+                  { item: item.name, amount: added },
+                  `+${added} ${item.id}`,
+                );
+              }
+            }
+          });
+        }
       }
 
       this.bridge.clock.setTimeout(() => {
@@ -264,6 +289,25 @@ export class GameLoop {
         } else if (player.stamina < STAMINA_MAX) {
           player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_REGEN_PER_SEC * dt);
         }
+      }
+    }
+  }
+
+  /** Tick down item cooldowns for all players. */
+  private tickItemCooldowns(dt: number): void {
+    for (const [, player] of this.bridge.state.players) {
+      if (player.itemCooldowns.size === 0) continue;
+      const expired: string[] = [];
+      for (const [itemId, remaining] of player.itemCooldowns) {
+        const next = remaining - dt;
+        if (next <= 0) {
+          expired.push(itemId);
+        } else {
+          player.itemCooldowns.set(itemId, next);
+        }
+      }
+      for (const id of expired) {
+        player.itemCooldowns.delete(id);
       }
     }
   }

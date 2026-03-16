@@ -27,6 +27,10 @@ export type {
   SprintMessage,
   AdminDebugInfoMessage,
   DamageDealtMessage,
+  ItemUseMessage,
+  ItemCooldownMessage,
+  ItemDefsRequestMessage,
+  ItemDefsResponseMessage,
 } from "./protocol.js";
 
 export {
@@ -81,3 +85,5 @@ export type { GateTypeValue } from "./GateTypes.js";
 
 export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
+
+export type { ItemDef } from "./Items.js";

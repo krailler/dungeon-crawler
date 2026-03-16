@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hash } from "colyseus";
 import { Role } from "@dungeon/shared";
 import { initDatabase } from "./database";
-import { accounts, characters } from "./schema";
+import { accounts, characters, items } from "./schema";
 
 interface SeedAccount {
   email: string;
@@ -48,6 +48,24 @@ async function seed() {
 
     console.log(`Created account "${entry.email}" with character "${entry.characterName}"`);
   }
+
+  // Seed world items (upsert)
+  await db
+    .insert(items)
+    .values({
+      id: "health_potion",
+      name: "items.healthPotion",
+      description: "items.healthPotionDesc",
+      icon: "potion_red",
+      maxStack: 10,
+      consumable: true,
+      cooldown: 10,
+      effectType: "heal",
+      effectParams: { amount: 50 },
+      dropWeight: 1.0,
+    })
+    .onConflictDoNothing();
+  console.log("World items seeded.");
 
   console.log("Seed complete.");
   process.exit(0);

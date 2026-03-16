@@ -2,6 +2,7 @@ import { Server, auth } from "colyseus";
 import { Encoder } from "@colyseus/schema";
 import { DungeonRoom } from "./rooms/DungeonRoom";
 import { initDatabase } from "./db/database";
+import { loadItemRegistry } from "./items/ItemRegistry";
 import { logger } from "./logger";
 import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
@@ -16,6 +17,7 @@ const port = parseInt(process.env.PORT ?? "3000", 10);
 const server = new Server({
   beforeListen: async () => {
     await initDatabase();
+    await loadItemRegistry();
   },
   express: (app) => {
     app.use("/auth", auth.routes());

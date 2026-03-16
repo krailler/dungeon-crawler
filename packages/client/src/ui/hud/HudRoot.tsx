@@ -16,6 +16,8 @@ import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { TutorialHint } from "./TutorialHint";
 import { XpBar } from "./XpBar";
 import { SkillBar } from "./SkillBar";
+import { ConsumableSlots } from "./ConsumableSlots";
+import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
@@ -24,6 +26,7 @@ import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
 import { CoinIcon } from "../icons/CoinIcon";
+import { BackpackIcon } from "../icons/BackpackIcon";
 
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
@@ -196,6 +199,9 @@ export const HudRoot = (): JSX.Element => {
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
   const closeCharacter = useCallback(() => setCharacterOpen(false), []);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const toggleInventory = useCallback(() => setInventoryOpen((v) => !v), []);
+  const closeInventory = useCallback(() => setInventoryOpen(false), []);
 
   // Context menu for party members
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
@@ -253,6 +259,7 @@ export const HudRoot = (): JSX.Element => {
       <TutorialHint />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
+      {inventoryOpen && <InventoryPanel onClose={closeInventory} />}
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">
@@ -362,14 +369,24 @@ export const HudRoot = (): JSX.Element => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
-      {/* Skill bar — bottom center, above XP bar */}
-      <SkillBar />
+      {/* Action bar — bottom center, above XP bar: consumables + skills */}
+      <div className="pointer-events-auto absolute bottom-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3">
+        <ConsumableSlots />
+        <SkillBar />
+      </div>
       {/* Stamina bar — thin bar above XP bar, only visible when draining */}
       <StaminaBar />
       {/* XP bar — bottom center (WoW-style) */}
       <XpBar />
       {/* HUD buttons — bottom right */}
       <div className="absolute bottom-5 right-5 flex items-center gap-2">
+        <HudButton
+          onClick={toggleInventory}
+          isOpen={inventoryOpen}
+          icon={<BackpackIcon />}
+          label={t("inventory.title")}
+          shortcut="B"
+        />
         <HudButton
           onClick={toggleMinimap}
           isOpen={minimapVisible}

@@ -1,7 +1,13 @@
 import { Schema, type, view } from "@colyseus/schema";
-import { computeDerivedStats, xpToNextLevel, MAX_LEVEL } from "@dungeon/shared";
+import {
+  computeDerivedStats,
+  xpToNextLevel,
+  MAX_LEVEL,
+  INVENTORY_MAX_SLOTS,
+} from "@dungeon/shared";
 import type { AllocatableStatValue, RoleValue } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
+import { InventorySlotState } from "./InventorySlotState";
 
 export class PlayerState extends Schema {
   // ── Public fields (visible to all clients) ─────────────────────────────────
@@ -33,6 +39,8 @@ export class PlayerState extends Schema {
   sprintRequested: boolean = false;
   /** Countdown before stamina regen begins after sprinting stops */
   staminaRegenDelay: number = 0;
+  /** Per-item cooldown timers (seconds remaining) — server-only */
+  itemCooldowns: Map<string, number> = new Map();
 
   // ── Convenience getters (delegate to secret for server-side code) ──────────
 
@@ -124,6 +132,10 @@ export class PlayerState extends Schema {
     this.secret.stamina = v;
   }
 
+  get inventory() {
+    return this.secret.inventory;
+  }
+
   /** Recompute all derived stats from current base stats and apply them. */
   applyDerivedStats(): void {
     const derived = computeDerivedStats({
@@ -199,5 +211,77 @@ export class PlayerState extends Schema {
 
     this.applyDerivedStats();
     this.health = this.maxHealth;
+  }
+
+  // ── Inventory helpers ──────────────────────────────────────────────────────
+
+  /**
+   * Add items to inventory. Stacks first, then fills empty slots.
+   * Returns quantity actually added (may be less if inventory full).
+   */
+  addItem(itemId: string, qty: number, maxStack: number): number {
+    let remaining = qty;
+
+    // First pass: stack onto existing slots with same item
+    this.inventory.forEach((slot) => {
+      if (remaining <= 0) return;
+      if (slot.itemId !== itemId) return;
+      const canAdd = maxStack - slot.quantity;
+      if (canAdd <= 0) return;
+      const toAdd = Math.min(remaining, canAdd);
+      slot.quantity += toAdd;
+      remaining -= toAdd;
+    });
+
+    // Second pass: fill empty slot indexes
+    if (remaining > 0) {
+      const usedSlots = new Set<number>();
+      this.inventory.forEach((_, key) => usedSlots.add(Number(key)));
+
+      for (let i = 0; i < INVENTORY_MAX_SLOTS && remaining > 0; i++) {
+        if (usedSlots.has(i)) continue;
+        const slot = new InventorySlotState();
+        slot.itemId = itemId;
+        slot.quantity = Math.min(remaining, maxStack);
+        remaining -= slot.quantity;
+        this.inventory.set(String(i), slot);
+      }
+    }
+
+    return qty - remaining;
+  }
+
+  /**
+   * Remove qty of an item from inventory. Returns quantity actually removed.
+   */
+  removeItem(itemId: string, qty: number): number {
+    let remaining = qty;
+    const toDelete: string[] = [];
+
+    this.inventory.forEach((slot, key) => {
+      if (remaining <= 0) return;
+      if (slot.itemId !== itemId) return;
+      const take = Math.min(remaining, slot.quantity);
+      slot.quantity -= take;
+      remaining -= take;
+      if (slot.quantity <= 0) toDelete.push(key);
+    });
+
+    for (const key of toDelete) {
+      this.inventory.delete(key);
+    }
+
+    return qty - remaining;
+  }
+
+  /**
+   * Count total quantity of an item across all inventory slots.
+   */
+  countItem(itemId: string): number {
+    let total = 0;
+    this.inventory.forEach((slot) => {
+      if (slot.itemId === itemId) total += slot.quantity;
+    });
+    return total;
   }
 }

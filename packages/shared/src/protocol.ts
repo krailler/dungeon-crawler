@@ -1,6 +1,7 @@
 import type { SkillIdValue } from "./Skills.js";
 import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
+import type { ItemDef } from "./Items.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -24,6 +25,10 @@ export const MessageType = {
   SPRINT: "sprint",
   ADMIN_DEBUG_INFO: "admin:debug_info",
   DAMAGE_DEALT: "combat:damage",
+  ITEM_USE: "item:use",
+  ITEM_COOLDOWN: "item:cooldown",
+  ITEM_DEFS_REQUEST: "item:defs:req",
+  ITEM_DEFS_RESPONSE: "item:defs:res",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -209,6 +214,32 @@ export interface AdminDebugInfoMessage {
   seed: number;
   tickRate: number;
   runtime: string;
+}
+
+// ── Items ────────────────────────────────────────────────────────────────────
+
+/** Client → Server: use a consumable item */
+export interface ItemUseMessage {
+  itemId: string;
+}
+
+/** Server → Client: item cooldown started (for UI overlay) */
+export interface ItemCooldownMessage {
+  itemId: string;
+  /** Total cooldown duration in seconds */
+  duration: number;
+}
+
+/** Client → Server: request item definitions by id */
+export interface ItemDefsRequestMessage {
+  itemIds: string[];
+}
+
+/** Server → Client: item definitions response */
+export interface ItemDefsResponseMessage {
+  /** Cache version — changes when item definitions are modified */
+  version: number;
+  items: ItemDef[];
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

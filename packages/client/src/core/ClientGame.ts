@@ -37,6 +37,7 @@ import type {
   DebugPathsMessage,
   TutorialHintMessage,
   DamageDealtMessage,
+  ItemCooldownMessage,
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -51,6 +52,7 @@ import { gateStore } from "../ui/stores/gateStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
+import { itemDefStore } from "../ui/stores/itemDefStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -299,6 +301,14 @@ export class ClientGame {
       // Tutorial hints from server
       room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
         tutorialStore.showHint(msg);
+      });
+
+      // Connect item def store to room for lazy loading
+      itemDefStore.connect(room);
+
+      // Item cooldown from server
+      room.onMessage(MessageType.ITEM_COOLDOWN, (data: ItemCooldownMessage) => {
+        hudStore.setItemCooldown(data.itemId, data.duration);
       });
 
       hudStore.setConnection(

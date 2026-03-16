@@ -1,11 +1,12 @@
 import type { Client, Deferred } from "colyseus";
 import type { Logger } from "pino";
-import { eq } from "drizzle-orm";
+import { eq, and, notInArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
-import { characters } from "../db/schema";
+import { characters, characterInventory } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
+import { InventorySlotState } from "../state/InventorySlotState";
 import { TileType, TILE_SIZE, xpToNextLevel, MessageType, TutorialStep } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import {
@@ -149,7 +150,10 @@ export class PlayerSessionManager {
       player.tutorialsCompleted = new Set();
     }
 
-    this.lastSavedHash.set(characterId, this.buildProgressHash(player));
+    // Load inventory from DB — hash is computed after load completes
+    this.loadInventory(characterId, player).then(() => {
+      this.lastSavedHash.set(characterId, this.buildProgressHash(player));
+    });
 
     // Compute derived stats
     player.applyDerivedStats();
@@ -484,9 +488,16 @@ export class PlayerSessionManager {
     if (this.lastSavedHash.get(characterId) === hash) return;
     const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
     const db = getDb();
-    db.update(characters)
+
+    // Save character stats + inventory in parallel
+    const statsPromise = db
+      .update(characters)
       .set({ gold, xp, level, strength, vitality, agility, statPoints, tutorialsCompleted })
-      .where(eq(characters.id, characterId))
+      .where(eq(characters.id, characterId));
+
+    const inventoryPromise = this.saveInventory(characterId, player);
+
+    Promise.all([statsPromise, inventoryPromise])
       .then(() => {
         this.lastSavedHash.set(characterId, hash);
         this.log.debug({ characterId, gold, xp, level }, "Progress saved");
@@ -499,7 +510,78 @@ export class PlayerSessionManager {
   private buildProgressHash(player: PlayerState): string {
     const { gold, xp, level, strength, vitality, agility, statPoints } = player;
     const tut = [...player.tutorialsCompleted].sort().join(",");
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}`;
+    const inv = this.buildInventoryHash(player);
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}:${inv}`;
+  }
+
+  private buildInventoryHash(player: PlayerState): string {
+    const parts: string[] = [];
+    player.inventory.forEach((slot, key) => {
+      parts.push(`${key}=${slot.itemId}x${slot.quantity}`);
+    });
+    return parts.sort().join("|");
+  }
+
+  private async loadInventory(characterId: string, player: PlayerState): Promise<void> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(characterInventory)
+      .where(eq(characterInventory.characterId, characterId));
+    for (const row of rows) {
+      const slot = new InventorySlotState();
+      slot.itemId = row.itemId;
+      slot.quantity = row.quantity;
+      player.inventory.set(String(row.slotIndex), slot);
+    }
+    if (rows.length > 0) {
+      this.log.debug({ characterId, slots: rows.length }, "Inventory loaded");
+    }
+  }
+
+  private async saveInventory(characterId: string, player: PlayerState): Promise<void> {
+    const db = getDb();
+
+    const activeSlots: number[] = [];
+    const rows: { characterId: string; slotIndex: number; itemId: string; quantity: number }[] = [];
+    player.inventory.forEach((slot, key) => {
+      if (slot.quantity > 0) {
+        const slotIndex = Number(key);
+        activeSlots.push(slotIndex);
+        rows.push({ characterId, slotIndex, itemId: slot.itemId, quantity: slot.quantity });
+      }
+    });
+
+    // Upsert active slots + delete emptied slots in a transaction
+    await db.transaction(async (tx) => {
+      if (rows.length > 0) {
+        await tx
+          .insert(characterInventory)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [characterInventory.characterId, characterInventory.slotIndex],
+            set: {
+              itemId: sql`excluded.item_id`,
+              quantity: sql`excluded.quantity`,
+            },
+          });
+      }
+
+      // Delete slots that are no longer in use
+      if (activeSlots.length > 0) {
+        await tx
+          .delete(characterInventory)
+          .where(
+            and(
+              eq(characterInventory.characterId, characterId),
+              notInArray(characterInventory.slotIndex, activeSlots),
+            ),
+          );
+      } else {
+        // Inventory is empty — delete all
+        await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
+      }
+    });
   }
 
   /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */

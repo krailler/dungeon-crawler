@@ -22,6 +22,8 @@ import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
+import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
+import { executeEffect } from "../items/EffectHandlers";
 import {
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
@@ -56,6 +58,8 @@ import type {
   StatAllocateMessage,
   SprintMessage,
   AdminDebugInfoMessage,
+  ItemUseMessage,
+  ItemDefsRequestMessage,
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
@@ -311,6 +315,52 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.sprintRequested = data.active;
     });
 
+    // Item use: consume an item from inventory
+    this.onMessage(MessageType.ITEM_USE, (client: Client, data: ItemUseMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.health <= 0) return;
+
+      const def = getItemDef(data.itemId);
+      if (!def || !def.consumable) return;
+
+      // Check cooldown
+      const cd = player.itemCooldowns.get(data.itemId);
+      if (cd && cd > 0) return;
+
+      // Check player has the item
+      if (player.countItem(data.itemId) <= 0) return;
+
+      // Execute effect
+      const success = executeEffect(def.effectType, player, def.effectParams);
+      if (!success) return;
+
+      // Consume one
+      player.removeItem(data.itemId, 1);
+
+      // Set cooldown
+      if (def.cooldown > 0) {
+        player.itemCooldowns.set(data.itemId, def.cooldown);
+        client.send(MessageType.ITEM_COOLDOWN, {
+          itemId: data.itemId,
+          duration: def.cooldown,
+        });
+      }
+    });
+
+    // Item definitions: client requests defs lazily by id
+    this.onMessage(
+      MessageType.ITEM_DEFS_REQUEST,
+      (client: Client, data: ItemDefsRequestMessage) => {
+        if (!Array.isArray(data.itemIds) || data.itemIds.length === 0) return;
+        // Cap to prevent abuse
+        const ids = data.itemIds.slice(0, 50);
+        client.send(MessageType.ITEM_DEFS_RESPONSE, {
+          version: getItemRegistryVersion(),
+          items: getItemDefs(ids),
+        });
+      },
+    );
+
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? Role.USER;
@@ -543,6 +593,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
       client.view.add(player.secret);
     }
+    // No longer push all item defs — client requests them lazily via ITEM_DEFS_REQUEST
+
     // Send debug info to admin clients
     const auth = client.auth as { role?: string } | undefined;
     if (auth?.role === Role.ADMIN) {

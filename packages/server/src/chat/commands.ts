@@ -5,6 +5,7 @@ import type { PlayerState } from "../state/PlayerState";
 import { MAX_LEVEL } from "@dungeon/shared";
 import { notifyLevelProgress } from "./notifyLevelProgress";
 import { resetTutorials } from "../tutorials/resetTutorials";
+import { getItemDef } from "../items/ItemRegistry";
 
 /**
  * Register all built-in slash commands.
@@ -264,6 +265,56 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         "cmd.resetTutorials",
         { name: target.player.characterName, count },
       );
+    },
+  });
+
+  registry.register({
+    name: "give",
+    usage: "/give <player> <item_id> [quantity]",
+    description: "Give an item to a player",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      if (!ctx.args[0] || !ctx.args[1]) {
+        ctx.replyError("Usage: /give <player_name> <item_id> [quantity]", "cmd.usageGive");
+        return;
+      }
+      const target = bridge.findPlayerByName(ctx.args[0]);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
+      const itemId = ctx.args[1];
+      const def = getItemDef(itemId);
+      if (!def) {
+        ctx.replyError(`Unknown item: ${itemId}`, "cmd.itemNotFound", { id: itemId });
+        return;
+      }
+      const qty = ctx.args[2] ? parseInt(ctx.args[2], 10) : 1;
+      if (isNaN(qty) || qty < 1) {
+        ctx.replyError("Quantity must be a positive number.", "cmd.invalidQuantity");
+        return;
+      }
+      const added = target.player.addItem(itemId, qty, def.maxStack);
+      if (added === 0) {
+        ctx.replyError(`${target.player.characterName}'s inventory is full.`, "cmd.inventoryFull", {
+          name: target.player.characterName,
+        });
+        return;
+      }
+      // Notify the receiving player
+      chat.sendSystemI18nTo(
+        target.sessionId,
+        "chat.itemPickup",
+        { item: def.name, amount: added },
+        `+${added} ${itemId}`,
+      );
+      ctx.reply(`Gave ${added}× ${itemId} to ${target.player.characterName}.`, "cmd.gaveItem", {
+        amount: added,
+        item: itemId,
+        name: target.player.characterName,
+      });
     },
   });
 }

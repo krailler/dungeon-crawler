@@ -10,6 +10,7 @@ import type {
   SkillIdValue,
   AllocatableStatValue,
   StatAllocateMessage,
+  ItemUseMessage,
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
@@ -39,6 +40,7 @@ export type PartyMember = {
   skills?: string[];
   autoAttackEnabled?: boolean;
   stats?: CharacterStats;
+  inventory?: { slot: number; itemId: string; quantity: number }[];
 };
 
 export type ConnectionStatus = "connecting" | "connected" | "error";
@@ -59,6 +61,8 @@ export type HudSnapshot = {
   localCoords: { x: number; z: number } | null;
   /** Active skill cooldowns, keyed by skill ID */
   skillCooldowns: Map<string, SkillCooldownState>;
+  /** Active item cooldowns, keyed by item ID */
+  itemCooldowns: Map<string, SkillCooldownState>;
   roomName: string;
 };
 
@@ -79,6 +83,7 @@ let connectionStatus: ConnectionStatus = "connecting";
 let connectionInfo: string = "";
 let localCoords: { x: number; z: number } | null = null;
 const skillCooldowns: Map<string, SkillCooldownState> = new Map();
+const itemCooldowns: Map<string, SkillCooldownState> = new Map();
 let roomName = "";
 
 let cachedSnapshot: HudSnapshot = {
@@ -89,6 +94,7 @@ let cachedSnapshot: HudSnapshot = {
   connectionInfo: "",
   localCoords: null,
   skillCooldowns: new Map(),
+  itemCooldowns: new Map(),
   roomName: "",
 };
 
@@ -101,6 +107,7 @@ const rebuildSnapshot = (): void => {
     connectionInfo,
     localCoords,
     skillCooldowns: new Map(skillCooldowns),
+    itemCooldowns: new Map(itemCooldowns),
     roomName,
   };
 };
@@ -199,6 +206,7 @@ export const hudStore = {
     roomName = "";
     room = null;
     skillCooldowns.clear();
+    itemCooldowns.clear();
     rebuildSnapshot();
     emit();
   },
@@ -248,6 +256,16 @@ export const hudStore = {
   },
   setSkillCooldown(skillId: string, duration: number): void {
     skillCooldowns.set(skillId, { duration, startedAt: Date.now() });
+    rebuildSnapshot();
+    emit();
+  },
+  useItem(itemId: string): void {
+    if (!room) return;
+    const msg: ItemUseMessage = { itemId };
+    room.send(MessageType.ITEM_USE, msg);
+  },
+  setItemCooldown(itemId: string, duration: number): void {
+    itemCooldowns.set(itemId, { duration, startedAt: Date.now() });
     rebuildSnapshot();
     emit();
   },
