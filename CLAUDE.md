@@ -34,11 +34,11 @@ packages/
   shared/           # Code shared between client and server
     src/
       constants/      # Game balance constants (economy.ts, items.ts, etc.)
-      Constants.ts    # Core constants (TILE_SIZE, PLAYER_*, ENEMY_*, etc.)
+      Constants.ts    # Core constants (TILE_SIZE, PLAYER_*, CREATURE_*, etc.)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + CloseCode + all message interfaces
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
-      EnemyTypes.ts   # Enemy type definitions + computeEnemyDerivedStats() + scaleEnemyDerivedStats()
+      CreatureTypes.ts # Creature type definitions + computeCreatureDerivedStats() + scaleCreatureDerivedStats()
       Economy.ts      # computeGoldDrop() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
       Items.ts        # ItemDef type, InventorySlot type
@@ -46,7 +46,7 @@ packages/
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
-      state/          # Schema state classes (PlayerState, EnemyState, DungeonState, GateState, InventorySlotState)
+      state/          # Schema state classes (PlayerState, CreatureState, DungeonState, GateState, InventorySlotState)
       rooms/          # DungeonRoom (game loop, economy, message handlers)
       systems/        # AISystem, CombatSystem, GameLoop (server-side logic)
       chat/           # ChatSystem, CommandRegistry, commands
@@ -60,7 +60,7 @@ packages/
     src/
       core/           # ClientGame, InputManager
       camera/         # IsometricCamera
-      entities/       # ClientPlayer, ClientEnemy, CharacterAssetLoader
+      entities/       # ClientPlayer, ClientCreature, CharacterAssetLoader
       dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
       systems/        # WallOcclusionSystem, FogOfWarSystem
       audio/          # SoundManager
@@ -113,21 +113,21 @@ packages/
 
 ### Economy (gold + XP + levels)
 
-- Dungeon level = average party level at generation time; enemy levels = `[dungeonLevel-1, dungeonLevel+2]`
-- Enemy stats scale with level: `scale = 1 + (level-1) * 0.20` on HP/attack/defense
-- Enemy count per room scales: `minEnemies = 1 + floor(dungeonLevel / 10)`
-- Gold per kill: `(5 + enemyLevel*3) * levelModifier / alivePartyCount` (min 1)
-- XP per kill: `(20 + enemyLevel*6) * levelModifier` — NOT split among party (incentivizes grouping)
+- Dungeon level = average party level at generation time; creature levels = `[dungeonLevel-1, dungeonLevel+2]`
+- Creature stats scale with level: `scale = 1 + (level-1) * 0.20` on HP/attack/defense
+- Creature count per room scales: `minCreatures = 1 + floor(dungeonLevel / 10)`
+- Gold per kill: `(5 + creatureLevel*3) * levelModifier / alivePartyCount` (min 1)
+- XP per kill: `(20 + creatureLevel*6) * levelModifier` — NOT split among party (incentivizes grouping)
 - XP curve: `xpToNextLevel(level) = floor(50 × level²)` — exponential, MAX_LEVEL = 30
 - Level-up: +1 str/vit/agi, full heal, carry-over excess XP, chat announcement
 - Gold + XP + level + stats persisted to DB on leave + auto-save every 60s (skip if unchanged)
-- Shared: `Economy.ts`, `Leveling.ts`, `constants/economy.ts`, `EnemyTypes.ts`
+- Shared: `Economy.ts`, `Leveling.ts`, `constants/economy.ts`, `CreatureTypes.ts`
 - Server: `DungeonRoom.ts` (distribution + persistence), `PlayerState` (gold, xp, xpToNext, level, addXp, setLevel)
 - Client: gold pill with floating "+amount" animation, XP bar (bottom center, WoW-style) with floating "+XP" text, level-up particle effect (golden aura)
 
 ### Combat
 
-- Server-authoritative: AISystem (enemy AI + threat), CombatSystem (player auto-attack)
+- Server-authoritative: AISystem (creature AI + threat), CombatSystem (player auto-attack)
 - Damage: `max(1, attackDamage - defense)`
 - Stats derived from base stats (strength/vitality/agility) via shared formulas
 
