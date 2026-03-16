@@ -30,6 +30,7 @@ export const MessageType = {
   ACTION_FEEDBACK: "action:feedback",
   ITEM_DEFS_REQUEST: "item:defs:req",
   ITEM_DEFS_RESPONSE: "item:defs:res",
+  LOOT_TAKE: "loot:take",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -241,6 +242,17 @@ export interface ItemDefsResponseMessage {
   /** Cache version — changes when item definitions are modified */
   version: number;
   items: ItemDef[];
+}
+
+// ── Loot ────────────────────────────────────────────────────────────────────
+
+/** Client → Server: take an item from a loot bag */
+export interface LootTakeMessage {
+  lootBagId: string;
+  /** Index of the item in the bag's items array */
+  itemIndex: number;
+  /** Item ID — used to verify the client and server agree on which item is at this index */
+  itemId: string;
 }
 
 // ── Action feedback ─────────────────────────────────────────────────────────

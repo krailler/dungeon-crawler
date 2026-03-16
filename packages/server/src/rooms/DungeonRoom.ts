@@ -44,6 +44,7 @@ import {
   MIN_PROTOCOL_VERSION,
   TutorialStep,
   ALLOCATABLE_STATS,
+  INTERACT_RANGE,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -59,6 +60,7 @@ import type {
   AdminDebugInfoMessage,
   ItemUseMessage,
   ItemDefsRequestMessage,
+  LootTakeMessage,
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
@@ -386,6 +388,51 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
     );
 
+    // Loot: take an item from a loot bag on the ground
+    this.onMessage(MessageType.LOOT_TAKE, (client: Client, data: LootTakeMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.health <= 0) return;
+
+      const bag = this.state.lootBags.get(data.lootBagId);
+      if (!bag) return;
+
+      // Range check
+      const dx = bag.x - player.x;
+      const dz = bag.z - player.z;
+      if (dx * dx + dz * dz > INTERACT_RANGE * INTERACT_RANGE) return;
+
+      // Validate slot key + item ID match
+      const slotKey = String(data.itemIndex);
+      const lootItem = bag.items.get(slotKey);
+      if (!lootItem || lootItem.quantity <= 0) return;
+      if (lootItem.itemId !== data.itemId) return;
+
+      // Try add to inventory
+      const def = getItemDef(lootItem.itemId);
+      if (!def) return;
+      const added = player.addItem(lootItem.itemId, lootItem.quantity, def.maxStack);
+      if (added <= 0) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.inventoryFull" });
+        return;
+      }
+
+      // Remove item from bag (stable key — no index shifting)
+      bag.items.delete(slotKey);
+
+      // Chat notification
+      this.chatSystem.sendSystemI18nTo(
+        client.sessionId,
+        "chat.itemPickup",
+        { item: def.name, amount: added },
+        `+${added} ${def.id}`,
+      );
+
+      // If bag empty → remove from world
+      if (bag.items.size === 0) {
+        this.state.lootBags.delete(data.lootBagId);
+      }
+    });
+
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? Role.USER;
@@ -490,8 +537,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const seed = data.seed ?? this.state.dungeonSeed;
     this.log.warn({ seed }, "Admin restart requested");
 
-    // Clear all enemies
+    // Clear all enemies and loot bags
     this.state.enemies.clear();
+    this.state.lootBags.clear();
 
     // Regenerate dungeon
     this.generateDungeon(seed);

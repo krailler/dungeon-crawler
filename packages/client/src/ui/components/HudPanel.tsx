@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { playUiSfx } from "../../audio/uiSfx";
 import { useDraggable } from "../hooks/useDraggable";
@@ -26,6 +27,15 @@ export const HudPanel = ({
   defaultPosition,
 }: HudPanelProps): JSX.Element => {
   const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 });
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
     <div

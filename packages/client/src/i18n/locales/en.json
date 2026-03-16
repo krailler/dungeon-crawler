@@ -158,12 +158,18 @@
     "title": "Inventory",
     "clickToUse": "Click to use"
   },
+  "loot": {
+    "title": "Loot",
+    "take": "Take",
+    "empty": "Empty"
+  },
   "feedback": {
     "dead": "You are dead",
     "noTarget": "No enemy in range",
     "onCooldown": "Not ready yet",
     "noItem": "You don't have that item",
-    "alreadyFull": "Already at full health"
+    "alreadyFull": "Already at full health",
+    "inventoryFull": "Inventory is full"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

@@ -20,6 +20,7 @@ import { ConsumableSlots } from "./ConsumableSlots";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { ActionFeedback } from "./ActionFeedback";
+import { LootBagPanel } from "./LootBagPanel";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -264,6 +265,7 @@ export const HudRoot = (): JSX.Element => {
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       {inventoryOpen && <InventoryPanel onClose={closeInventory} />}
+      <LootBagPanel />
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">

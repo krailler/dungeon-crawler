@@ -2,11 +2,13 @@ import { Schema, MapSchema, type } from "@colyseus/schema";
 import { PlayerState } from "./PlayerState";
 import { EnemyState } from "./EnemyState";
 import { GateState } from "./GateState";
+import { LootBagState } from "./LootBagState";
 
 export class DungeonState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>();
   @type({ map: GateState }) gates = new MapSchema<GateState>();
+  @type({ map: LootBagState }) lootBags = new MapSchema<LootBagState>();
   @type("string") tileMapData: string = "";
   @type("string") floorVariantData: string = "";
   @type("string") wallVariantData: string = "";

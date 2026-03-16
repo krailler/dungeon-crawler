@@ -18,7 +18,7 @@ import {
   STAMINA_DRAIN_PER_SEC,
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
-  POTION_DROP_CHANCE,
+  LOOT_DROP_CHANCE,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -30,6 +30,8 @@ import type {
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 import { getDroppableItems } from "../items/ItemRegistry";
+import { LootBagState } from "../state/LootBagState";
+import { InventorySlotState } from "../state/InventorySlotState";
 
 export interface GameLoopBridge {
   readonly state: DungeonState;
@@ -237,24 +239,24 @@ export class GameLoop {
           }
         });
 
-        // Drop items for alive players
+        // Drop loot bag on the ground
         const droppable = getDroppableItems();
         if (droppable.length > 0) {
-          this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
-            if (p.health <= 0) return;
-            if (Math.random() < POTION_DROP_CHANCE) {
-              const item = droppable[Math.floor(Math.random() * droppable.length)];
-              const added = p.addItem(item.id, 1, item.maxStack);
-              if (added > 0) {
-                this.bridge.chatSystem.sendSystemI18nTo(
-                  sessionId,
-                  "chat.itemPickup",
-                  { item: item.name, amount: added },
-                  `+${added} ${item.id}`,
-                );
-              }
+          const bag = new LootBagState();
+          let slotIndex = 0;
+          for (const item of droppable) {
+            if (Math.random() < LOOT_DROP_CHANCE) {
+              const slot = new InventorySlotState();
+              slot.itemId = item.id;
+              slot.quantity = 1;
+              bag.items.set(String(slotIndex++), slot);
             }
-          });
+          }
+          if (bag.items.size > 0) {
+            bag.x = killedEnemy.x;
+            bag.z = killedEnemy.z;
+            this.bridge.state.lootBags.set(`loot_${event.enemyId}_${Date.now()}`, bag);
+          }
         }
       }
 

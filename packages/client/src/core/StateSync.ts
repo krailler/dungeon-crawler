@@ -9,6 +9,7 @@ import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { ClientPlayer } from "../entities/ClientPlayer";
 import { ClientEnemy } from "../entities/ClientEnemy";
+import { ClientLootBag } from "../entities/ClientLootBag";
 import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
@@ -19,6 +20,7 @@ import { itemDefStore } from "../ui/stores/itemDefStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
+import { lootBagStore } from "../ui/stores/lootBagStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { minimapStore } from "../ui/stores/minimapStore";
@@ -50,6 +52,7 @@ export interface StateSyncDeps {
 export class StateSync {
   players: Map<string, ClientPlayer> = new Map();
   enemies: Map<string, ClientEnemy> = new Map();
+  lootBags: Map<string, ClientLootBag> = new Map();
   inputManager: InputManager | null = null;
   wallOcclusion: WallOcclusionSystem | null = null;
   localSessionId: string = "";
@@ -135,6 +138,10 @@ export class StateSync {
         this.inputManager = null;
         this.wallOcclusion?.dispose();
         this.wallOcclusion = null;
+        // Clean up loot bags (server clears them on restart)
+        for (const bag of this.lootBags.values()) bag.dispose();
+        this.lootBags.clear();
+        lootBagStore.close();
       }
 
       // Rebuild dungeon — wrapped in a function so we can defer it on restart
@@ -206,7 +213,10 @@ export class StateSync {
             floorMeshes: this.deps.dungeonRenderer.getFloorMeshes(),
             room,
             interactable: {
-              getMeshes: () => this.deps.dungeonRenderer.getInteractableMeshes(),
+              getMeshes: () => [
+                ...this.deps.dungeonRenderer.getInteractableMeshes(),
+                ...Array.from(this.lootBags.values()).map((d) => d.getMesh()),
+              ],
               getPlayerPosition: () => {
                 const local = this.players.get(room.sessionId);
                 if (!local) return null;
@@ -474,6 +484,38 @@ export class StateSync {
         this.enemies.delete(id);
       }
     });
+
+    // ── Loot bags ──────────────────────────────────────────────────────────
+    lootBagStore.setRoom(room);
+
+    state$.lootBags.onAdd((bag: any, bagId: string) => {
+      const drop = new ClientLootBag(this.deps.scene, bagId, bag.x, bag.z);
+      this.lootBags.set(bagId, drop);
+      // Pre-fetch item defs for loot panel
+      const itemIds: string[] = [];
+      bag.items.forEach((item: any) => {
+        if (item.itemId && !itemIds.includes(item.itemId)) itemIds.push(item.itemId);
+      });
+      if (itemIds.length > 0) itemDefStore.ensureLoaded(itemIds);
+
+      // Refresh loot panel when items are removed from this bag
+      const bag$ = $(bag);
+      bag$.items.onRemove(() => {
+        lootBagStore.refresh();
+      });
+    });
+
+    state$.lootBags.onRemove((_bag: any, bagId: string) => {
+      const drop = this.lootBags.get(bagId);
+      if (drop) {
+        drop.dispose();
+        this.lootBags.delete(bagId);
+      }
+      // Auto-close panel if this was the open bag
+      if (lootBagStore.getSnapshot().lootBagId === bagId) {
+        lootBagStore.close();
+      }
+    });
     /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
@@ -504,7 +546,10 @@ export class StateSync {
         });
         break;
       }
-      // Future: case "chest": { … break; }
+      case "loot": {
+        lootBagStore.open(id);
+        break;
+      }
     }
   }
 
@@ -542,6 +587,11 @@ export class StateSync {
       enemy.dispose();
     }
     this.enemies.clear();
+    for (const [, drop] of this.lootBags) {
+      drop.dispose();
+    }
+    this.lootBags.clear();
+    lootBagStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();
