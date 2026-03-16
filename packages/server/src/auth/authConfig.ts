@@ -1,7 +1,7 @@
-import { auth, JWT } from "colyseus";
+import { auth, Hash, JWT } from "colyseus";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/database";
-import { accounts } from "../db/schema";
+import { accounts, characters } from "../db/schema";
 
 // JWT secret — use env var in production, dev fallback for local development
 JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-prod";
@@ -13,9 +13,36 @@ auth.settings.onFindUserByEmail = async (email: string) => {
   return account;
 };
 
-// Registration disabled — accounts are created via seed only
-auth.settings.onRegisterWithEmailAndPassword = async () => {
-  throw new Error("Registration is disabled");
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Registration — only allowed in dev mode, auto-creates account + character
+auth.settings.onRegisterWithEmailAndPassword = async (email: string, password: string) => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Registration is disabled");
+  }
+  if (!EMAIL_RE.test(email)) {
+    throw new Error("Invalid email address");
+  }
+  if (password.length < 4) {
+    throw new Error("Password must be at least 4 characters");
+  }
+
+  const db = getDb();
+  const hashedPassword = await Hash.make(password);
+
+  // Derive character name from email: "test@domain.com" → "Test"
+  const raw = email.split("@")[0];
+  const charName = raw.charAt(0).toUpperCase() + raw.slice(1);
+
+  const [account] = await db
+    .insert(accounts)
+    .values({ email, password: hashedPassword, role: "user" })
+    .returning();
+
+  await db.insert(characters).values({ accountId: account.id, name: charName });
+
+  console.log(`[Auth] Auto-created account "${email}" with character "${charName}"`);
+  return account;
 };
 
 auth.settings.onGenerateToken = async (userdata: unknown) => {

@@ -84,18 +84,27 @@ export const authStore = {
     }
   },
 
-  /** Login with email and password */
+  /** Login with email and password. In dev mode, auto-registers if account doesn't exist. */
   async login(email: string, password: string): Promise<boolean> {
     update({ loading: true, error: null });
     try {
       const c = this.getClient();
-      const { token } = await c.auth.signInWithEmailAndPassword(email, password);
+      let token: string;
+      try {
+        ({ token } = await c.auth.signInWithEmailAndPassword(email, password));
+      } catch (loginErr) {
+        // In dev mode, auto-register if account not found
+        if (import.meta.env.DEV) {
+          ({ token } = await c.auth.registerWithEmailAndPassword(email, password));
+        } else {
+          throw loginErr;
+        }
+      }
       localStorage.setItem(AUTH_TOKEN_KEY, token);
       update({ isAuthenticated: true, loading: false });
       return true;
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      // Network errors (server down) produce "Failed to fetch" — show user-friendly message
       const msg = raw.includes("Failed to fetch") ? "login.connectionError" : raw;
       update({ loading: false, error: msg });
       return false;
