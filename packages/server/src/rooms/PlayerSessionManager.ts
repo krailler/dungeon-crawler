@@ -7,7 +7,7 @@ import { characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { TileType, TILE_SIZE, xpToNextLevel } from "@dungeon/shared";
-import type { TileMap } from "@dungeon/shared";
+import type { TileMap, RoleValue } from "@dungeon/shared";
 import {
   registerSession,
   unregisterSession,
@@ -69,7 +69,7 @@ export class PlayerSessionManager {
       accountId: string;
       characterId: string;
       characterName: string;
-      role: string;
+      role: RoleValue;
       strength: number;
       vitality: number;
       agility: number;

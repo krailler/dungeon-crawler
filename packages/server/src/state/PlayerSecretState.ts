@@ -1,5 +1,6 @@
 import { ArraySchema, Schema, type } from "@colyseus/schema";
-import { DEFAULT_SKILLS } from "@dungeon/shared";
+import { DEFAULT_SKILLS, Role } from "@dungeon/shared";
+import type { RoleValue } from "@dungeon/shared";
 
 /**
  * Private player data — only visible to the owning client via @view().
@@ -25,5 +26,5 @@ export class PlayerSecretState extends Schema {
   @type("boolean") autoAttackEnabled: boolean = true;
 
   // Role (admin/user)
-  @type("string") role: string = "user";
+  @type("string") role: RoleValue = Role.USER;
 }

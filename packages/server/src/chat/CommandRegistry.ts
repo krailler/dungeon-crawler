@@ -1,4 +1,5 @@
 import type { PlayerState } from "../state/PlayerState";
+import { Role } from "@dungeon/shared";
 
 export interface CommandContext {
   sessionId: string;
@@ -45,7 +46,7 @@ export class CommandRegistry {
   ): { name: string; usage: string; description: string; adminOnly: boolean }[] {
     const result: { name: string; usage: string; description: string; adminOnly: boolean }[] = [];
     for (const cmd of this.commands.values()) {
-      if (!cmd.adminOnly || role === "admin") {
+      if (!cmd.adminOnly || role === Role.ADMIN) {
         result.push({
           name: cmd.name,
           usage: cmd.usage,

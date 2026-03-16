@@ -62,3 +62,9 @@ export { xpToNextLevel, computeXpDrop } from "./Leveling.js";
 
 export { MAX_SKILL_SLOTS, SkillId, SKILL_DEFS, DEFAULT_SKILLS } from "./Skills.js";
 export type { SkillIdValue, SkillIcon, SkillDef } from "./Skills.js";
+
+export { Role } from "./Roles.js";
+export type { RoleValue } from "./Roles.js";
+
+export { GateType } from "./GateTypes.js";
+export type { GateTypeValue } from "./GateTypes.js";

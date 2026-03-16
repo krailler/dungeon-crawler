@@ -1,10 +1,11 @@
 import { pgTable, text, integer, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { Role } from "@dungeon/shared";
 
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("user"),
+  role: text("role").notNull().default(Role.USER),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

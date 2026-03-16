@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Hash } from "colyseus";
+import { Role } from "@dungeon/shared";
 import { initDatabase } from "./database";
 import { accounts, characters } from "./schema";
 
@@ -11,8 +12,8 @@ interface SeedAccount {
 }
 
 const SEED_ACCOUNTS: SeedAccount[] = [
-  { email: "test@test.com", password: "password", characterName: "Hero", role: "user" },
-  { email: "admin@admin.com", password: "admin", characterName: "Admin", role: "admin" },
+  { email: "test@test.com", password: "password", characterName: "Hero", role: Role.USER },
+  { email: "admin@admin.com", password: "admin", characterName: "Admin", role: Role.ADMIN },
 ];
 
 async function seed() {

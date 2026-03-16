@@ -1,5 +1,6 @@
 import { Schema, type, view } from "@colyseus/schema";
 import { computeDerivedStats, xpToNextLevel, MAX_LEVEL } from "@dungeon/shared";
+import type { RoleValue } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
 
 export class PlayerState extends Schema {
@@ -85,10 +86,10 @@ export class PlayerState extends Schema {
     this.secret.xpToNext = v;
   }
 
-  get role(): string {
+  get role(): RoleValue {
     return this.secret.role;
   }
-  set role(v: string) {
+  set role(v: RoleValue) {
     this.secret.role = v;
   }
 

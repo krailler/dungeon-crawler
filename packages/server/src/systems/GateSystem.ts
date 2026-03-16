@@ -5,7 +5,7 @@ import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import type { ChatSystem } from "../chat/ChatSystem";
-import { TILE_SIZE, GATE_INTERACT_RANGE, GATE_COUNTDOWN_SECONDS } from "@dungeon/shared";
+import { TILE_SIZE, GATE_INTERACT_RANGE, GATE_COUNTDOWN_SECONDS, GateType } from "@dungeon/shared";
 import type { GateInteractMessage } from "@dungeon/shared";
 
 export interface GateSystemDeps {
@@ -46,7 +46,7 @@ export class GateSystem {
     if (!gate || gate.open) return;
 
     // Lobby gates require leader
-    if (gate.gateType === "lobby" && !player.isLeader) {
+    if (gate.gateType === GateType.LOBBY && !player.isLeader) {
       this.chatSystem.sendToClientI18n(
         client,
         "message",
@@ -59,7 +59,7 @@ export class GateSystem {
     }
 
     // If any lobby gate countdown is already running, ignore
-    if (gate.gateType === "lobby" && this.gateCountdowns.size > 0) return;
+    if (gate.gateType === GateType.LOBBY && this.gateCountdowns.size > 0) return;
 
     // Check proximity
     const gateWX = gate.tileX * TILE_SIZE;
@@ -69,10 +69,10 @@ export class GateSystem {
     if (dx * dx + dz * dz > GATE_INTERACT_RANGE * GATE_INTERACT_RANGE) return;
 
     // Lobby gates use countdown; other types open immediately
-    if (gate.gateType === "lobby") {
+    if (gate.gateType === GateType.LOBBY) {
       // Mark ALL lobby gates as counting down
       this.state.gates.forEach((g: any, id: string) => {
-        if (g.gateType === "lobby") this.gateCountdowns.add(id);
+        if (g.gateType === GateType.LOBBY) this.gateCountdowns.add(id);
       });
 
       const leaderName = player.characterName || client.sessionId.slice(0, 6);
@@ -124,7 +124,7 @@ export class GateSystem {
   /** Open all lobby gates and unblock their tiles. */
   private openAllLobbyGates(): void {
     this.state.gates.forEach((g: any, id: string) => {
-      if (g.gateType === "lobby" && !g.open) {
+      if (g.gateType === GateType.LOBBY && !g.open) {
         g.open = true;
         this.pathfinder.unblockTile(g.tileX, g.tileY);
         this.gateCountdowns.delete(id);

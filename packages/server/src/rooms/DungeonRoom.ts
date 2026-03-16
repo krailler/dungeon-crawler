@@ -37,6 +37,8 @@ import {
   GOLD_SAVE_INTERVAL,
   CloseCode,
   SkillId,
+  Role,
+  GateType,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -79,7 +81,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const chatBridge: ChatRoomBridge = {
       getClients: () => this.clients,
       getPlayer: (sid) => this.state.players.get(sid),
-      getPlayerRole: (c) => (c.auth as { role: string })?.role ?? "user",
+      getPlayerRole: (c) => (c.auth as { role: string })?.role ?? Role.USER,
       getPlayerName: (c) => {
         const p = this.state.players.get(c.sessionId);
         return p?.characterName || c.sessionId.slice(0, 6);
@@ -179,7 +181,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
     // Client requests command list after setting up listeners
     this.onMessage(MessageType.CHAT_COMMANDS, (client: Client) => {
-      const role = (client.auth as { role: string })?.role ?? "user";
+      const role = (client.auth as { role: string })?.role ?? Role.USER;
       const commands = this.chatSystem.getCommandsForRole(role);
       client.send(MessageType.CHAT_COMMANDS, commands);
     });
@@ -258,8 +260,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
-      const role = (client.auth as { role: string })?.role ?? "user";
-      if (role !== "admin") return;
+      const role = (client.auth as { role: string })?.role ?? Role.USER;
+      if (role !== Role.ADMIN) return;
       this.gameLoop.setDebugPaths(client.sessionId, data.enabled);
     });
 
@@ -299,7 +301,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const gate = new GateState();
       const gateId = `lobby_${i}`;
       gate.id = gateId;
-      gate.gateType = "lobby";
+      gate.gateType = GateType.LOBBY;
       gate.tileX = pos.x;
       gate.tileY = pos.y;
       gate.isNS = pos.isNS;
@@ -351,7 +353,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   private handleAdminRestart(client: Client, data: AdminRestartMessage): void {
     const auth = client.auth as { role: string };
-    if (auth.role !== "admin") {
+    if (auth.role !== Role.ADMIN) {
       this.log.warn({ player: client.sessionId }, "Non-admin tried to restart room");
       return;
     }
@@ -574,7 +576,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private isDungeonStarted(): boolean {
     let started = false;
     this.state.gates.forEach((gate: GateState) => {
-      if (gate.gateType === "lobby" && gate.open) started = true;
+      if (gate.gateType === GateType.LOBBY && gate.open) started = true;
     });
     return started;
   }
@@ -583,7 +585,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private broadcastToAdmins(type: string, message: unknown): void {
     for (const client of this.clients) {
       const auth = client.auth as { role?: string } | undefined;
-      if (auth?.role === "admin") {
+      if (auth?.role === Role.ADMIN) {
         client.send(type, message);
       }
     }

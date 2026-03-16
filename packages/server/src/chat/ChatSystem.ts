@@ -7,6 +7,7 @@ import {
   CHAT_RATE_LIMIT_BURST,
   CHAT_RATE_LIMIT_WINDOW,
   MessageType,
+  Role,
 } from "@dungeon/shared";
 import type { ChatEntry, ChatCategoryValue, ChatVariantValue } from "@dungeon/shared";
 import { CommandRegistry } from "./CommandRegistry";
@@ -223,7 +224,7 @@ export class ChatSystem {
     }
 
     const role = this.bridge.getPlayerRole(client);
-    if (cmd.adminOnly && role !== "admin") {
+    if (cmd.adminOnly && role !== Role.ADMIN) {
       this.sendToClientI18n(
         client,
         ChatCategory.MESSAGE,

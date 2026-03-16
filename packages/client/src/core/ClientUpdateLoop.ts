@@ -24,6 +24,7 @@ import {
   TILE_SIZE,
   MINIMAP_DISCOVERY_RADIUS,
   GATE_INTERACT_RANGE,
+  GateType,
 } from "@dungeon/shared";
 import type { DebugPathsMessage } from "@dungeon/shared";
 
@@ -97,7 +98,7 @@ export class ClientUpdateLoop {
         const info = gateSnap.gates.get(id);
         if (!info || info.isOpen) continue;
         // Lobby gates require leader
-        if (info.gateType === "lobby" && !isLeader) continue;
+        if (info.gateType === GateType.LOBBY && !isLeader) continue;
 
         const dx = pPos.x - wpos.x;
         const dz = pPos.z - wpos.z;

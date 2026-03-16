@@ -20,7 +20,7 @@ import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { minimapStore } from "../ui/stores/minimapStore";
 import { loadingStore, LoadingPhase } from "../ui/stores/loadingStore";
-import { TileMap, unpackSetId, tileSetNameFromId, MessageType } from "@dungeon/shared";
+import { TileMap, unpackSetId, tileSetNameFromId, MessageType, GateType } from "@dungeon/shared";
 import type { SkillCooldownMessage } from "@dungeon/shared";
 
 export interface StateSyncDeps {
@@ -77,7 +77,7 @@ export class StateSync {
       const tileX = gate.tileX as number;
       const tileY = gate.tileY as number;
       const open = gate.open as boolean;
-      const gateType = (gate.gateType as string) || "lobby";
+      const gateType = (gate.gateType as string) || GateType.LOBBY;
 
       gateStore.addGate(gateId, gateType, tileX, tileY, open);
       minimapStore.addGatePosition(gateId, tileX, tileY);
