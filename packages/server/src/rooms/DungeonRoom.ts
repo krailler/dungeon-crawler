@@ -48,6 +48,7 @@ import type {
   PromoteLeaderMessage,
   PartyKickMessage,
   SkillIdValue,
+  TutorialDismissMessage,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
@@ -141,6 +142,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         },
         get chatSystem() {
           return self.chatSystem;
+        },
+        get clock() {
+          return self.clock;
+        },
+        sendToClient: (sessionId: string, type: string, message: unknown) => {
+          const c = self.clients.find((cl) => cl.sessionId === sessionId);
+          if (c) c.send(type, message);
         },
         allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
         onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
@@ -259,6 +267,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           remaining: result.remaining,
         });
       }
+    });
+    // Tutorial: player dismisses a tutorial hint
+    this.onMessage(MessageType.TUTORIAL_DISMISS, (client: Client, data: TutorialDismissMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      player.tutorialsCompleted.add(data.step);
     });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
@@ -409,6 +423,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     level: number;
     gold: number;
     xp: number;
+    tutorialsCompleted: string;
   }> {
     // Check client protocol version
     const clientVersion = options?.protocolVersion ?? 0;
@@ -444,6 +459,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         level: characters.level,
         gold: characters.gold,
         xp: characters.xp,
+        tutorialsCompleted: characters.tutorialsCompleted,
       })
       .from(characters)
       .where(eq(characters.accountId, account.id))
@@ -472,6 +488,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       level: character.level,
       gold: character.gold,
       xp: character.xp,
+      tutorialsCompleted: character.tutorialsCompleted,
     };
   }
 

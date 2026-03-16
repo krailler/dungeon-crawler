@@ -21,6 +21,8 @@ export type {
   SkillToggleMessage,
   SkillUseMessage,
   SkillCooldownMessage,
+  TutorialHintMessage,
+  TutorialDismissMessage,
 } from "./protocol.js";
 
 export {
@@ -68,3 +70,6 @@ export type { RoleValue } from "./Roles.js";
 
 export { GateType } from "./GateTypes.js";
 export type { GateTypeValue } from "./GateTypes.js";
+
+export { TutorialStep } from "./Tutorial.js";
+export type { TutorialStepValue } from "./Tutorial.js";

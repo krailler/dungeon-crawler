@@ -122,6 +122,9 @@
     "cooldown": "Cooldown: {{seconds}}s",
     "damage": "Damage: {{multiplier}}×"
   },
+  "tutorial": {
+    "startDungeon": "You are the party leader! Walk to the gate and press F to start the dungeon."
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",
@@ -131,6 +134,8 @@
     "teleported": "Teleported to {{name}}.",
     "usageSetlevel": "Usage: /setlevel <player_name> <level>",
     "invalidLevel": "Level must be between 1 and {{max}}.",
-    "setLevel": "Set {{name}} to level {{level}}."
+    "setLevel": "Set {{name}} to level {{level}}.",
+    "usageResettutorials": "Usage: /resettutorials <player_name>",
+    "resetTutorials": "Reset {{count}} tutorial(s) for {{name}}."
   }
 }

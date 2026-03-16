@@ -2,7 +2,8 @@ import type { Client } from "colyseus";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
 import type { PlayerState } from "../state/PlayerState";
-import { MAX_LEVEL } from "@dungeon/shared";
+import { MAX_LEVEL, MessageType, TutorialStep } from "@dungeon/shared";
+import type { TutorialHintMessage } from "@dungeon/shared";
 
 /**
  * Register all built-in slash commands.
@@ -221,6 +222,47 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         chat.broadcastSystemI18n("chat.kicked", { name }, `${name} has been kicked.`);
         targetClient.leave(4101);
       }
+    },
+  });
+
+  registry.register({
+    name: "resettutorials",
+    usage: "/resettutorials <player>",
+    description: "Reset all completed tutorials for a player",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /resettutorials <player_name>", "cmd.usageResettutorials");
+        return;
+      }
+      const target = bridge.findPlayerByName(ctx.args[0]);
+      if (!target) {
+        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+          name: ctx.args[0],
+        });
+        return;
+      }
+
+      const count = target.player.tutorialsCompleted.size;
+      target.player.tutorialsCompleted.clear();
+
+      // Re-send tutorial hints that now apply (e.g. leader hint)
+      if (target.player.isLeader) {
+        const targetClient = findClient(bridge, target.sessionId);
+        if (targetClient) {
+          const msg: TutorialHintMessage = {
+            step: TutorialStep.START_DUNGEON,
+            i18nKey: "tutorial.startDungeon",
+          };
+          targetClient.send(MessageType.TUTORIAL_HINT, msg);
+        }
+      }
+
+      ctx.reply(
+        `Reset ${count} tutorial(s) for ${target.player.characterName}.`,
+        "cmd.resetTutorials",
+        { name: target.player.characterName, count },
+      );
     },
   });
 }

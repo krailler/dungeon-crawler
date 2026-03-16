@@ -1,4 +1,5 @@
 import type { SkillIdValue } from "./Skills.js";
+import type { TutorialStepValue } from "./Tutorial.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -15,6 +16,8 @@ export const MessageType = {
   SKILL_TOGGLE: "skill:toggle",
   SKILL_USE: "skill:use",
   SKILL_COOLDOWN: "skill:cooldown",
+  TUTORIAL_HINT: "tutorial:hint",
+  TUTORIAL_DISMISS: "tutorial:dismiss",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -158,6 +161,21 @@ export interface SkillCooldownMessage {
   /** Remaining cooldown in seconds */
   remaining: number;
 }
+
+// ── Tutorial ─────────────────────────────────────────────────────────────────
+
+/** Server → Client: show a tutorial hint */
+export interface TutorialHintMessage {
+  step: TutorialStepValue;
+  i18nKey: string;
+}
+
+/** Client → Server: player dismisses/completes a tutorial step */
+export interface TutorialDismissMessage {
+  step: TutorialStepValue;
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
 
 /** Command info sent to client on join for help overlay */
 export interface CommandInfo {

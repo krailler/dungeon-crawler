@@ -6,7 +6,7 @@ import { getDb } from "../db/database";
 import { characters } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
-import { TileType, TILE_SIZE, xpToNextLevel } from "@dungeon/shared";
+import { TileType, TILE_SIZE, xpToNextLevel, MessageType, TutorialStep } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import {
   registerSession,
@@ -27,6 +27,8 @@ export interface SessionRoomBridge {
     removePlayer(sid: string): void;
     broadcastSystemI18n(key: string, params: Record<string, unknown>, fallback: string): void;
   };
+  clock: { setTimeout(fn: () => void, ms: number): unknown };
+  sendToClient(sessionId: string, type: string, message: unknown): void;
   allowReconnection(client: Client, seconds: number): Deferred<Client>;
   onSessionCleanup(sessionId: string): void;
 }
@@ -65,6 +67,7 @@ export class PlayerSessionManager {
       level,
       gold,
       xp,
+      tutorialsCompleted: tutorialsRaw,
     } = client.auth as {
       accountId: string;
       characterId: string;
@@ -76,6 +79,7 @@ export class PlayerSessionManager {
       level: number;
       gold: number;
       xp: number;
+      tutorialsCompleted: string;
     };
 
     // Kick previous session if same account is already connected (any room)
@@ -133,10 +137,16 @@ export class PlayerSessionManager {
     player.xp = xp;
     player.xpToNext = xpToNextLevel(level);
     player.characterId = characterId;
-    this.lastSavedHash.set(
-      characterId,
-      `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}`,
-    );
+
+    // Parse tutorial completion from DB
+    try {
+      const parsed = JSON.parse(tutorialsRaw || "[]") as string[];
+      player.tutorialsCompleted = new Set(parsed);
+    } catch {
+      player.tutorialsCompleted = new Set();
+    }
+
+    this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
     // Compute derived stats
     player.applyDerivedStats();
@@ -154,6 +164,9 @@ export class PlayerSessionManager {
     this.bridge.combatSystem.registerPlayer(client.sessionId);
     this.accountToSession.set(accountId, client.sessionId);
     this.reassignLeader();
+
+    // Tutorial: send START_DUNGEON hint to new leader after a short delay
+    this.sendTutorialHintIfNeeded(client.sessionId);
 
     // Chat: broadcast join event
     this.bridge.chatSystem.broadcastSystemI18n(
@@ -444,24 +457,32 @@ export class PlayerSessionManager {
   reassignLeader(): void {
     // Leader is the first player in the map
     let leaderAssigned = false;
-    this.bridge.state.players.forEach((player: PlayerState) => {
+    let newLeaderSessionId: string | null = null;
+    this.bridge.state.players.forEach((player: PlayerState, sid: string) => {
       if (!leaderAssigned) {
         player.isLeader = true;
         leaderAssigned = true;
+        newLeaderSessionId = sid;
       } else {
         player.isLeader = false;
       }
     });
+
+    // Send tutorial hint to new leader if they haven't completed it
+    if (newLeaderSessionId) {
+      this.sendTutorialHintIfNeeded(newLeaderSessionId);
+    }
   }
 
   savePlayerProgress(player: PlayerState): void {
     const { characterId, gold, xp, level, strength, vitality, agility } = player;
     if (!characterId) return;
-    const hash = `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}`;
+    const hash = this.buildProgressHash(player);
     if (this.lastSavedHash.get(characterId) === hash) return;
+    const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
     const db = getDb();
     db.update(characters)
-      .set({ gold, xp, level, strength, vitality, agility })
+      .set({ gold, xp, level, strength, vitality, agility, tutorialsCompleted })
       .where(eq(characters.id, characterId))
       .then(() => {
         this.lastSavedHash.set(characterId, hash);
@@ -470,6 +491,39 @@ export class PlayerSessionManager {
       .catch((err) => {
         this.log.error({ characterId, err }, "Failed to save progress");
       });
+  }
+
+  private buildProgressHash(player: PlayerState): string {
+    const { gold, xp, level, strength, vitality, agility } = player;
+    const tut = [...player.tutorialsCompleted].sort().join(",");
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${tut}`;
+  }
+
+  /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */
+  private sendTutorialHintIfNeeded(sessionId: string): void {
+    const player = this.bridge.state.players.get(sessionId);
+    if (!player?.isLeader) return;
+    if (player.tutorialsCompleted.has(TutorialStep.START_DUNGEON)) return;
+
+    // Check that lobby gates are still closed (dungeon not yet started)
+    let dungeonStarted = false;
+    this.bridge.state.gates.forEach((gate: { gateType: string; open: boolean }) => {
+      if (gate.gateType === "lobby" && gate.open) dungeonStarted = true;
+    });
+    if (dungeonStarted) return;
+
+    // Delay so the client has time to set up message listeners
+    this.bridge.clock.setTimeout(() => {
+      // Re-check: player might have left or is no longer leader
+      const p = this.bridge.state.players.get(sessionId);
+      if (!p?.isLeader || !p.online) return;
+      if (p.tutorialsCompleted.has(TutorialStep.START_DUNGEON)) return;
+
+      this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.START_DUNGEON,
+        i18nKey: "tutorial.startDungeon",
+      });
+    }, 2000);
   }
 
   saveAllPlayersProgress(): void {

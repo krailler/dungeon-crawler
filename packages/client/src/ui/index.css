@@ -136,6 +136,18 @@ body {
   }
 }
 
+@keyframes tutorial-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+    border-color: rgba(56, 189, 248, 0.6);
+  }
+}
+
 @layer utilities {
   .animate-rise-in {
     animation: rise-in 0.35s ease-out backwards;
@@ -151,5 +163,9 @@ body {
 
   .animate-xp-float {
     animation: xp-float-up 1.2s ease-out forwards;
+  }
+
+  .animate-tutorial-glow {
+    animation: tutorial-glow 2.4s ease-in-out infinite;
   }
 }

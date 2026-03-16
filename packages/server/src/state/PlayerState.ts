@@ -27,6 +27,7 @@ export class PlayerState extends Schema {
   speed: number = 0;
   attackCooldown: number = 1.0;
   attackRange: number = 2.5;
+  tutorialsCompleted: Set<string> = new Set();
 
   // ── Convenience getters (delegate to secret for server-side code) ──────────
 

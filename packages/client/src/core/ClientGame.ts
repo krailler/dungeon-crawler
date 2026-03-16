@@ -30,7 +30,13 @@ import {
   ChatCategory,
   PROTOCOL_VERSION,
 } from "@dungeon/shared";
-import type { CombatLogMessage, ChatEntry, CommandInfo, DebugPathsMessage } from "@dungeon/shared";
+import type {
+  CombatLogMessage,
+  ChatEntry,
+  CommandInfo,
+  DebugPathsMessage,
+  TutorialHintMessage,
+} from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
   loadingStore,
@@ -43,6 +49,7 @@ import { chatStore } from "../ui/stores/chatStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
+import { tutorialStore } from "../ui/stores/tutorialStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -197,6 +204,7 @@ export class ClientGame {
       adminStore.setRoom(room);
       hudStore.setRoom(room);
       gateStore.setRoom(room);
+      tutorialStore.setRoom(room);
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
@@ -261,6 +269,11 @@ export class ClientGame {
       // Debug: path visualization
       room.onMessage(MessageType.DEBUG_PATHS, (msg: DebugPathsMessage) => {
         this.updateLoop.handleDebugPaths(msg);
+      });
+
+      // Tutorial hints from server
+      room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
+        tutorialStore.showHint(msg);
       });
 
       hudStore.setConnection(
@@ -355,6 +368,7 @@ export class ClientGame {
     gateStore.reset();
     promptStore.reset();
     announcementStore.reset();
+    tutorialStore.reset();
     localStorage.removeItem("reconnectionToken");
     this.room?.leave();
     window.clearInterval(this.pingInterval);

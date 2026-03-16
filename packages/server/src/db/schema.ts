@@ -24,6 +24,7 @@ export const characters = pgTable(
     level: integer("level").notNull().default(1),
     gold: integer("gold").notNull().default(0),
     xp: integer("xp").notNull().default(0),
+    tutorialsCompleted: text("tutorials_completed").notNull().default("[]"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

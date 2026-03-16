@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { gateStore } from "../stores/gateStore";
 import { promptStore } from "../stores/promptStore";
+import { tutorialStore } from "../stores/tutorialStore";
 
 /** "Press F" interaction hint — shown when the leader is near the gate */
 export const GateHint = (): JSX.Element | null => {
@@ -26,7 +27,10 @@ export const GateHint = (): JSX.Element | null => {
         message: t("gate.promptMessage"),
         confirmLabel: t("gate.promptAccept"),
         cancelLabel: t("gate.promptCancel"),
-        onConfirm: () => gateStore.confirmOpenNearest(),
+        onConfirm: () => {
+          tutorialStore.dismiss();
+          gateStore.confirmOpenNearest();
+        },
       });
     };
 

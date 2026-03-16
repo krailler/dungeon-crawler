@@ -13,6 +13,7 @@ import { ChatPanel } from "./ChatPanel";
 import { GateHint } from "./GatePrompt";
 import { PromptOverlay } from "./PromptOverlay";
 import { AnnouncementOverlay } from "./AnnouncementOverlay";
+import { TutorialHint } from "./TutorialHint";
 import { XpBar } from "./XpBar";
 import { SkillBar } from "./SkillBar";
 import { HudButton } from "../components/HudButton";
@@ -210,6 +211,7 @@ export const HudRoot = (): JSX.Element => {
       <GateHint />
       <PromptOverlay />
       <AnnouncementOverlay />
+      <TutorialHint />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
