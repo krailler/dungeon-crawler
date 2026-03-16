@@ -1,6 +1,6 @@
 import { Schema, type, view } from "@colyseus/schema";
 import { computeDerivedStats, xpToNextLevel, MAX_LEVEL } from "@dungeon/shared";
-import type { RoleValue } from "@dungeon/shared";
+import type { AllocatableStatValue, RoleValue } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
 
 export class PlayerState extends Schema {
@@ -98,6 +98,13 @@ export class PlayerState extends Schema {
     return this.secret.skills;
   }
 
+  get statPoints(): number {
+    return this.secret.statPoints;
+  }
+  set statPoints(v: number) {
+    this.secret.statPoints = v;
+  }
+
   get autoAttackEnabled(): boolean {
     return this.secret.autoAttackEnabled;
   }
@@ -121,57 +128,55 @@ export class PlayerState extends Schema {
   }
 
   /**
-   * Advance one level: +1 to each base stat, recompute derived, full heal.
-   * Returns stat deltas for UI feedback.
+   * Advance one level: grant +1 stat point (player allocates manually), full heal.
    */
-  levelUp(): { dhp: number; datk: number; ddef: number } {
-    const prevHp = this.maxHealth;
-    const prevAtk = this.attackDamage;
-    const prevDef = this.defense;
-
+  levelUp(): void {
     this.level++;
-    this.strength++;
-    this.vitality++;
-    this.agility++;
+    this.statPoints++;
 
     this.applyDerivedStats();
     this.health = this.maxHealth;
     this.xpToNext = xpToNextLevel(this.level);
+  }
 
-    return {
-      dhp: this.maxHealth - prevHp,
-      datk: this.attackDamage - prevAtk,
-      ddef: this.defense - prevDef,
-    };
+  /**
+   * Allocate one stat point to a base stat. Returns true on success.
+   */
+  allocateStat(stat: AllocatableStatValue): boolean {
+    if (this.statPoints <= 0) return false;
+    this[stat]++;
+    this.statPoints--;
+    this.applyDerivedStats();
+    return true;
   }
 
   /**
    * Add XP and process any resulting level-ups.
-   * Returns an array of level-up events with stat deltas (empty if no level-up).
+   * Returns an array of new levels reached (empty if no level-up).
    */
-  addXp(amount: number): { level: number; dhp: number; datk: number; ddef: number }[] {
+  addXp(amount: number): number[] {
     if (this.level >= MAX_LEVEL) return [];
     this.xp += amount;
 
-    const levelUps: { level: number; dhp: number; datk: number; ddef: number }[] = [];
+    const levelUps: number[] = [];
     while (this.level < MAX_LEVEL && this.xp >= xpToNextLevel(this.level)) {
       this.xp -= xpToNextLevel(this.level);
-      const deltas = this.levelUp();
-      levelUps.push({ level: this.level, ...deltas });
+      this.levelUp();
+      levelUps.push(this.level);
     }
     return levelUps;
   }
 
   /**
-   * Set player to a specific level: recompute base stats (+1 per level gained
-   * from the base 10/10/10), recompute derived stats, full heal, reset XP.
+   * Set player to a specific level: reset base stats to 10/10/10, grant
+   * (targetLevel - 1) unassigned stat points, full heal, reset XP.
    */
   setLevel(targetLevel: number): void {
-    const levelsGained = targetLevel - 1;
     this.level = targetLevel;
-    this.strength = 10 + levelsGained;
-    this.vitality = 10 + levelsGained;
-    this.agility = 10 + levelsGained;
+    this.strength = 10;
+    this.vitality = 10;
+    this.agility = 10;
+    this.statPoints = targetLevel - 1;
     this.xp = 0;
     this.xpToNext = xpToNextLevel(targetLevel);
 

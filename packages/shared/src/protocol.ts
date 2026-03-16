@@ -1,4 +1,5 @@
 import type { SkillIdValue } from "./Skills.js";
+import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
 
 /** Message types for client ↔ server communication */
@@ -18,6 +19,7 @@ export const MessageType = {
   SKILL_COOLDOWN: "skill:cooldown",
   TUTORIAL_HINT: "tutorial:hint",
   TUTORIAL_DISMISS: "tutorial:dismiss",
+  STAT_ALLOCATE: "stat:allocate",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -173,6 +175,13 @@ export interface TutorialHintMessage {
 /** Client → Server: player dismisses/completes a tutorial step */
 export interface TutorialDismissMessage {
   step: TutorialStepValue;
+}
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+
+/** Client → Server: allocate a stat point to a base stat */
+export interface StatAllocateMessage {
+  stat: AllocatableStatValue;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

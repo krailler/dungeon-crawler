@@ -1,3 +1,20 @@
+// ── Allocatable stat identifiers ─────────────────────────────────────────────
+
+export const AllocatableStat = {
+  STRENGTH: "strength",
+  VITALITY: "vitality",
+  AGILITY: "agility",
+} as const;
+
+export type AllocatableStatValue = (typeof AllocatableStat)[keyof typeof AllocatableStat];
+
+/** Runtime set for quick membership checks */
+export const ALLOCATABLE_STATS: readonly AllocatableStatValue[] = [
+  AllocatableStat.STRENGTH,
+  AllocatableStat.VITALITY,
+  AllocatableStat.AGILITY,
+];
+
 // ── Base stats ──────────────────────────────────────────────────────────────
 
 export interface BaseStats {

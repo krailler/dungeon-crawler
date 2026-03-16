@@ -8,6 +8,8 @@ import type {
   SkillToggleMessage,
   SkillUseMessage,
   SkillIdValue,
+  AllocatableStatValue,
+  StatAllocateMessage,
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
@@ -32,6 +34,7 @@ export type PartyMember = {
   gold?: number;
   xp?: number;
   xpToNext?: number;
+  statPoints?: number;
   skills?: string[];
   autoAttackEnabled?: boolean;
   stats?: CharacterStats;
@@ -225,6 +228,11 @@ export const hudStore = {
     if (!room) return;
     const msg: SkillUseMessage = { skillId };
     room.send(MessageType.SKILL_USE, msg);
+  },
+  allocateStat(stat: AllocatableStatValue): void {
+    if (!room) return;
+    const msg: StatAllocateMessage = { stat };
+    room.send(MessageType.STAT_ALLOCATE, msg);
   },
   setSkillCooldown(skillId: string, duration: number): void {
     skillCooldowns.set(skillId, { duration, startedAt: Date.now() });

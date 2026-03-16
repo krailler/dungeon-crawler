@@ -19,6 +19,8 @@ export interface ChatRoomBridge {
   getPlayerName(client: Client): string;
   findPlayerByName(name: string): { sessionId: string; player: PlayerState } | null;
   getAllPlayers(): Map<string, PlayerState>;
+  /** Send a message to a specific client by sessionId */
+  sendToClient(sessionId: string, type: string, message: unknown): void;
   /** Remove a player from all room systems (state, combat, AI, etc.) */
   kickPlayer(sessionId: string): void;
 }

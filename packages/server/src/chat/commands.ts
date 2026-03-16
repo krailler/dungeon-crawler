@@ -4,6 +4,7 @@ import type { CommandContext } from "./CommandRegistry";
 import type { PlayerState } from "../state/PlayerState";
 import { MAX_LEVEL, MessageType, TutorialStep } from "@dungeon/shared";
 import type { TutorialHintMessage } from "@dungeon/shared";
+import { notifyLevelProgress } from "./notifyLevelProgress";
 
 /**
  * Register all built-in slash commands.
@@ -190,6 +191,15 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
       target.player.setLevel(targetLevel);
 
+      // Notify the target player about stat points and tutorial (no public broadcast)
+      notifyLevelProgress(
+        target.sessionId,
+        target.player,
+        [],
+        chat,
+        bridge.sendToClient.bind(bridge),
+      );
+
       ctx.reply(`Set ${target.player.characterName} to level ${targetLevel}.`, "cmd.setLevel", {
         name: target.player.characterName,
         level: targetLevel,
@@ -248,14 +258,10 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
       // Re-send tutorial hints that now apply (e.g. leader hint)
       if (target.player.isLeader) {
-        const targetClient = findClient(bridge, target.sessionId);
-        if (targetClient) {
-          const msg: TutorialHintMessage = {
-            step: TutorialStep.START_DUNGEON,
-            i18nKey: "tutorial.startDungeon",
-          };
-          targetClient.send(MessageType.TUTORIAL_HINT, msg);
-        }
+        bridge.sendToClient(target.sessionId, MessageType.TUTORIAL_HINT, {
+          step: TutorialStep.START_DUNGEON,
+          i18nKey: "tutorial.startDungeon",
+        } satisfies TutorialHintMessage);
       }
 
       ctx.reply(

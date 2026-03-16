@@ -303,6 +303,7 @@ export class StateSync {
           gold: secret.gold,
           xp: secret.xp,
           xpToNext: secret.xpToNext,
+          statPoints: secret.statPoints,
           skills: Array.from(secret.skills as Iterable<string>),
           autoAttackEnabled: secret.autoAttackEnabled ?? true,
           stats: localStats,
@@ -335,6 +336,7 @@ export class StateSync {
             gold: secret.gold,
             xp: secret.xp,
             xpToNext: secret.xpToNext,
+            statPoints: secret.statPoints,
             autoAttackEnabled: secret.autoAttackEnabled ?? true,
             stats: {
               strength: secret.strength,

@@ -16,6 +16,9 @@ export class PlayerSecretState extends Schema {
   @type("int16") attackDamage: number = 0;
   @type("int16") defense: number = 0;
 
+  // Stat points (unassigned)
+  @type("int16") statPoints: number = 0;
+
   // Economy & progression
   @type("int32") gold: number = 0;
   @type("int32") xp: number = 0;

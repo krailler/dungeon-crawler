@@ -67,6 +67,7 @@ export class PlayerSessionManager {
       level,
       gold,
       xp,
+      statPoints,
       tutorialsCompleted: tutorialsRaw,
     } = client.auth as {
       accountId: string;
@@ -79,6 +80,7 @@ export class PlayerSessionManager {
       level: number;
       gold: number;
       xp: number;
+      statPoints: number;
       tutorialsCompleted: string;
     };
 
@@ -136,6 +138,7 @@ export class PlayerSessionManager {
     player.gold = gold;
     player.xp = xp;
     player.xpToNext = xpToNextLevel(level);
+    player.statPoints = statPoints;
     player.characterId = characterId;
 
     // Parse tutorial completion from DB
@@ -475,14 +478,14 @@ export class PlayerSessionManager {
   }
 
   savePlayerProgress(player: PlayerState): void {
-    const { characterId, gold, xp, level, strength, vitality, agility } = player;
+    const { characterId, gold, xp, level, strength, vitality, agility, statPoints } = player;
     if (!characterId) return;
     const hash = this.buildProgressHash(player);
     if (this.lastSavedHash.get(characterId) === hash) return;
     const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
     const db = getDb();
     db.update(characters)
-      .set({ gold, xp, level, strength, vitality, agility, tutorialsCompleted })
+      .set({ gold, xp, level, strength, vitality, agility, statPoints, tutorialsCompleted })
       .where(eq(characters.id, characterId))
       .then(() => {
         this.lastSavedHash.set(characterId, hash);
@@ -494,9 +497,9 @@ export class PlayerSessionManager {
   }
 
   private buildProgressHash(player: PlayerState): string {
-    const { gold, xp, level, strength, vitality, agility } = player;
+    const { gold, xp, level, strength, vitality, agility, statPoints } = player;
     const tut = [...player.tutorialsCompleted].sort().join(",");
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${tut}`;
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}`;
   }
 
   /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */

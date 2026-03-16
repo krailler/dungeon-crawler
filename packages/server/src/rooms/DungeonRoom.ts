@@ -40,6 +40,8 @@ import {
   Role,
   GateType,
   MIN_PROTOCOL_VERSION,
+  TutorialStep,
+  ALLOCATABLE_STATS,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -48,7 +50,9 @@ import type {
   PromoteLeaderMessage,
   PartyKickMessage,
   SkillIdValue,
+  AllocatableStatValue,
   TutorialDismissMessage,
+  StatAllocateMessage,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
@@ -103,6 +107,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const map = new Map<string, PlayerState>();
         this.state.players.forEach((p: PlayerState, sid: string) => map.set(sid, p));
         return map;
+      },
+      sendToClient: (sessionId: string, type: string, message: unknown) => {
+        const c = self.clients.find((cl) => cl.sessionId === sessionId);
+        if (c) c.send(type, message);
       },
       kickPlayer: (sessionId: string) => {
         this.sessionManager.markKicked(sessionId);
@@ -274,6 +282,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       if (!player) return;
       player.tutorialsCompleted.add(data.step);
     });
+    // Stats: allocate a stat point to a base stat
+    this.onMessage(MessageType.STAT_ALLOCATE, (client: Client, data: StatAllocateMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (!ALLOCATABLE_STATS.includes(data.stat as AllocatableStatValue)) return;
+      if (player.allocateStat(data.stat)) {
+        // Auto-complete the allocate stats tutorial
+        player.tutorialsCompleted.add(TutorialStep.ALLOCATE_STATS);
+      }
+    });
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? Role.USER;
@@ -423,6 +441,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     level: number;
     gold: number;
     xp: number;
+    statPoints: number;
     tutorialsCompleted: string;
   }> {
     // Check client protocol version
@@ -459,6 +478,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         level: characters.level,
         gold: characters.gold,
         xp: characters.xp,
+        statPoints: characters.statPoints,
         tutorialsCompleted: characters.tutorialsCompleted,
       })
       .from(characters)
@@ -488,6 +508,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       level: character.level,
       gold: character.gold,
       xp: character.xp,
+      statPoints: character.statPoints,
       tutorialsCompleted: character.tutorialsCompleted,
     };
   }

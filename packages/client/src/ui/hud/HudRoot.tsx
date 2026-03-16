@@ -339,13 +339,20 @@ export const HudRoot = (): JSX.Element => {
           label={t("hud.map")}
           shortcut="M"
         />
-        <HudButton
-          onClick={toggleCharacter}
-          isOpen={characterOpen}
-          icon={<CharacterIcon />}
-          label={t("character.title")}
-          shortcut="C"
-        />
+        <div className="relative">
+          <HudButton
+            onClick={toggleCharacter}
+            isOpen={characterOpen}
+            icon={<CharacterIcon />}
+            label={t("character.title")}
+            shortcut="C"
+          />
+          {(localMember?.statPoints ?? 0) > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white shadow animate-pulse">
+              {localMember!.statPoints}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

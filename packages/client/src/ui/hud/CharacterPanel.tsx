@@ -1,14 +1,39 @@
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
+import { AllocatableStat } from "@dungeon/shared";
+import type { AllocatableStatValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
+import { tutorialStore } from "../stores/tutorialStore";
 import { CoinIcon } from "../icons/CoinIcon";
 import { playUiSfx } from "../../audio/uiSfx";
 
-const StatRow = ({ label, value, color }: { label: string; value: number; color: string }) => (
+const StatRow = ({
+  label,
+  value,
+  color,
+  canAllocate,
+  onAllocate,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  canAllocate?: boolean;
+  onAllocate?: () => void;
+}) => (
   <div className="flex items-center justify-between py-1">
     <span className="text-xs text-slate-400">{label}</span>
-    <span className={`font-mono text-sm font-semibold ${color}`}>{value}</span>
+    <div className="flex items-center gap-1.5">
+      <span className={`font-mono text-sm font-semibold ${color}`}>{value}</span>
+      {canAllocate && (
+        <button
+          onClick={onAllocate}
+          className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/40 hover:text-sky-100"
+        >
+          +
+        </button>
+      )}
+    </div>
   </div>
 );
 
@@ -20,7 +45,14 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
   if (!local?.stats) return null;
 
   const stats: CharacterStats = local.stats;
+  const statPoints = local.statPoints ?? 0;
   const healthPct = Math.round((local.health / Math.max(1, local.maxHealth)) * 100);
+
+  const handleAllocate = (stat: AllocatableStatValue): void => {
+    playUiSfx("ui_click");
+    tutorialStore.dismiss();
+    hudStore.allocateStat(stat);
+  };
 
   return (
     <div className="pointer-events-auto absolute right-5 top-14 w-56 animate-rise-in">
@@ -100,13 +132,38 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
         </div>
 
         {/* Divider + Base stats */}
-        <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
-          {t("character.baseStats")}
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            {t("character.baseStats")}
+          </span>
+          {statPoints > 0 && (
+            <span className="animate-pulse rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+              {t("character.statPoints", { count: statPoints })}
+            </span>
+          )}
         </div>
         <div className="mb-3 rounded-xl bg-slate-900/40 px-3 py-1">
-          <StatRow label={t("character.strength")} value={stats.strength} color="text-red-400" />
-          <StatRow label={t("character.vitality")} value={stats.vitality} color="text-green-400" />
-          <StatRow label={t("character.agility")} value={stats.agility} color="text-yellow-400" />
+          <StatRow
+            label={t("character.strength")}
+            value={stats.strength}
+            color="text-red-400"
+            canAllocate={statPoints > 0}
+            onAllocate={() => handleAllocate(AllocatableStat.STRENGTH)}
+          />
+          <StatRow
+            label={t("character.vitality")}
+            value={stats.vitality}
+            color="text-green-400"
+            canAllocate={statPoints > 0}
+            onAllocate={() => handleAllocate(AllocatableStat.VITALITY)}
+          />
+          <StatRow
+            label={t("character.agility")}
+            value={stats.agility}
+            color="text-yellow-400"
+            canAllocate={statPoints > 0}
+            onAllocate={() => handleAllocate(AllocatableStat.AGILITY)}
+          />
         </div>
 
         {/* Derived stats */}

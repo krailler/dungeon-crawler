@@ -23,6 +23,7 @@ export type {
   SkillCooldownMessage,
   TutorialHintMessage,
   TutorialDismissMessage,
+  StatAllocateMessage,
 } from "./protocol.js";
 
 export {
@@ -43,12 +44,14 @@ export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
 export { mulberry32 } from "./random.js";
 
 export {
+  AllocatableStat,
+  ALLOCATABLE_STATS,
   computeDerivedStats,
   computeDamage,
   PLAYER_SCALING,
   DEFAULT_PLAYER_STATS,
 } from "./Stats.js";
-export type { BaseStats, DerivedStats, StatScaling } from "./Stats.js";
+export type { AllocatableStatValue, BaseStats, DerivedStats, StatScaling } from "./Stats.js";
 
 export {
   EnemyTypeId,

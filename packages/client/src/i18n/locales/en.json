@@ -64,7 +64,8 @@
     "baseStats": "Attributes",
     "derivedStats": "Combat",
     "gold": "Gold",
-    "xp": "Experience"
+    "xp": "Experience",
+    "statPoints": "{{count}} pt"
   },
   "hud": {
     "ping": "{{value}} ms",
@@ -96,7 +97,7 @@
     "gateOpened": "The gate opens... The dungeon awaits!",
     "goldGained": "+{{amount}} gold from {{enemy}}!",
     "levelUp": "{{name}} reached level {{level}}!",
-    "levelUpStats": "+{{dhp}} Health\n+{{datk}} Attack\n+{{ddef}} Defense"
+    "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign."
   },
   "gate": {
     "interactHint": "Open the gate",
@@ -123,7 +124,8 @@
     "damage": "Damage: {{multiplier}}×"
   },
   "tutorial": {
-    "startDungeon": "You are the party leader! Click the gate or press F nearby to start the dungeon."
+    "startDungeon": "You are the party leader! Click the gate or press F nearby to start the dungeon.",
+    "allocateStats": "You have attribute points! Press C to open the character panel and assign them."
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

@@ -14,6 +14,7 @@ import {
   ENTITY_COLLISION_RADIUS,
 } from "@dungeon/shared";
 import type { TileMap, CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
+import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 
 export interface GameLoopBridge {
   readonly state: DungeonState;
@@ -181,17 +182,13 @@ export class GameLoop {
           const xpGain = computeXpDrop(killedEnemy.level, p.level);
           const levelUps = p.addXp(xpGain);
 
-          for (const { level, dhp, datk, ddef } of levelUps) {
-            this.bridge.chatSystem.broadcastSystemI18n(
-              "chat.levelUp",
-              { name: p.characterName, level },
-              `${p.characterName} reached level ${level}!`,
-            );
-            this.bridge.chatSystem.sendSystemI18nTo(
+          if (levelUps.length > 0) {
+            notifyLevelProgress(
               sessionId,
-              "chat.levelUpStats",
-              { dhp, datk, ddef },
-              `+${dhp} Health\n+${datk} Attack\n+${ddef} Defense`,
+              p,
+              levelUps,
+              this.bridge.chatSystem,
+              this.bridge.sendToClient.bind(this.bridge),
             );
           }
         });
