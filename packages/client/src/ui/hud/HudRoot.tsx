@@ -25,11 +25,11 @@ import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
 import { CoinIcon } from "../icons/CoinIcon";
 
-type GoldFloat = { id: number; amount: number };
-let goldFloatId = 0;
+type FloatEntry = { id: number; amount: number };
+let floatIdCounter = 0;
 
 const GoldPill = ({ gold }: { gold: number }): JSX.Element => {
-  const [floats, setFloats] = useState<GoldFloat[]>([]);
+  const [floats, setFloats] = useState<FloatEntry[]>([]);
   const prevGoldRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ const GoldPill = ({ gold }: { gold: number }): JSX.Element => {
     if (prev === null || gold <= prev) return;
 
     const gain = gold - prev;
-    const id = ++goldFloatId;
+    const id = ++floatIdCounter;
     setFloats((f) => [...f, { id, amount: gain }]);
     const timer = setTimeout(() => {
       setFloats((f) => f.filter((e) => e.id !== id));
@@ -89,6 +89,25 @@ const PartyRow = ({
   const isDead = member.health <= 0;
   const barClass = isDead ? "from-red-900/60 via-red-900/40 to-red-950/50" : healthColor(pct);
 
+  // Floating health change numbers
+  const [hpFloats, setHpFloats] = useState<FloatEntry[]>([]);
+  const prevHpRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const prev = prevHpRef.current;
+    prevHpRef.current = member.health;
+    if (prev === null) return;
+    const delta = Math.round(member.health - prev);
+    if (delta === 0) return;
+
+    const id = ++floatIdCounter;
+    setHpFloats((f) => [...f, { id, amount: delta }]);
+    const timer = setTimeout(() => {
+      setHpFloats((f) => f.filter((e) => e.id !== id));
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [member.health]);
+
   return (
     <div
       onContextMenu={(e) => onContextMenu(e, member)}
@@ -129,9 +148,23 @@ const PartyRow = ({
             {member.isLeader ? t("party.roleLeader") : t("party.roleMember")}
           </span>
         </div>
-        <span className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : "text-slate-300"}`}>
-          {formatHealth(member)}
-        </span>
+        <div className="relative">
+          {hpFloats.map((f) => (
+            <span
+              key={f.id}
+              className={`animate-xp-float absolute -top-1 right-0 whitespace-nowrap font-mono text-xs font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${
+                f.amount < 0 ? "text-red-400" : "text-emerald-400"
+              }`}
+            >
+              {f.amount < 0 ? f.amount : `+${f.amount}`}
+            </span>
+          ))}
+          <span
+            className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : "text-slate-300"}`}
+          >
+            {formatHealth(member)}
+          </span>
+        </div>
       </div>
       <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">
         <div
