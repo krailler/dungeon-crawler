@@ -20,6 +20,7 @@ import { GameLoop } from "../systems/GameLoop";
 import { ChatSystem } from "../chat/ChatSystem";
 import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
+import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
 import {
   DUNGEON_WIDTH,
@@ -281,6 +282,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       player.tutorialsCompleted.add(data.step);
+    });
+    // Tutorial: player resets all their tutorials
+    this.onMessage(MessageType.TUTORIAL_RESET, (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      resetTutorials(player, client.sessionId, (_sid, type, msg) => {
+        client.send(type, msg);
+      });
     });
     // Stats: allocate a stat point to a base stat
     this.onMessage(MessageType.STAT_ALLOCATE, (client: Client, data: StatAllocateMessage) => {

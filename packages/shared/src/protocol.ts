@@ -19,6 +19,7 @@ export const MessageType = {
   SKILL_COOLDOWN: "skill:cooldown",
   TUTORIAL_HINT: "tutorial:hint",
   TUTORIAL_DISMISS: "tutorial:dismiss",
+  TUTORIAL_RESET: "tutorial:reset",
   STAT_ALLOCATE: "stat:allocate",
 } as const;
 

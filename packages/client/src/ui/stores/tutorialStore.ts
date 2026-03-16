@@ -64,6 +64,12 @@ export const tutorialStore = {
     }
   },
 
+  /** Player-initiated: reset all completed tutorials (sends message to server) */
+  resetAll(): void {
+    if (!room) return;
+    room.send(MessageType.TUTORIAL_RESET);
+  },
+
   reset(): void {
     currentHint = null;
     room = null;

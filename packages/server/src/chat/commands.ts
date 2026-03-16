@@ -2,9 +2,9 @@ import type { Client } from "colyseus";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
 import type { PlayerState } from "../state/PlayerState";
-import { MAX_LEVEL, MessageType, TutorialStep } from "@dungeon/shared";
-import type { TutorialHintMessage } from "@dungeon/shared";
+import { MAX_LEVEL } from "@dungeon/shared";
 import { notifyLevelProgress } from "./notifyLevelProgress";
+import { resetTutorials } from "../tutorials/resetTutorials";
 
 /**
  * Register all built-in slash commands.
@@ -253,16 +253,11 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         return;
       }
 
-      const count = target.player.tutorialsCompleted.size;
-      target.player.tutorialsCompleted.clear();
-
-      // Re-send tutorial hints that now apply (e.g. leader hint)
-      if (target.player.isLeader) {
-        bridge.sendToClient(target.sessionId, MessageType.TUTORIAL_HINT, {
-          step: TutorialStep.START_DUNGEON,
-          i18nKey: "tutorial.startDungeon",
-        } satisfies TutorialHintMessage);
-      }
+      const count = resetTutorials(
+        target.player,
+        target.sessionId,
+        bridge.sendToClient.bind(bridge),
+      );
 
       ctx.reply(
         `Reset ${count} tutorial(s) for ${target.player.characterName}.`,

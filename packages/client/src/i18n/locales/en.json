@@ -50,6 +50,11 @@
   "pause": {
     "title": "Paused",
     "resume": "Resume",
+    "resetTutorials": "Reset Tutorials",
+    "resetTutorialsTitle": "Reset Tutorials?",
+    "resetTutorialsMessage": "All tutorial hints will be shown again. This cannot be undone.",
+    "resetTutorialsConfirm": "Reset",
+    "resetTutorialsCancel": "Cancel",
     "logout": "Logout"
   },
   "character": {
