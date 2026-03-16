@@ -95,7 +95,11 @@ export const authStore = {
       } catch (loginErr) {
         // In dev mode, auto-register if account not found
         if (import.meta.env.DEV) {
-          ({ token } = await c.auth.registerWithEmailAndPassword(email, password));
+          try {
+            ({ token } = await c.auth.registerWithEmailAndPassword(email, password));
+          } catch (regErr) {
+            throw loginErr;
+          }
         } else {
           throw loginErr;
         }

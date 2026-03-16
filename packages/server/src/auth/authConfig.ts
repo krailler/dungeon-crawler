@@ -13,15 +13,10 @@ auth.settings.onFindUserByEmail = async (email: string) => {
   return account;
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 // Registration — only allowed in dev mode, auto-creates account + character
 auth.settings.onRegisterWithEmailAndPassword = async (email: string, password: string) => {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Registration is disabled");
-  }
-  if (!EMAIL_RE.test(email)) {
-    throw new Error("Invalid email address");
   }
   if (password.length < 4) {
     throw new Error("Password must be at least 4 characters");
