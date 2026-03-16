@@ -64,6 +64,7 @@ export type HudSnapshot = {
   /** Active item cooldowns, keyed by item ID */
   itemCooldowns: Map<string, SkillCooldownState>;
   roomName: string;
+  dungeonLevel: number;
 };
 
 type Listener = () => void;
@@ -85,6 +86,7 @@ let localCoords: { x: number; z: number } | null = null;
 const skillCooldowns: Map<string, SkillCooldownState> = new Map();
 const itemCooldowns: Map<string, SkillCooldownState> = new Map();
 let roomName = "";
+let dungeonLevel = 1;
 
 let cachedSnapshot: HudSnapshot = {
   members: [],
@@ -96,6 +98,7 @@ let cachedSnapshot: HudSnapshot = {
   skillCooldowns: new Map(),
   itemCooldowns: new Map(),
   roomName: "",
+  dungeonLevel: 1,
 };
 
 const rebuildSnapshot = (): void => {
@@ -109,6 +112,7 @@ const rebuildSnapshot = (): void => {
     skillCooldowns: new Map(skillCooldowns),
     itemCooldowns: new Map(itemCooldowns),
     roomName,
+    dungeonLevel,
   };
 };
 
@@ -204,6 +208,7 @@ export const hudStore = {
     connectionInfo = "";
     localCoords = null;
     roomName = "";
+    dungeonLevel = 1;
     room = null;
     skillCooldowns.clear();
     itemCooldowns.clear();
@@ -251,6 +256,12 @@ export const hudStore = {
   setRoomName(name: string): void {
     if (roomName === name) return;
     roomName = name;
+    rebuildSnapshot();
+    emit();
+  },
+  setDungeonLevel(level: number): void {
+    if (dungeonLevel === level) return;
+    dungeonLevel = level;
     rebuildSnapshot();
     emit();
   },

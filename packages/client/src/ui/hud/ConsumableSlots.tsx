@@ -89,9 +89,22 @@ export const ConsumableSlots = (): JSX.Element => {
         quantityPosition="top-right"
         cooldown={hasPotion ? (snapshot.itemCooldowns.get(firstEntry.itemId) ?? null) : null}
         tooltip={
-          hasPotion ? (
-            <div className="text-[11px] font-semibold text-slate-100">{t(firstEntry.name)}</div>
-          ) : undefined
+          hasPotion
+            ? (() => {
+                const def = itemDefs.get(firstEntry.itemId);
+                return def ? (
+                  <>
+                    <div className="text-[11px] font-semibold text-slate-100">{t(def.name)}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-400">
+                      {t(def.description, def.effectParams)}
+                    </div>
+                    <div className="mt-1 text-[10px] text-emerald-400/80">
+                      {t("inventory.clickToUse")}
+                    </div>
+                  </>
+                ) : undefined;
+              })()
+            : undefined
         }
       />
 
@@ -118,9 +131,20 @@ export const ConsumableSlots = (): JSX.Element => {
             quantity={entry.totalQty}
             quantityPosition="top-right"
             cooldown={snapshot.itemCooldowns.get(entry.itemId) ?? null}
-            tooltip={
-              <div className="text-[11px] font-semibold text-slate-100">{t(entry.name)}</div>
-            }
+            tooltip={(() => {
+              const def = itemDefs.get(entry.itemId);
+              return def ? (
+                <>
+                  <div className="text-[11px] font-semibold text-slate-100">{t(def.name)}</div>
+                  <div className="mt-0.5 text-[10px] text-slate-400">
+                    {t(def.description, def.effectParams)}
+                  </div>
+                  <div className="mt-1 text-[10px] text-emerald-400/80">
+                    {t("inventory.clickToUse")}
+                  </div>
+                </>
+              ) : undefined;
+            })()}
           />
         );
       })}

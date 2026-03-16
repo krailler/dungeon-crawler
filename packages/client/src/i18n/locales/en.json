@@ -27,7 +27,8 @@
     "promoteLeader": "Promote to Leader",
     "kick": "Kick from Party",
     "dead": "Dead",
-    "offline": "Offline"
+    "offline": "Offline",
+    "dungeonLevel": "Lv.{{level}}"
   },
   "connection": {
     "connecting": "Connecting...",

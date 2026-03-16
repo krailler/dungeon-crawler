@@ -36,7 +36,6 @@ import {
   assignRoomSets,
   ENEMY_TYPES,
   computeEnemyDerivedStats,
-  scaleEnemyDerivedStats,
   GOLD_SAVE_INTERVAL,
   CloseCode,
   SkillId,
@@ -593,6 +592,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
       client.view.add(player.secret);
     }
+
+    // Recalculate dungeon level when the first player joins (dungeon was generated empty)
+    if (this.state.players.size === 1 && !this.isDungeonStarted()) {
+      this.recalcDungeonLevel();
+    }
+
     // No longer push all item defs — client requests them lazily via ITEM_DEFS_REQUEST
 
     // Send debug info to admin clients
@@ -679,28 +684,44 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const levelOffset = Math.floor(rng() * 4) - 1; // -1 to +2
         const enemyLevel = Math.max(1, dungeonLevel + levelOffset);
 
-        // Scale stats based on enemy level
-        const derived = scaleEnemyDerivedStats(baseDerived, enemyLevel);
-
         const enemy = new EnemyState();
         enemy.x = tileX * TILE_SIZE;
         enemy.z = tileY * TILE_SIZE;
         enemy.enemyType = typeDef.id;
-        enemy.level = enemyLevel;
-        enemy.maxHealth = derived.maxHealth;
-        enemy.health = derived.maxHealth;
-        enemy.speed = derived.moveSpeed;
-        enemy.attackDamage = derived.attackDamage;
-        enemy.defense = derived.defense;
-        enemy.attackCooldown = derived.attackCooldown;
-        enemy.attackRange = derived.attackRange;
         enemy.detectionRange = typeDef.detectionRange;
+        enemy.applyStats(baseDerived, enemyLevel);
 
         const id = `enemy_${enemyId++}`;
         this.state.enemies.set(id, enemy);
         this.aiSystem.register(enemy, id, typeDef.leashRange);
       }
     }
+  }
+
+  /** Recalculate dungeon level from current party and re-scale all enemies */
+  private recalcDungeonLevel(): void {
+    let levelSum = 0;
+    let playerCount = 0;
+    this.state.players.forEach((p: PlayerState) => {
+      levelSum += p.level;
+      playerCount++;
+    });
+    const newLevel = playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
+    if (newLevel === this.state.dungeonLevel) return;
+
+    const oldLevel = this.state.dungeonLevel;
+    this.state.dungeonLevel = newLevel;
+
+    // Re-scale all existing enemies to match the new dungeon level
+    const typeDef = ENEMY_TYPES.zombie;
+    const baseDerived = computeEnemyDerivedStats(typeDef);
+    this.state.enemies.forEach((enemy: EnemyState) => {
+      const levelOffset = enemy.level - oldLevel;
+      const enemyLevel = Math.max(1, newLevel + levelOffset);
+      enemy.applyStats(baseDerived, enemyLevel);
+    });
+
+    this.log.info({ dungeonLevel: newLevel, playerCount }, "Recalculated dungeon level");
   }
 
   /** Returns true if any lobby gate has been opened (dungeon expedition active) */

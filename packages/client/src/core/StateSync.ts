@@ -107,10 +107,18 @@ export class StateSync {
       this.deps.dungeonRenderer.removeGate(gateId);
     });
 
-    // Listen for room name changes (fires on join and every restart)
+    // Listen for room name / dungeon level changes (fires on join and every restart)
     state$.listen("roomName", (name: string) => {
       hudStore.setRoomName(name);
     });
+    state$.listen("dungeonLevel", (level: number) => {
+      hudStore.setDungeonLevel(level);
+    });
+
+    // Seed current values (listen may not fire if already set before registration)
+    const state = room.state as any;
+    if (state.roomName) hudStore.setRoomName(state.roomName);
+    if (state.dungeonLevel) hudStore.setDungeonLevel(state.dungeonLevel);
 
     // Listen for dungeon version (fires on join and every restart, even same-seed)
     state$.listen("dungeonVersion", () => {

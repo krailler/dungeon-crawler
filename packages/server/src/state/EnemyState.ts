@@ -1,4 +1,6 @@
 import { Schema, type } from "@colyseus/schema";
+import type { DerivedStats } from "@dungeon/shared";
+import { scaleEnemyDerivedStats } from "@dungeon/shared";
 
 export class EnemyState extends Schema {
   @type("float32") x: number = 0;
@@ -21,4 +23,17 @@ export class EnemyState extends Schema {
   attackCooldown: number = 1.5;
   attackRange: number = 2.5;
   detectionRange: number = 12;
+
+  /** Apply scaled stats from base derived stats at a given level */
+  applyStats(baseDerived: DerivedStats, level: number): void {
+    const derived = scaleEnemyDerivedStats(baseDerived, level);
+    this.level = level;
+    this.maxHealth = derived.maxHealth;
+    this.health = derived.maxHealth;
+    this.speed = derived.moveSpeed;
+    this.attackDamage = derived.attackDamage;
+    this.defense = derived.defense;
+    this.attackCooldown = derived.attackCooldown;
+    this.attackRange = derived.attackRange;
+  }
 }

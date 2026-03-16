@@ -269,8 +269,11 @@ export const HudRoot = (): JSX.Element => {
             <div className="text-xs uppercase tracking-[0.4em] text-slate-400">
               {t("party.title")}
             </div>
-            <div className="text-sm font-semibold text-slate-100">
-              {snapshot.roomName || t("party.subtitle")}
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+              <span>{snapshot.roomName || t("party.subtitle")}</span>
+              <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                {t("party.dungeonLevel", { level: snapshot.dungeonLevel })}
+              </span>
             </div>
           </div>
         </div>
