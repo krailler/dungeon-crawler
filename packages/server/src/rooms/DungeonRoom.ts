@@ -74,6 +74,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tileMap!: TileMap;
   private log!: Logger;
 
+  /** Send a message to a specific client by session ID. */
+  private sendToClient = (sessionId: string, type: string, message: unknown): void => {
+    const c = this.clients.find((cl) => cl.sessionId === sessionId);
+    if (c) c.send(type, message);
+  };
+
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
     // Keep the room alive even when all players leave
@@ -110,10 +116,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.state.players.forEach((p: PlayerState, sid: string) => map.set(sid, p));
         return map;
       },
-      sendToClient: (sessionId: string, type: string, message: unknown) => {
-        const c = self.clients.find((cl) => cl.sessionId === sessionId);
-        if (c) c.send(type, message);
-      },
+      sendToClient: this.sendToClient,
       kickPlayer: (sessionId: string) => {
         this.sessionManager.markKicked(sessionId);
         this.sessionManager.removePlayerFromAllSystems(sessionId);
@@ -130,10 +133,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       chatSystem: this.chatSystem,
       clock: this.clock,
       log: this.log,
-      sendToClient: (sessionId: string, type: string, message: unknown) => {
-        const c = self.clients.find((cl) => cl.sessionId === sessionId);
-        if (c) c.send(type, message);
-      },
+      sendToClient: this.sendToClient,
     });
 
     // Setup session manager
@@ -160,10 +160,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         get clock() {
           return self.clock;
         },
-        sendToClient: (sessionId: string, type: string, message: unknown) => {
-          const c = self.clients.find((cl) => cl.sessionId === sessionId);
-          if (c) c.send(type, message);
-        },
+        sendToClient: this.sendToClient,
         allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
         onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
       },
@@ -191,10 +188,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         return self.pathfinder;
       },
       broadcastToAdmins: (type, message) => self.broadcastToAdmins(type, message),
-      sendToClient: (sessionId, type, message) => {
-        const client = self.clients.find((c) => c.sessionId === sessionId);
-        if (client) client.send(type, message);
-      },
+      sendToClient: this.sendToClient,
       get clock() {
         return self.clock;
       },
