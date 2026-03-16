@@ -16,6 +16,7 @@ export class PlayerState extends Schema {
   @type("boolean") online: boolean = true;
   @type("boolean") isLeader: boolean = false;
   @type("int16") level: number = 1;
+  @type("boolean") isSprinting: boolean = false;
 
   // ── Private fields (only visible to the owning client via StateView) ───────
   @view() @type(PlayerSecretState) secret = new PlayerSecretState();
@@ -28,6 +29,10 @@ export class PlayerState extends Schema {
   attackCooldown: number = 1.0;
   attackRange: number = 2.5;
   tutorialsCompleted: Set<string> = new Set();
+  /** Client wants to sprint (set by SPRINT message) */
+  sprintRequested: boolean = false;
+  /** Countdown before stamina regen begins after sprinting stops */
+  staminaRegenDelay: number = 0;
 
   // ── Convenience getters (delegate to secret for server-side code) ──────────
 
@@ -110,6 +115,13 @@ export class PlayerState extends Schema {
   }
   set autoAttackEnabled(v: boolean) {
     this.secret.autoAttackEnabled = v;
+  }
+
+  get stamina(): number {
+    return this.secret.stamina;
+  }
+  set stamina(v: number) {
+    this.secret.stamina = v;
   }
 
   /** Recompute all derived stats from current base stats and apply them. */

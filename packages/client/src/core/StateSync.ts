@@ -304,6 +304,7 @@ export class StateSync {
           xp: secret.xp,
           xpToNext: secret.xpToNext,
           statPoints: secret.statPoints,
+          stamina: secret.stamina,
           skills: Array.from(secret.skills as Iterable<string>),
           autoAttackEnabled: secret.autoAttackEnabled ?? true,
           stats: localStats,
@@ -337,6 +338,7 @@ export class StateSync {
             xp: secret.xp,
             xpToNext: secret.xpToNext,
             statPoints: secret.statPoints,
+            stamina: secret.stamina,
             autoAttackEnabled: secret.autoAttackEnabled ?? true,
             stats: {
               strength: secret.strength,
@@ -354,7 +356,13 @@ export class StateSync {
 
       // Listen to changes on public player state
       $(player).onChange(() => {
-        clientPlayer.setServerState(player.x, player.z, player.rotY, player.animState);
+        clientPlayer.setServerState(
+          player.x,
+          player.z,
+          player.rotY,
+          player.animState,
+          player.isSprinting,
+        );
 
         // Level-up: sound (local only) + particle aura (all players)
         if (player.level > prevLevel) {

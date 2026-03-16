@@ -28,6 +28,9 @@ export class PlayerSecretState extends Schema {
   @type(["string"]) skills = new ArraySchema<string>(...DEFAULT_SKILLS);
   @type("boolean") autoAttackEnabled: boolean = true;
 
+  // Stamina (sprint resource — ephemeral, not persisted)
+  @type("float32") stamina: number = 100;
+
   // Role (admin/user)
   @type("string") role: RoleValue = Role.USER;
 }

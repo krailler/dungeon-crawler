@@ -7,3 +7,4 @@ export * from "./gate.js";
 export * from "./chat.js";
 export * from "./economy.js";
 export * from "./version.js";
+export * from "./stamina.js";

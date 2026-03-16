@@ -16,6 +16,7 @@ import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { TutorialHint } from "./TutorialHint";
 import { XpBar } from "./XpBar";
 import { SkillBar } from "./SkillBar";
+import { StaminaBar } from "./StaminaBar";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -328,6 +329,8 @@ export const HudRoot = (): JSX.Element => {
       <ChatPanel />
       {/* Skill bar — bottom center, above XP bar */}
       <SkillBar />
+      {/* Stamina bar — thin bar above XP bar, only visible when draining */}
+      <StaminaBar />
       {/* XP bar — bottom center (WoW-style) */}
       <XpBar />
       {/* HUD buttons — bottom right */}

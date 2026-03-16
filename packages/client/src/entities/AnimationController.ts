@@ -114,6 +114,13 @@ export class AnimationController {
     }
   }
 
+  /** Set the playback speed of the current looping animation (1.0 = default). */
+  setSpeedRatio(ratio: number): void {
+    if (!this.currentAnim) return;
+    const anim = this.animations.get(this.currentAnim);
+    if (anim) anim.speedRatio = ratio;
+  }
+
   /** Dispose all animation groups. */
   dispose(): void {
     for (const [, anim] of this.animations) {

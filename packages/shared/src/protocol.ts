@@ -21,6 +21,7 @@ export const MessageType = {
   TUTORIAL_DISMISS: "tutorial:dismiss",
   TUTORIAL_RESET: "tutorial:reset",
   STAT_ALLOCATE: "stat:allocate",
+  SPRINT: "sprint",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -183,6 +184,13 @@ export interface TutorialDismissMessage {
 /** Client → Server: allocate a stat point to a base stat */
 export interface StatAllocateMessage {
   stat: AllocatableStatValue;
+}
+
+// ── Sprint ───────────────────────────────────────────────────────────────────
+
+/** Client → Server: toggle sprint on/off */
+export interface SprintMessage {
+  active: boolean;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

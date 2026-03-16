@@ -54,6 +54,7 @@ import type {
   AllocatableStatValue,
   TutorialDismissMessage,
   StatAllocateMessage,
+  SprintMessage,
 } from "@dungeon/shared";
 import { mulberry32 } from "@dungeon/shared";
 
@@ -304,6 +305,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         player.tutorialsCompleted.add(TutorialStep.ALLOCATE_STATS);
       }
     });
+    this.onMessage(MessageType.SPRINT, (client: Client, data: SprintMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.health <= 0) return;
+      player.sprintRequested = data.active;
+    });
+
     // Debug: subscribe/unsubscribe to path visualization (admin-only)
     this.onMessage(MessageType.DEBUG_PATHS, (client: Client, data: { enabled: boolean }) => {
       const role = (client.auth as { role: string })?.role ?? Role.USER;

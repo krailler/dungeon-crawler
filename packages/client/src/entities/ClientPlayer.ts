@@ -35,6 +35,13 @@ const MOVE_THRESHOLD = 0.05;
 /** Interval between footstep sounds while running (seconds) */
 const FOOTSTEP_INTERVAL = 0.32;
 
+/** Animation speed when walking (not sprinting) — slower than the baked run animation */
+const WALK_ANIM_SPEED = 0.4;
+/** Animation speed when sprinting — full speed of the baked run animation */
+const SPRINT_ANIM_SPEED = 1.0;
+/** Footstep interval when sprinting (faster steps) */
+const SPRINT_FOOTSTEP_INTERVAL = 0.22;
+
 /** How long the chat bubble stays fully visible (seconds) */
 const BUBBLE_DURATION = 5;
 
@@ -80,6 +87,8 @@ export class ClientPlayer {
   private targetX: number = 0;
   private targetZ: number = 0;
   private targetRotY: number = 0;
+  /** Whether the server says this player is sprinting */
+  private sprinting: boolean = false;
 
   /** Client-side facing override — player looks toward this point while holding click */
   private facingTarget: { x: number; z: number } | null = null;
@@ -185,10 +194,17 @@ export class ClientPlayer {
   }
 
   /** Called when server state changes */
-  setServerState(x: number, z: number, rotY: number, animState: string = ""): void {
+  setServerState(
+    x: number,
+    z: number,
+    rotY: number,
+    animState: string = "",
+    isSprinting: boolean = false,
+  ): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
+    this.sprinting = isSprinting;
 
     // Trigger one-shot animation if server says so
     if (animState && !this.animController.isOneShotPlaying) {
@@ -249,11 +265,15 @@ export class ClientPlayer {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
         this.animController.playLoop("run");
+        // Adjust animation speed: walk = slower, sprint = full speed
+        const animSpeed = this.sprinting ? SPRINT_ANIM_SPEED : WALK_ANIM_SPEED;
+        this.animController.setSpeedRatio(animSpeed);
 
         // Footstep sound at regular intervals (local player only)
         if (this.soundManager) {
+          const stepInterval = this.sprinting ? SPRINT_FOOTSTEP_INTERVAL : FOOTSTEP_INTERVAL;
           this.footstepTimer += dt;
-          if (this.footstepTimer >= FOOTSTEP_INTERVAL) {
+          if (this.footstepTimer >= stepInterval) {
             this.soundManager.playRandomFootstep();
             this.footstepTimer = 0;
           }

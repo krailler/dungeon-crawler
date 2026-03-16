@@ -24,6 +24,7 @@ export type {
   TutorialHintMessage,
   TutorialDismissMessage,
   StatAllocateMessage,
+  SprintMessage,
 } from "./protocol.js";
 
 export {

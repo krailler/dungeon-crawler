@@ -3,6 +3,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
+import type { SprintMessage } from "@dungeon/shared";
 
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
@@ -65,7 +66,12 @@ export class InputManager {
   private handlePointerUp: (ev: PointerEvent) => void;
   private handlePointerLeave: () => void;
   private handleContextMenu: (ev: Event) => void;
+  private handleKeyDown: (ev: KeyboardEvent) => void;
+  private handleKeyUp: (ev: KeyboardEvent) => void;
+  private handleWindowBlur: () => void;
   private renderObserver: Observer<Scene> | null = null;
+  /** Whether the client is requesting sprint (Shift held) */
+  private sprintActive: boolean = false;
 
   constructor(deps: InputManagerDeps) {
     this.scene = deps.scene;
@@ -113,10 +119,34 @@ export class InputManager {
     // Prevent browser context menu on the game canvas
     this.handleContextMenu = (ev: Event) => ev.preventDefault();
 
+    // Sprint: Shift key hold
+    this.handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "Shift" && !this.sprintActive) {
+        this.sprintActive = true;
+        this.room.send(MessageType.SPRINT, { active: true } satisfies SprintMessage);
+      }
+    };
+    this.handleKeyUp = (ev: KeyboardEvent) => {
+      if (ev.key === "Shift" && this.sprintActive) {
+        this.sprintActive = false;
+        this.room.send(MessageType.SPRINT, { active: false } satisfies SprintMessage);
+      }
+    };
+    // Safety: stop sprinting if window loses focus while Shift is held
+    this.handleWindowBlur = () => {
+      if (this.sprintActive) {
+        this.sprintActive = false;
+        this.room.send(MessageType.SPRINT, { active: false } satisfies SprintMessage);
+      }
+    };
+
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerup", this.handlePointerUp);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("contextmenu", this.handleContextMenu);
+    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("blur", this.handleWindowBlur);
 
     // While holding, update cursor position each frame and throttle MOVE sends
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
@@ -275,6 +305,9 @@ export class InputManager {
     this.canvas.removeEventListener("pointerup", this.handlePointerUp);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
+    window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("blur", this.handleWindowBlur);
     if (this.renderObserver) {
       this.scene.onBeforeRenderObservable.remove(this.renderObserver);
       this.renderObserver = null;

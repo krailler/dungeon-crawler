@@ -13,6 +13,11 @@ import {
   TILE_SIZE,
   ENTITY_COLLISION_RADIUS,
   WALL_MARGIN,
+  STAMINA_MAX,
+  SPRINT_SPEED_MULTIPLIER,
+  STAMINA_DRAIN_PER_SEC,
+  STAMINA_REGEN_PER_SEC,
+  STAMINA_REGEN_DELAY,
 } from "@dungeon/shared";
 import type { TileMap, CombatLogMessage, DebugPathEntry } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
@@ -59,6 +64,9 @@ export class GameLoop {
     this.lastTickTime = now;
 
     const dtSec = dt / 1000;
+
+    // Update sprint stamina before movement so speed is correct this tick
+    this.updateStamina(dtSec);
 
     // Move players along their paths
     for (const [, player] of this.bridge.state.players) {
@@ -212,13 +220,43 @@ export class GameLoop {
     }
   }
 
+  /** Drain / regenerate stamina for all players each tick. */
+  private updateStamina(dt: number): void {
+    for (const [, player] of this.bridge.state.players) {
+      if (player.health <= 0) {
+        player.isSprinting = false;
+        player.sprintRequested = false;
+        continue;
+      }
+
+      const shouldSprint = player.sprintRequested && player.isMoving && player.stamina > 0;
+      player.isSprinting = shouldSprint;
+
+      if (shouldSprint) {
+        player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN_PER_SEC * dt);
+        player.staminaRegenDelay = STAMINA_REGEN_DELAY;
+        if (player.stamina <= 0) {
+          player.isSprinting = false;
+        }
+      } else {
+        if (player.staminaRegenDelay > 0) {
+          player.staminaRegenDelay -= dt;
+        } else if (player.stamina < STAMINA_MAX) {
+          player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_REGEN_PER_SEC * dt);
+        }
+      }
+    }
+  }
+
   moveEntity(entity: PlayerState, dt: number): void {
     if (!entity.isMoving || entity.currentPathIndex >= entity.path.length) {
       entity.isMoving = false;
       return;
     }
 
-    let remaining = entity.speed * dt;
+    let effectiveSpeed = entity.speed;
+    if (entity.isSprinting) effectiveSpeed *= SPRINT_SPEED_MULTIPLIER;
+    let remaining = effectiveSpeed * dt;
 
     while (remaining > 0 && entity.currentPathIndex < entity.path.length) {
       const target = entity.path[entity.currentPathIndex];
