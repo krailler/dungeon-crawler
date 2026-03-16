@@ -52,7 +52,9 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
     <HudPanel
       onClose={onClose}
       header={<h3 className="text-sm font-bold text-slate-100">{t("inventory.title")}</h3>}
-      className="absolute bottom-16 right-5 w-[220px]"
+      panelId="inventory"
+      defaultPosition={{ x: window.innerWidth - 240, y: window.innerHeight - 380 }}
+      className="w-[220px]"
     >
       <div className="grid grid-cols-4 gap-1.5">
         {slots.map((slot, i) => {

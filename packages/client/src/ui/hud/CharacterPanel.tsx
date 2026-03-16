@@ -73,7 +73,9 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Elemen
           </span>
         </div>
       }
-      className="absolute right-5 top-14 w-56"
+      panelId="character"
+      defaultPosition={{ x: window.innerWidth - 244, y: 56 }}
+      className="w-56"
     >
       {/* Health bar */}
       <div className="mb-4">
