@@ -18,6 +18,7 @@ import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { skillDefStore } from "../ui/stores/skillDefStore";
+import { effectDefStore } from "../ui/stores/effectDefStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
@@ -87,8 +88,9 @@ export class StateSync {
       return unsub;
     };
 
-    // Connect skill def store — lazy-loads skill definitions from server
+    // Connect def stores — lazy-loads definitions from server
     skillDefStore.connect(room);
+    effectDefStore.connect(room);
 
     // Listen for skill cooldown messages from server
     room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {
@@ -492,6 +494,41 @@ export class StateSync {
           });
         }
 
+        // Sync active effects (buffs/debuffs) — visible to all players
+        const syncEffects = (): void => {
+          const effects: {
+            effectId: string;
+            remaining: number;
+            duration: number;
+            stacks: number;
+          }[] = [];
+          player.effects?.forEach((effect: any, effectId: string) => {
+            effects.push({
+              effectId,
+              remaining: effect.remaining,
+              duration: effect.duration,
+              stacks: effect.stacks,
+            });
+          });
+          hudStore.updateMember(sessionId, { effects });
+          // Prefetch effect definitions for UI
+          if (effects.length > 0) {
+            effectDefStore.ensureLoaded(effects.map((e) => e.effectId));
+          }
+        };
+        if (player.effects) {
+          $(player).effects.onAdd((effect: any, _effectId: string) => {
+            // Listen for changes within each ActiveEffectState (e.g. remaining ticking down)
+            $(effect).onChange(() => {
+              syncEffects();
+            });
+            syncEffects();
+          });
+          $(player).effects.onRemove(() => {
+            syncEffects();
+          });
+        }
+
         // Track level to detect level-up (level is public, visible to all)
         let prevLevel = player.level as number;
         // Track life state changes to switch death audio loops (local player only)
@@ -832,6 +869,7 @@ export class StateSync {
     creatureStore.reset();
     deathStore.reset();
     skillDefStore.reset();
+    effectDefStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();

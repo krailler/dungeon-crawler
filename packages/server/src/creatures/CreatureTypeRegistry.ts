@@ -1,10 +1,18 @@
 import type { CreatureTypeDefinition, CreatureLootEntry, DerivedStats } from "@dungeon/shared";
-import { creatures, creatureLoot } from "../db/schema";
+import { creatures, creatureLoot, creatureEffects } from "../db/schema";
 import { getDb } from "../db/database";
 import { logger } from "../logger";
 
+export type CreatureEffectEntry = {
+  trigger: string;
+  effectId: string;
+  chance: number;
+  stacks: number;
+};
+
 const typeMap = new Map<string, CreatureTypeDefinition>();
 const lootMap = new Map<string, CreatureLootEntry[]>();
+const effectsMap = new Map<string, CreatureEffectEntry[]>();
 
 export async function loadCreatureTypeRegistry(): Promise<void> {
   const db = getDb();
@@ -52,8 +60,22 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
     lootMap.set(row.creatureId, entries);
   }
 
+  // Load creature effects
+  const effectRows = await db.select().from(creatureEffects);
+  effectsMap.clear();
+  for (const row of effectRows) {
+    const entries = effectsMap.get(row.creatureId) ?? [];
+    entries.push({
+      trigger: row.trigger,
+      effectId: row.effectId,
+      chance: row.chance,
+      stacks: row.stacks,
+    });
+    effectsMap.set(row.creatureId, entries);
+  }
+
   logger.info(
-    `CreatureTypeRegistry loaded ${typeMap.size} creature type(s), ${lootRows.length} loot entry(ies)`,
+    `CreatureTypeRegistry loaded ${typeMap.size} creature type(s), ${lootRows.length} loot entry(ies), ${effectRows.length} effect(s)`,
   );
 }
 
@@ -73,4 +95,8 @@ export function getCreatureTypesForLevel(level: number): CreatureTypeDefinition[
 
 export function getCreatureLoot(creatureTypeId: string): CreatureLootEntry[] {
   return lootMap.get(creatureTypeId) ?? [];
+}
+
+export function getCreatureEffects(creatureTypeId: string): CreatureEffectEntry[] {
+  return effectsMap.get(creatureTypeId) ?? [];
 }

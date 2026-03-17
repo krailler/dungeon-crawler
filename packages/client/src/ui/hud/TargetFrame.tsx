@@ -5,8 +5,10 @@ import { targetStore } from "../stores/targetStore";
 import { hudStore } from "../stores/hudStore";
 import { creatureStore } from "../stores/creatureStore";
 import { deathStore } from "../stores/deathStore";
+import { effectDefStore } from "../stores/effectDefStore";
 import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
+import { EffectIcon } from "../components/EffectIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { LifeState } from "@dungeon/shared";
 
@@ -16,6 +18,7 @@ export const TargetFrame = (): ReactNode => {
   const deathSnap = useSyncExternalStore(deathStore.subscribe, deathStore.getSnapshot);
   const hudSnap = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const creatureSnap = useSyncExternalStore(creatureStore.subscribe, creatureStore.getSnapshot);
+  const defSnap = useSyncExternalStore(effectDefStore.subscribe, effectDefStore.getSnapshot);
 
   // Resolve target entity data from the appropriate store.
   const targetCreature =
@@ -48,6 +51,9 @@ export const TargetFrame = (): ReactNode => {
     }
     return null;
   }, [targetMember, targetCreature]);
+
+  // Resolve effects for the targeted player (creatures don't have effects yet)
+  const targetEffects = targetMember?.effects;
 
   // Compute canRevive before hooks (entity may be null — that's fine, just false)
   const canRevive =
@@ -155,6 +161,22 @@ export const TargetFrame = (): ReactNode => {
             )}
           </div>
         </div>
+        {/* Effects below the frame */}
+        {targetEffects && targetEffects.length > 0 && (
+          <div className="mt-1.5 flex justify-center gap-1">
+            {targetEffects.map((effect) => (
+              <EffectIcon
+                key={effect.effectId}
+                effectId={effect.effectId}
+                remaining={effect.remaining}
+                duration={effect.duration}
+                stacks={effect.stacks}
+                def={defSnap.get(effect.effectId)}
+                size="small"
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

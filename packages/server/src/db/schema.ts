@@ -139,3 +139,29 @@ export const creatureLoot = worldSchema.table("creature_loot", {
   minQuantity: integer("min_quantity").notNull().default(1),
   maxQuantity: integer("max_quantity").notNull().default(1),
 });
+
+export const effects = worldSchema.table("effects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  icon: text("icon").notNull(),
+  duration: real("duration").notNull().default(5),
+  maxStacks: integer("max_stacks").notNull().default(1),
+  stackBehavior: text("stack_behavior").notNull().default("refresh"),
+  isDebuff: boolean("is_debuff").notNull().default(true),
+  statModifiers: jsonb("stat_modifiers").notNull().default({}),
+  tickEffect: jsonb("tick_effect"),
+});
+
+export const creatureEffects = worldSchema.table("creature_effects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  creatureId: text("creature_id")
+    .notNull()
+    .references(() => creatures.id, { onDelete: "cascade" }),
+  trigger: text("trigger").notNull(),
+  effectId: text("effect_id")
+    .notNull()
+    .references(() => effects.id, { onDelete: "cascade" }),
+  chance: real("chance").notNull().default(0.3),
+  stacks: integer("stacks").notNull().default(1),
+});

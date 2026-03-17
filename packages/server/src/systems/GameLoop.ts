@@ -4,6 +4,7 @@ import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
 import type { AISystem } from "./AISystem";
 import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
+import type { EffectSystem } from "./EffectSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
 import {
   MessageType,
@@ -37,7 +38,7 @@ import type {
 } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
-import { getCreatureLoot } from "../creatures/CreatureTypeRegistry";
+import { getCreatureLoot, getCreatureEffects } from "../creatures/CreatureTypeRegistry";
 import { LootBagState } from "../state/LootBagState";
 import { InventorySlotState } from "../state/InventorySlotState";
 
@@ -45,6 +46,7 @@ export interface GameLoopBridge {
   readonly state: DungeonState;
   readonly aiSystem: AISystem;
   readonly combatSystem: CombatSystem;
+  readonly effectSystem: EffectSystem;
   readonly chatSystem: ChatSystem;
   readonly tileMap: TileMap;
   readonly pathfinder: Pathfinder;
@@ -101,6 +103,13 @@ export class GameLoop {
     // Tick item cooldowns
     this.tickItemCooldowns(dtSec);
 
+    // Tick active effects (debuffs/buffs)
+    this.tickPlayersMap.clear();
+    this.bridge.state.players.forEach((player: PlayerState, sessionId: string) => {
+      this.tickPlayersMap.set(sessionId, player);
+    });
+    this.bridge.effectSystem.update(dtSec, this.tickPlayersMap);
+
     // Update life states (downed, dead, respawn, revive channels)
     this.updateLifeStates(dtSec);
 
@@ -147,6 +156,16 @@ export class GameLoop {
           kill: player.lifeState !== LifeState.ALIVE,
         };
         this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+        // Apply creature effects (e.g. zombie applies Weakness on hit)
+        if (creature && player.lifeState === LifeState.ALIVE) {
+          const creatureEffects = getCreatureEffects(creature.creatureType);
+          for (const entry of creatureEffects) {
+            if (entry.trigger === "on_hit" && Math.random() < entry.chance) {
+              this.bridge.effectSystem.applyEffect(player, entry.effectId, entry.stacks);
+            }
+          }
+        }
       },
     );
 
@@ -549,9 +568,10 @@ export class GameLoop {
     player.reviveProgress = 0;
     player.reviverSessionId = "";
 
-    // Clear cooldowns
+    // Clear cooldowns and effects
     player.itemCooldowns.clear();
     this.bridge.combatSystem.clearCooldowns(sessionId);
+    this.bridge.effectSystem.clearEffects(player);
 
     return true;
   }
@@ -566,6 +586,7 @@ export class GameLoop {
     player.isSprinting = false;
     player.sprintRequested = false;
     player.path = [];
+    this.bridge.effectSystem.clearEffects(player);
 
     const name = player.characterName || sessionId.slice(0, 6);
     this.bridge.chatSystem.broadcastSystemI18n("chat.downed", { name }, `${name} has been downed!`);
@@ -620,9 +641,10 @@ export class GameLoop {
     player.reviveProgress = 0;
     player.reviverSessionId = "";
 
-    // Clear cooldowns so the player starts fresh
+    // Clear cooldowns and effects so the player starts fresh
     player.itemCooldowns.clear();
     this.bridge.combatSystem.clearCooldowns(sessionId);
+    this.bridge.effectSystem.clearEffects(player);
 
     const spawn = this.bridge.getSpawnPoint();
     if (spawn) {

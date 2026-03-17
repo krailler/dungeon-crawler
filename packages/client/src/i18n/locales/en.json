@@ -228,6 +228,10 @@
     "alreadyFull": "Already at full health",
     "inventoryFull": "Inventory is full"
   },
+  "effects": {
+    "weakness": "Weakness",
+    "weakness_desc": "Attack damage reduced by {{value}}%"
+  },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",
     "usageKill": "Usage: /kill <player_name>",

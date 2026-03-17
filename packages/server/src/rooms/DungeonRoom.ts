@@ -17,6 +17,7 @@ import { AISystem } from "../systems/AISystem";
 import { CombatSystem } from "../systems/CombatSystem";
 import { GateSystem } from "../systems/GateSystem";
 import { GameLoop } from "../systems/GameLoop";
+import { EffectSystem } from "../systems/EffectSystem";
 import { ChatSystem } from "../chat/ChatSystem";
 import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
@@ -24,6 +25,7 @@ import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
 import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
 import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
+import { getEffectDefs, getEffectRegistryVersion } from "../effects/EffectRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
@@ -62,6 +64,7 @@ import type {
   ItemUseMessage,
   ItemSwapMessage,
   ItemDefsRequestMessage,
+  EffectDefsRequestMessage,
   LootTakeMessage,
   SetTargetMessage,
   ReviveStartMessage,
@@ -83,6 +86,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
   private aiSystem!: AISystem;
   private combatSystem!: CombatSystem;
+  private effectSystem: EffectSystem = new EffectSystem();
   private chatSystem!: ChatSystem;
   private gateSystem!: GateSystem;
   private gameLoop!: GameLoop;
@@ -212,6 +216,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
       get combatSystem() {
         return self.combatSystem;
+      },
+      get effectSystem() {
+        return self.effectSystem;
       },
       get chatSystem() {
         return self.chatSystem;
@@ -473,6 +480,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(MessageType.SKILL_DEFS_RESPONSE, {
           version: getSkillRegistryVersion(),
           skills: getSkillDefs(ids),
+        });
+      },
+    );
+
+    // Effect definitions: client requests defs lazily by id
+    this.onMessage(
+      MessageType.EFFECT_DEFS_REQUEST,
+      (client: Client, data: EffectDefsRequestMessage) => {
+        if (!Array.isArray(data.effectIds) || data.effectIds.length === 0) return;
+        const ids = data.effectIds.slice(0, 50);
+        client.send(MessageType.EFFECT_DEFS_RESPONSE, {
+          version: getEffectRegistryVersion(),
+          effects: getEffectDefs(ids),
         });
       },
     );

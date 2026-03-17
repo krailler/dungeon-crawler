@@ -1,4 +1,4 @@
-import { Schema, type, view } from "@colyseus/schema";
+import { Schema, MapSchema, type, view } from "@colyseus/schema";
 import {
   computeDerivedStats,
   xpToNextLevel,
@@ -9,6 +9,7 @@ import {
 import type { AllocatableStatValue, RoleValue } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
 import { InventorySlotState } from "./InventorySlotState";
+import { ActiveEffectState } from "./ActiveEffectState";
 
 export class PlayerState extends Schema {
   // ── Public fields (visible to all clients) ─────────────────────────────────
@@ -24,6 +25,7 @@ export class PlayerState extends Schema {
   @type("boolean") isLeader: boolean = false;
   @type("int16") level: number = 1;
   @type("boolean") isSprinting: boolean = false;
+  @type({ map: ActiveEffectState }) effects = new MapSchema<ActiveEffectState>();
 
   // ── Death / revive fields (visible to all clients) ────────────────────────
   @type("string") lifeState: string = LifeState.ALIVE;

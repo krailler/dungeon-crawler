@@ -2,6 +2,7 @@ import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
 import type { ItemDef } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
+import type { EffectDef } from "./Effects.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -37,6 +38,8 @@ export const MessageType = {
   SET_TARGET: "target:set",
   TOGGLE_AOI: "debug:aoi",
   REVIVE_START: "revive:start",
+  EFFECT_DEFS_REQUEST: "effect:defs:req",
+  EFFECT_DEFS_RESPONSE: "effect:defs:res",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -308,6 +311,22 @@ export interface SetTargetMessage {
 export interface ReviveStartMessage {
   /** Session ID of the downed player to revive */
   targetSessionId: string;
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+
+// ── Effects ─────────────────────────────────────────────────────────────────
+
+/** Client → Server: request effect definitions by id */
+export interface EffectDefsRequestMessage {
+  effectIds: string[];
+}
+
+/** Server → Client: effect definitions response */
+export interface EffectDefsResponseMessage {
+  /** Cache version — changes when effect definitions are modified */
+  version: number;
+  effects: EffectDef[];
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

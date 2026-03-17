@@ -29,6 +29,20 @@
       "when": 1774600000000,
       "tag": "0003_add_skill_anim_state",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774700000000,
+      "tag": "0004_add_effects",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774800000000,
+      "tag": "0005_rename_creature_abilities",
+      "breakpoints": true
     }
   ]
 }

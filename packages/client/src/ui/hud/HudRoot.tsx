@@ -22,6 +22,7 @@ import { ConsumableSlots } from "./ConsumableSlots";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { ActionFeedback } from "./ActionFeedback";
+import { BuffBar } from "./BuffBar";
 import { LootBagPanel } from "./LootBagPanel";
 import { DeathOverlay } from "./DeathOverlay";
 import { TargetFrame } from "./TargetFrame";
@@ -449,6 +450,8 @@ export const HudRoot = (): ReactNode => {
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
+      {/* Buff/debuff bar — above action bar */}
+      <BuffBar />
       {/* Action feedback — floats above action bar */}
       <ActionFeedback />
       {/* Action bar — bottom center, above XP bar: consumables + skills */}

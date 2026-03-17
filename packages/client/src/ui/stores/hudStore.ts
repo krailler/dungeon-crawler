@@ -50,6 +50,7 @@ export type PartyMember = {
   autoAttackEnabled?: boolean;
   stats?: CharacterStats;
   inventory?: { slot: number; itemId: string; quantity: number }[];
+  effects?: { effectId: string; remaining: number; duration: number; stacks: number }[];
 };
 
 export type ConnectionStatus = "connecting" | "connected" | "error";

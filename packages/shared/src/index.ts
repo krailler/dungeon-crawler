@@ -38,6 +38,8 @@ export type {
   LootTakeMessage,
   SetTargetMessage,
   ReviveStartMessage,
+  EffectDefsRequestMessage,
+  EffectDefsResponseMessage,
 } from "./protocol.js";
 
 export {
@@ -89,3 +91,12 @@ export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
 
 export type { ItemDef } from "./Items.js";
+
+export { StackBehavior, StatModType } from "./Effects.js";
+export type {
+  StackBehaviorValue,
+  StatModTypeValue,
+  StatModifier,
+  TickEffect,
+  EffectDef,
+} from "./Effects.js";
