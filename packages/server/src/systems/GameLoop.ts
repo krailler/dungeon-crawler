@@ -43,6 +43,8 @@ export interface GameLoopBridge {
   broadcastToAdmins(type: string, message: unknown): void;
   sendToClient(sessionId: string, type: string, message: unknown): void;
   readonly clock: ClockTimer;
+  /** Called when a creature is permanently removed (death cleanup). */
+  onCreatureRemoved?: (creatureId: string) => void;
 }
 
 export class GameLoop {
@@ -272,6 +274,7 @@ export class GameLoop {
       this.bridge.clock.setTimeout(() => {
         this.bridge.state.creatures.delete(event.creatureId);
         this.bridge.aiSystem.unregister(event.creatureId);
+        this.bridge.onCreatureRemoved?.(event.creatureId);
       }, 1000);
     }
   }

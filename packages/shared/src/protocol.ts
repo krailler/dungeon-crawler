@@ -33,6 +33,7 @@ export const MessageType = {
   ITEM_DEFS_RESPONSE: "item:defs:res",
   LOOT_TAKE: "loot:take",
   SET_TARGET: "target:set",
+  TOGGLE_AOI: "debug:aoi",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */

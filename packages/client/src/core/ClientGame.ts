@@ -337,9 +337,12 @@ export class ClientGame {
       room.onMessage(MessageType.DEBUG_PATHS, (msg: DebugPathsMessage) => {
         this.updateLoop.handleDebugPaths(msg);
       });
-      // Restore persisted showPaths toggle on reconnect
+      // Restore persisted debug toggles on reconnect
       if (debugStore.getSnapshot().showPaths) {
         room.send(MessageType.DEBUG_PATHS, { enabled: true });
+      }
+      if (debugStore.getSnapshot().showAllCreatures) {
+        room.send(MessageType.TOGGLE_AOI, { enabled: false });
       }
 
       // Tutorial hints from server

@@ -215,6 +215,10 @@ export class ClientUpdateLoop {
         this.clearDebugPaths();
       }
     }
+    if (debug.showAllCreatures !== this.lastDebug.showAllCreatures) {
+      // AOI enabled = NOT showing all creatures (inverted logic)
+      this.deps.getRoom()?.send(MessageType.TOGGLE_AOI, { enabled: !debug.showAllCreatures });
+    }
 
     this.lastDebug = debug;
   }

@@ -24,6 +24,7 @@ const TOGGLES: ToggleEntry[] = [
   { key: "showPaths", label: "Show Paths", adminOnly: true },
   { key: "showCoords", label: "Show Coords" },
   { key: "showTickRate", label: "Show Tick Rate", adminOnly: true },
+  { key: "showAllCreatures", label: "Show All Creatures (AOI bypass)", adminOnly: true },
 ];
 
 export const DebugPanel = (): ReactNode => {

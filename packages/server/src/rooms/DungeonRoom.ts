@@ -89,6 +89,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private tileMap!: TileMap;
   private log!: Logger;
 
+  // ── Area of Interest (AOI) ──────────────────────────────────────────────────
+  /** All creatures (authoritative) — includes those outside sync range */
+  private allCreatures: Map<string, CreatureState> = new Map();
+  /** Whether AOI culling is active (false = bypass, all creatures synced) */
+  private aoiEnabled: boolean = true;
+  private aoiCheckCounter: number = 0;
+  private static readonly AOI_RANGE = 10;
+  private static readonly AOI_CHECK_TICKS = 10;
+
   /** Send a message to a specific client by session ID. */
   private sendToClient = (sessionId: string, type: string, message: unknown): void => {
     const c = this.clients.find((cl) => cl.sessionId === sessionId);
@@ -209,6 +218,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       sendToClient: this.sendToClient,
       get clock() {
         return self.clock;
+      },
+      onCreatureRemoved: (creatureId: string) => {
+        self.allCreatures.delete(creatureId);
       },
     });
 
@@ -483,13 +495,76 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.gameLoop.setDebugPaths(client.sessionId, data.enabled);
     });
 
+    // Debug: toggle AOI culling (admin-only)
+    this.onMessage(MessageType.TOGGLE_AOI, (client: Client, data: { enabled: boolean }) => {
+      const role = (client.auth as { role: string })?.role ?? Role.USER;
+      if (role !== Role.ADMIN) return;
+      this.aoiEnabled = data.enabled;
+      this.log.info({ aoiEnabled: data.enabled }, "AOI toggled");
+      if (!data.enabled) {
+        // Bypass: sync all creatures immediately
+        for (const [id, creature] of this.allCreatures) {
+          if (!this.state.creatures.has(id)) {
+            this.state.creatures.set(id, creature);
+          }
+        }
+      }
+    });
+
     // Auto-save gold for all players periodically
     this.clock.setInterval(() => {
       this.sessionManager.saveAllPlayersProgress();
     }, GOLD_SAVE_INTERVAL);
 
-    // Game loop
-    this.setSimulationInterval(this.gameLoop.update.bind(this.gameLoop), TICK_INTERVAL_MS);
+    // Game loop (includes AOI check)
+    const gameLoopUpdate = this.gameLoop.update.bind(this.gameLoop);
+    this.setSimulationInterval((dt: number) => {
+      gameLoopUpdate(dt);
+      this.updateCreatureAOI();
+    }, TICK_INTERVAL_MS);
+  }
+
+  /**
+   * Periodically add/remove creatures from the synced state based on
+   * proximity to any connected player. Runs every AOI_CHECK_TICKS ticks.
+   */
+  private updateCreatureAOI(): void {
+    if (!this.aoiEnabled) return;
+    if (++this.aoiCheckCounter < DungeonRoom.AOI_CHECK_TICKS) return;
+    this.aoiCheckCounter = 0;
+
+    // Before the dungeon starts (lobby), don't sync any creatures
+    if (!this.isDungeonStarted()) {
+      if (this.state.creatures.size > 0) {
+        this.state.creatures.clear();
+      }
+      return;
+    }
+
+    const rangeSq = DungeonRoom.AOI_RANGE * DungeonRoom.AOI_RANGE;
+
+    for (const [id, creature] of this.allCreatures) {
+      // Dead creatures are cleaned up by GameLoop — skip
+      if (creature.isDead) continue;
+
+      let inRange = false;
+      for (const [, player] of this.state.players) {
+        if (player.health <= 0) continue;
+        const dx = creature.x - player.x;
+        const dz = creature.z - player.z;
+        if (dx * dx + dz * dz <= rangeSq) {
+          inRange = true;
+          break;
+        }
+      }
+
+      const inState = this.state.creatures.has(id);
+      if (inRange && !inState) {
+        this.state.creatures.set(id, creature);
+      } else if (!inRange && inState) {
+        this.state.creatures.delete(id);
+      }
+    }
   }
 
   private generateDungeon(seed: number): void {
@@ -574,6 +649,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.log.warn({ seed }, "Admin restart requested");
 
     // Clear all creatures and loot bags
+    this.allCreatures.clear();
     this.state.creatures.clear();
     this.state.lootBags.clear();
 
@@ -807,6 +883,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         creature.applyStats(baseDerived, creatureLevel);
 
         const id = `creature_${creatureId++}`;
+        this.allCreatures.set(id, creature);
         this.state.creatures.set(id, creature);
         this.aiSystem.register(creature, id, typeDef.leashRange);
       }
