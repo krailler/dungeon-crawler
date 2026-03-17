@@ -480,6 +480,7 @@ export class StateSync {
           creature.maxHealth,
           creature.isDead,
           creature.animState,
+          creature.isAggro,
         );
         // Attach creature GLB model
         const creatureInstance = this.deps.creatureLoader.instantiate(`creature_${id}`);
@@ -500,6 +501,7 @@ export class StateSync {
             creature.maxHealth,
             creature.isDead,
             creature.animState,
+            creature.isAggro,
           );
         });
       }),

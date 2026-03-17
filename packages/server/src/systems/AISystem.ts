@@ -194,6 +194,9 @@ export class AISystem {
       // Find highest-threat alive player
       const target = this.getHighestThreatTarget(entry, players);
 
+      // Sync aggro flag for clients (minimap visibility, etc.)
+      entry.creature.isAggro = target !== null;
+
       if (!target) {
         // No threat — idle or roam
         if (entry.state === AIState.ROAM) {
@@ -365,6 +368,7 @@ export class AISystem {
     entry.state = AIState.LEASH;
     entry.threatTable.clear();
     entry.creature.animState = "";
+    entry.creature.isAggro = false;
     entry.damageTimer = 0;
     entry.damageSessionId = null;
 

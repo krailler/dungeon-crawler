@@ -9,6 +9,7 @@ export class CreatureState extends Schema {
   @type("int16") health: number = 0;
   @type("int16") maxHealth: number = 0;
   @type("boolean") isDead: boolean = false;
+  @type("boolean") isAggro: boolean = false;
   @type("string") animState: string = "";
   @type("string") creatureType: string = "zombie";
   @type("int16") level: number = 1;

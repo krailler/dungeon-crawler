@@ -30,6 +30,7 @@ export class ClientCreature {
   /** All GLB child meshes — for shadow casting and hit flash */
   public modelMeshes: AbstractMesh[] = [];
   public isDead: boolean = false;
+  public isAggro: boolean = false;
 
   private animController: AnimationController;
 
@@ -169,10 +170,12 @@ export class ClientCreature {
     maxHealth: number,
     isDead: boolean,
     animState: string = "",
+    isAggro: boolean = false,
   ): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
+    this.isAggro = isAggro;
 
     if (health < this.previousHealth && !isDead) {
       this.triggerHitFlash();
@@ -196,12 +199,10 @@ export class ClientCreature {
     }
   }
 
-  /** Whether creature is moving or attacking (for minimap visibility) */
+  /** Whether creature is in combat (for minimap visibility) */
   get isActive(): boolean {
     if (this.isDead) return false;
-    const dx = this.targetX - this.mesh.position.x;
-    const dz = this.targetZ - this.mesh.position.z;
-    return Math.sqrt(dx * dx + dz * dz) > MOVE_THRESHOLD || this.animController.isOneShotPlaying;
+    return this.isAggro;
   }
 
   getWorldPosition(): Vector3 {
