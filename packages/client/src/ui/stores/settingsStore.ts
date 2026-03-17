@@ -13,6 +13,7 @@ export const BindableAction = {
   INVENTORY: "inventory",
   MINIMAP: "minimap",
   INTERACT: "interact",
+  FULLSCREEN: "fullscreen",
 } as const;
 
 export type BindableActionValue = (typeof BindableAction)[keyof typeof BindableAction];
@@ -55,6 +56,7 @@ const DEFAULT_KEYBINDINGS: KeybindingSettings = {
   inventory: "b",
   minimap: "m",
   interact: "f",
+  fullscreen: "F11",
 };
 
 // ── Persistence ─────────────────────────────────────────────────────────────

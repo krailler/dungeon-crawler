@@ -87,7 +87,8 @@
     "consumable1": "Consumable",
     "characterPanel": "Character",
     "inventoryPanel": "Inventory",
-    "minimapPanel": "Minimap"
+    "minimapPanel": "Minimap",
+    "fullscreen": "Fullscreen"
   },
   "character": {
     "title": "Character",

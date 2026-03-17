@@ -99,6 +99,7 @@ const ACTION_ORDER: { action: BindableActionValue; i18nKey: string }[] = [
   { action: BindableAction.CHARACTER, i18nKey: "settings.characterPanel" },
   { action: BindableAction.INVENTORY, i18nKey: "settings.inventoryPanel" },
   { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
+  { action: BindableAction.FULLSCREEN, i18nKey: "settings.fullscreen" },
 ];
 
 // ── Keybindings tab ─────────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
 import { BackpackIcon } from "../icons/BackpackIcon";
+import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 
 type FloatEntry = { id: number; amount: number };
@@ -175,6 +176,21 @@ export const HudRoot = (): ReactNode => {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const toggleInventory = useCallback(() => setInventoryOpen((v) => !v), []);
   const closeInventory = useCallback(() => setInventoryOpen(false), []);
+
+  // Fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = (): void => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+  }, []);
 
   // Context menu for party members
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
@@ -367,6 +383,17 @@ export const HudRoot = (): ReactNode => {
             </span>
           </HudPill>
         )}
+        <button
+          onClick={toggleFullscreen}
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-600/40 bg-slate-900/60 text-slate-400 shadow-lg shadow-black/30 backdrop-blur-md transition-all hover:border-slate-500/50 hover:text-slate-200"
+          title={t("settings.fullscreen")}
+        >
+          {isFullscreen ? (
+            <ExitFullscreenIcon className="h-3.5 w-3.5" />
+          ) : (
+            <FullscreenIcon className="h-3.5 w-3.5" />
+          )}
+        </button>
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
