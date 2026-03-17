@@ -39,6 +39,7 @@ export interface GameLoopBridge {
   readonly chatSystem: ChatSystem;
   readonly tileMap: TileMap;
   readonly pathfinder: Pathfinder;
+  readonly tickRateTarget: number;
   broadcastToAdmins(type: string, message: unknown): void;
   sendToClient(sessionId: string, type: string, message: unknown): void;
   readonly clock: ClockTimer;
@@ -70,6 +71,7 @@ export class GameLoop {
         this.bridge.broadcastToAdmins(MessageType.ADMIN_DEBUG_INFO, {
           seed: this.bridge.state.dungeonSeed,
           tickRate: rate,
+          tickRateTarget: this.bridge.tickRateTarget,
           runtime: this.bridge.state.serverRuntime,
         } satisfies AdminDebugInfoMessage);
         this.tickAccum = 0;

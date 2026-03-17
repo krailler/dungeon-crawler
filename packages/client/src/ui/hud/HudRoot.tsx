@@ -5,6 +5,7 @@ import type { PartyMember } from "../stores/hudStore";
 import { hudStore } from "../stores/hudStore";
 import { authStore } from "../stores/authStore";
 import { debugStore } from "../stores/debugStore";
+import { adminStore } from "../stores/adminStore";
 import { minimapStore } from "../stores/minimapStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
@@ -201,6 +202,7 @@ export const HudRoot = (): ReactNode => {
   const minimapVisible = minimapSnapshot.visible;
   const toggleMinimap = useCallback(() => minimapStore.toggle(), []);
   const debugSnapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
+  const adminSnapshot = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
@@ -376,6 +378,21 @@ export const HudRoot = (): ReactNode => {
         <HudPill>
           {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
         </HudPill>
+        {debugSnapshot.showTickRate && adminSnapshot.tickRate > 0 && (
+          <HudPill>
+            <span
+              className={
+                adminSnapshot.tickRate >= adminSnapshot.tickRateTarget * 0.87
+                  ? "text-emerald-400"
+                  : adminSnapshot.tickRate >= adminSnapshot.tickRateTarget * 0.62
+                    ? "text-amber-400"
+                    : "text-red-400"
+              }
+            >
+              {adminSnapshot.tickRate} t/s
+            </span>
+          </HudPill>
+        )}
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />

@@ -7,6 +7,7 @@ export type DebugSnapshot = {
   combatLog: boolean;
   showPaths: boolean;
   showCoords: boolean;
+  showTickRate: boolean;
 };
 
 type DebugKey = keyof DebugSnapshot;
@@ -23,6 +24,7 @@ const DEFAULTS: DebugSnapshot = {
   combatLog: false,
   showPaths: false,
   showCoords: false,
+  showTickRate: false,
 };
 
 const listeners = new Set<Listener>();

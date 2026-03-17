@@ -23,6 +23,7 @@ const TOGGLES: ToggleEntry[] = [
   { key: "combatLog", label: "Combat Log", adminOnly: true },
   { key: "showPaths", label: "Show Paths", adminOnly: true },
   { key: "showCoords", label: "Show Coords" },
+  { key: "showTickRate", label: "Show Tick Rate", adminOnly: true },
 ];
 
 export const DebugPanel = (): ReactNode => {
@@ -107,14 +108,6 @@ export const DebugPanel = (): ReactNode => {
                 )}
                 <div>
                   Seed: <span className="font-mono text-slate-400">{admin.seed}</span>
-                </div>
-                <div>
-                  Tick rate:{" "}
-                  <span
-                    className={`font-mono ${admin.tickRate >= 14 ? "text-emerald-400" : admin.tickRate >= 10 ? "text-amber-400" : "text-red-400"}`}
-                  >
-                    {admin.tickRate > 0 ? `${admin.tickRate} t/s` : "—"}
-                  </span>
                 </div>
               </div>
               <div className="mt-2 flex flex-col gap-1.5">

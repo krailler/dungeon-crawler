@@ -5,13 +5,21 @@ import type { AdminRestartMessage, AdminDebugInfoMessage } from "@dungeon/shared
 type AdminSnapshot = {
   seed: number;
   tickRate: number;
+  tickRateTarget: number;
   runtime: string;
   roomId: string;
   sessionId: string;
 };
 
 let room: Room | null = null;
-let snapshot: AdminSnapshot = { seed: 0, tickRate: 0, runtime: "", roomId: "", sessionId: "" };
+let snapshot: AdminSnapshot = {
+  seed: 0,
+  tickRate: 0,
+  tickRateTarget: 0,
+  runtime: "",
+  roomId: "",
+  sessionId: "",
+};
 let listeners: Set<() => void> = new Set();
 
 function emit(): void {
@@ -26,11 +34,17 @@ export const adminStore = {
   },
   clearRoom(): void {
     room = null;
-    snapshot = { seed: 0, tickRate: 0, runtime: "", roomId: "", sessionId: "" };
+    snapshot = { seed: 0, tickRate: 0, tickRateTarget: 0, runtime: "", roomId: "", sessionId: "" };
     emit();
   },
   setDebugInfo(data: AdminDebugInfoMessage): void {
-    snapshot = { ...snapshot, seed: data.seed, tickRate: data.tickRate, runtime: data.runtime };
+    snapshot = {
+      ...snapshot,
+      seed: data.seed,
+      tickRate: data.tickRate,
+      tickRateTarget: data.tickRateTarget,
+      runtime: data.runtime,
+    };
     emit();
   },
   subscribe(fn: () => void): () => void {

@@ -215,6 +215,7 @@ export interface DamageDealtMessage {
 export interface AdminDebugInfoMessage {
   seed: number;
   tickRate: number;
+  tickRateTarget: number;
   runtime: string;
 }
 

@@ -65,12 +65,16 @@ import type {
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
-const TICK_RATE = 64; // ms between simulation ticks
+/** Simulation frequency in Hz (configurable via TICK_RATE env var) */
+const TICK_RATE = process.env.TICK_RATE ? Number(process.env.TICK_RATE) : 32;
+const TICK_INTERVAL_MS = Math.floor(1000 / TICK_RATE);
 
 /** Fixed seed for deterministic dungeon generation (set to null for random). */
 const DUNGEON_SEED: number | null = process.env.DUNGEON_SEED
   ? Number(process.env.DUNGEON_SEED)
-  : null;
+  : process.env.NODE_ENV !== "production"
+    ? 42
+    : null;
 
 export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
@@ -198,6 +202,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       get pathfinder() {
         return self.pathfinder;
       },
+      tickRateTarget: TICK_RATE,
       broadcastToAdmins: (type, message) => self.broadcastToAdmins(type, message),
       sendToClient: this.sendToClient,
       get clock() {
@@ -459,7 +464,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }, GOLD_SAVE_INTERVAL);
 
     // Game loop
-    this.setSimulationInterval(this.gameLoop.update.bind(this.gameLoop), TICK_RATE);
+    this.setSimulationInterval(this.gameLoop.update.bind(this.gameLoop), TICK_INTERVAL_MS);
   }
 
   private generateDungeon(seed: number): void {
@@ -686,6 +691,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       client.send(MessageType.ADMIN_DEBUG_INFO, {
         seed: this.state.dungeonSeed,
         tickRate: this.state.tickRate,
+        tickRateTarget: TICK_RATE,
         runtime: this.state.serverRuntime,
       } satisfies AdminDebugInfoMessage);
     }

@@ -196,7 +196,7 @@
 - `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: gold, xp, skills, inventory (MapSchema\<InventorySlotState\>)
 - `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16)
 - `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle, session migration, `savePlayerProgress()` (stats + inventory upsert), `loadInventory()`, leader reassignment
-- `systems/GameLoop.ts` — 20-tick simulation: movement, sprint/stamina, item drops on kill, item cooldown ticking
+- `systems/GameLoop.ts` — 64-tick simulation: movement, sprint/stamina, item drops on kill, item cooldown ticking
 - `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level) + server-only AI/combat data
 - `state/GateState.ts` — Gate Schema (position, type, open state)
 - `systems/AISystem.ts` — Creature AI: IDLE/CHASE/ATTACK, multi-player targeting (threat table), A\* repath, combat event callbacks
