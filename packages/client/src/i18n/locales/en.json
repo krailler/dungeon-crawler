@@ -187,7 +187,8 @@
   },
   "inventory": {
     "title": "Inventory",
-    "clickToUse": "Click to use"
+    "clickToUse": "Click to use",
+    "rightClickToUse": "Right-click to use"
   },
   "loot": {
     "title": "Loot",

@@ -11,6 +11,7 @@ import type {
   AllocatableStatValue,
   StatAllocateMessage,
   ItemUseMessage,
+  ItemSwapMessage,
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
@@ -300,6 +301,11 @@ export const hudStore = {
     if (!room) return;
     const msg: ItemUseMessage = { itemId };
     room.send(MessageType.ITEM_USE, msg);
+  },
+  swapInventorySlots(from: number, to: number): void {
+    if (!room) return;
+    const msg: ItemSwapMessage = { from, to };
+    room.send(MessageType.ITEM_SWAP, msg);
   },
   setItemCooldown(itemId: string, duration: number): void {
     itemCooldowns.set(itemId, { duration, startedAt: Date.now() });

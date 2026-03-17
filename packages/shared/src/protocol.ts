@@ -26,6 +26,7 @@ export const MessageType = {
   ADMIN_DEBUG_INFO: "admin:debug_info",
   DAMAGE_DEALT: "combat:damage",
   ITEM_USE: "item:use",
+  ITEM_SWAP: "item:swap",
   ITEM_COOLDOWN: "item:cooldown",
   ACTION_FEEDBACK: "action:feedback",
   ITEM_DEFS_REQUEST: "item:defs:req",
@@ -224,6 +225,14 @@ export interface AdminDebugInfoMessage {
 /** Client → Server: use a consumable item */
 export interface ItemUseMessage {
   itemId: string;
+}
+
+/** Client → Server: swap (or move) two inventory slots */
+export interface ItemSwapMessage {
+  /** Source slot index */
+  from: number;
+  /** Destination slot index */
+  to: number;
 }
 
 /** Server → Client: item cooldown started (for UI overlay) */

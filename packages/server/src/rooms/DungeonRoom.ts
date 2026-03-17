@@ -60,6 +60,7 @@ import type {
   SprintMessage,
   AdminDebugInfoMessage,
   ItemUseMessage,
+  ItemSwapMessage,
   ItemDefsRequestMessage,
   LootTakeMessage,
 } from "@dungeon/shared";
@@ -390,6 +391,17 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           duration: def.cooldown,
         });
       }
+    });
+
+    // Item swap: move / swap inventory slots
+    this.onMessage(MessageType.ITEM_SWAP, (client: Client, data: ItemSwapMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (typeof data.from !== "number" || typeof data.to !== "number") return;
+      player.swapSlots(data.from, data.to, (itemId) => {
+        const def = getItemDef(itemId);
+        return def?.maxStack ?? 1;
+      });
     });
 
     // Item definitions: client requests defs lazily by id

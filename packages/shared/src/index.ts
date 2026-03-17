@@ -28,6 +28,7 @@ export type {
   AdminDebugInfoMessage,
   DamageDealtMessage,
   ItemUseMessage,
+  ItemSwapMessage,
   ItemCooldownMessage,
   ItemDefsRequestMessage,
   ItemDefsResponseMessage,

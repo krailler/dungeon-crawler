@@ -275,6 +275,64 @@ export class PlayerState extends Schema {
   }
 
   /**
+   * Swap two inventory slots. Handles move-to-empty, swap occupied, and same-item stacking.
+   * Returns true if the operation succeeded.
+   */
+  swapSlots(from: number, to: number, maxStackLookup: (itemId: string) => number): boolean {
+    if (from === to) return false;
+    if (from < 0 || from >= INVENTORY_MAX_SLOTS) return false;
+    if (to < 0 || to >= INVENTORY_MAX_SLOTS) return false;
+
+    const fromKey = String(from);
+    const toKey = String(to);
+    const fromSlot = this.inventory.get(fromKey);
+    const toSlot = this.inventory.get(toKey);
+
+    // Nothing to move
+    if (!fromSlot) return false;
+
+    if (!toSlot) {
+      // Move to empty slot
+      const newSlot = new InventorySlotState();
+      newSlot.itemId = fromSlot.itemId;
+      newSlot.quantity = fromSlot.quantity;
+      this.inventory.set(toKey, newSlot);
+      this.inventory.delete(fromKey);
+    } else if (fromSlot.itemId === toSlot.itemId) {
+      // Same item — try to stack
+      const maxStack = maxStackLookup(fromSlot.itemId);
+      const canAdd = maxStack - toSlot.quantity;
+      if (canAdd >= fromSlot.quantity) {
+        // All fit into destination
+        toSlot.quantity += fromSlot.quantity;
+        this.inventory.delete(fromKey);
+      } else if (canAdd > 0) {
+        // Partial stack — fill destination, keep remainder in source
+        toSlot.quantity += canAdd;
+        fromSlot.quantity -= canAdd;
+      } else {
+        // Destination already full — plain swap
+        const tmpId = fromSlot.itemId;
+        const tmpQty = fromSlot.quantity;
+        fromSlot.itemId = toSlot.itemId;
+        fromSlot.quantity = toSlot.quantity;
+        toSlot.itemId = tmpId;
+        toSlot.quantity = tmpQty;
+      }
+    } else {
+      // Different items — swap
+      const tmpId = fromSlot.itemId;
+      const tmpQty = fromSlot.quantity;
+      fromSlot.itemId = toSlot.itemId;
+      fromSlot.quantity = toSlot.quantity;
+      toSlot.itemId = tmpId;
+      toSlot.quantity = tmpQty;
+    }
+
+    return true;
+  }
+
+  /**
    * Count total quantity of an item across all inventory slots.
    */
   countItem(itemId: string): number {
