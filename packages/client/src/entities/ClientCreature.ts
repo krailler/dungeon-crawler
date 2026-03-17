@@ -208,7 +208,8 @@ export class ClientCreature {
       this.animController.playOneShot(animState as AnimName);
     }
 
-    if (isDead && !this.isDead) {
+    if (isDead) {
+      if (this.isDead) return; // Already processed death — avoid double dispose
       this.isDead = true;
       this.healthBarContainer.dispose();
       this.barAnchor.dispose();

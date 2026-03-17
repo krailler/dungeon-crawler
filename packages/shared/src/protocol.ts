@@ -160,7 +160,7 @@ export interface GateInteractMessage {
   gateId: string;
 }
 
-// ── Chat ──────────────────────────────────────────────────────────────────────
+// ── Skills ────────────────────────────────────────────────────────────────────
 
 /** Client → Server: toggle a skill on/off */
 export interface SkillToggleMessage {

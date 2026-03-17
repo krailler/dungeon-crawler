@@ -72,7 +72,7 @@ export type { AllocatableStatValue, BaseStats, DerivedStats, StatScaling } from 
 export { computeCreatureDerivedStats, scaleCreatureDerivedStats } from "./CreatureTypes.js";
 export type { CreatureTypeDefinition, CreatureLootEntry } from "./CreatureTypes.js";
 
-export { computeGoldDrop } from "./Economy.js";
+export { computeGoldDrop, computeLevelModifier } from "./Economy.js";
 
 export { xpToNextLevel, computeXpDrop } from "./Leveling.js";
 

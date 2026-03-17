@@ -354,7 +354,14 @@ export class ChatSystem {
       return false;
     }
 
-    timestamps.push(now);
+    // Clean up empty entries to avoid unbounded map growth
+    if (timestamps.length === 0) {
+      this.rateLimits.delete(sessionId);
+      timestamps = [now];
+      this.rateLimits.set(sessionId, timestamps);
+    } else {
+      timestamps.push(now);
+    }
     return true;
   }
 

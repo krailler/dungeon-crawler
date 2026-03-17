@@ -213,145 +213,152 @@ export class StateSync {
           const wallSetNames = Array.from(usedWallSets);
           console.log("[Client] Loading floor tile sets:", floorSetNames);
           console.log("[Client] Loading wall tile sets:", wallSetNames);
-          this.deps.dungeonRenderer.loadAssets(floorSetNames, wallSetNames).then(async () => {
-            loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
-            console.log("[Client] Assets loaded, rendering dungeon");
-            this.deps.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
+          this.deps.dungeonRenderer
+            .loadAssets(floorSetNames, wallSetNames)
+            .then(async () => {
+              loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
+              console.log("[Client] Assets loaded, rendering dungeon");
+              this.deps.dungeonRenderer.render(tileMap, floorVariants, wallVariants);
 
-            // Place gate meshes from current state (onAdd already tracked data in stores,
-            // but mesh placement must happen after render since render() disposes everything)
-            const gates = (room.state as any).gates;
-            if (gates) {
-              gates.forEach((gate: any, gateId: string) => {
-                const open = gate.open as boolean;
-                if (!open && gate.tileX >= 0 && gate.tileY >= 0) {
-                  this.deps.dungeonRenderer.placeGate(
-                    gateId,
-                    gate.tileX,
-                    gate.tileY,
-                    gate.isNS,
-                    gate.dir,
-                  );
-                }
-              });
-            }
+              // Place gate meshes from current state (onAdd already tracked data in stores,
+              // but mesh placement must happen after render since render() disposes everything)
+              const gates = (room.state as any).gates;
+              if (gates) {
+                gates.forEach((gate: any, gateId: string) => {
+                  const open = gate.open as boolean;
+                  if (!open && gate.tileX >= 0 && gate.tileY >= 0) {
+                    this.deps.dungeonRenderer.placeGate(
+                      gateId,
+                      gate.tileX,
+                      gate.tileY,
+                      gate.isNS,
+                      gate.dir,
+                    );
+                  }
+                });
+              }
 
-            // Setup input after dungeon renders (sends move commands to server)
-            this.inputManager = new InputManager({
-              scene: this.deps.scene,
-              floorMeshes: this.deps.dungeonRenderer.getFloorMeshes(),
-              room,
-              interactable: {
-                getMeshes: () => [
-                  ...this.deps.dungeonRenderer.getInteractableMeshes(),
-                  ...Array.from(this.lootBags.values()).map((d) => d.getMesh()),
-                ],
-                getPlayerPosition: () => {
-                  const local = this.players.get(room.sessionId);
-                  if (!local) return null;
-                  const pos = local.getWorldPosition();
-                  return { x: pos.x, z: pos.z };
+              // Setup input after dungeon renders (sends move commands to server)
+              this.inputManager = new InputManager({
+                scene: this.deps.scene,
+                floorMeshes: this.deps.dungeonRenderer.getFloorMeshes(),
+                room,
+                interactable: {
+                  getMeshes: () => [
+                    ...this.deps.dungeonRenderer.getInteractableMeshes(),
+                    ...Array.from(this.lootBags.values()).map((d) => d.getMesh()),
+                  ],
+                  getPlayerPosition: () => {
+                    const local = this.players.get(room.sessionId);
+                    if (!local) return null;
+                    const pos = local.getWorldPosition();
+                    return { x: pos.x, z: pos.z };
+                  },
+                  range: INTERACT_RANGE,
+                  onClick: (type, id) => this.handleInteractableClick(room, type, id),
                 },
-                range: INTERACT_RANGE,
-                onClick: (type, id) => this.handleInteractableClick(room, type, id),
-              },
-              onEntityPicked: (pickType, pickId) => {
-                if (pickType === "creature") {
-                  const creatureState = (room.state as any).creatures.get(pickId);
-                  if (!creatureState || creatureState.isDead) return;
-                  targetStore.selectCreature(pickId);
-                } else if (pickType === "player") {
-                  if (pickId === this.localSessionId) return; // don't target self
-                  const playerState = (room.state as any).players.get(pickId);
-                  if (!playerState) return;
-                  targetStore.selectPlayer(pickId);
-                }
-              },
-              onNothingPicked: () => targetStore.clear(),
-              onTabTarget: () => {
-                const local = this.players.get(room.sessionId);
-                if (!local) return;
-                const pPos = local.getWorldPosition();
-                const currentId = targetStore.getSnapshot().targetId;
+                onEntityPicked: (pickType, pickId) => {
+                  if (pickType === "creature") {
+                    const creatureState = (room.state as any).creatures.get(pickId);
+                    if (!creatureState || creatureState.isDead) return;
+                    targetStore.selectCreature(pickId);
+                  } else if (pickType === "player") {
+                    if (pickId === this.localSessionId) return; // don't target self
+                    const playerState = (room.state as any).players.get(pickId);
+                    if (!playerState) return;
+                    targetStore.selectPlayer(pickId);
+                  }
+                },
+                onNothingPicked: () => targetStore.clear(),
+                onTabTarget: () => {
+                  const local = this.players.get(room.sessionId);
+                  if (!local) return;
+                  const pPos = local.getWorldPosition();
+                  const currentId = targetStore.getSnapshot().targetId;
 
-                // Collect alive creatures sorted by distance
-                const creatures: { id: string; dist: number }[] = [];
-                for (const [id, creature] of this.creatures) {
-                  if (creature.isDead) continue;
-                  const cPos = creature.getWorldPosition();
-                  const dx = cPos.x - pPos.x;
-                  const dz = cPos.z - pPos.z;
-                  creatures.push({ id, dist: dx * dx + dz * dz });
-                }
+                  // Collect alive creatures sorted by distance
+                  const creatures: { id: string; dist: number }[] = [];
+                  for (const [id, creature] of this.creatures) {
+                    if (creature.isDead) continue;
+                    const cPos = creature.getWorldPosition();
+                    const dx = cPos.x - pPos.x;
+                    const dz = cPos.z - pPos.z;
+                    creatures.push({ id, dist: dx * dx + dz * dz });
+                  }
 
-                if (creatures.length > 0) {
-                  // Cycle through creatures
-                  creatures.sort((a, b) => a.dist - b.dist);
+                  if (creatures.length > 0) {
+                    // Cycle through creatures
+                    creatures.sort((a, b) => a.dist - b.dist);
+                    let nextIdx = 0;
+                    if (currentId) {
+                      const curIdx = creatures.findIndex((e) => e.id === currentId);
+                      if (curIdx >= 0) nextIdx = (curIdx + 1) % creatures.length;
+                    }
+                    const nextId = creatures[nextIdx].id;
+                    targetStore.selectCreature(nextId);
+                    return;
+                  }
+
+                  // No alive creatures — cycle through other players
+                  const players: { id: string; dist: number }[] = [];
+                  for (const [id, player] of this.players) {
+                    if (id === room.sessionId) continue; // skip self
+                    const oPos = player.getWorldPosition();
+                    const dx = oPos.x - pPos.x;
+                    const dz = oPos.z - pPos.z;
+                    players.push({ id, dist: dx * dx + dz * dz });
+                  }
+                  if (players.length === 0) return;
+                  players.sort((a, b) => a.dist - b.dist);
                   let nextIdx = 0;
                   if (currentId) {
-                    const curIdx = creatures.findIndex((e) => e.id === currentId);
-                    if (curIdx >= 0) nextIdx = (curIdx + 1) % creatures.length;
+                    const curIdx = players.findIndex((e) => e.id === currentId);
+                    if (curIdx >= 0) nextIdx = (curIdx + 1) % players.length;
                   }
-                  const nextId = creatures[nextIdx].id;
-                  targetStore.selectCreature(nextId);
-                  return;
-                }
+                  const nextPlayerId = players[nextIdx].id;
+                  targetStore.selectPlayer(nextPlayerId);
+                },
+              });
 
-                // No alive creatures — cycle through other players
-                const players: { id: string; dist: number }[] = [];
-                for (const [id, player] of this.players) {
-                  if (id === room.sessionId) continue; // skip self
-                  const oPos = player.getWorldPosition();
-                  const dx = oPos.x - pPos.x;
-                  const dz = oPos.z - pPos.z;
-                  players.push({ id, dist: dx * dx + dz * dz });
-                }
-                if (players.length === 0) return;
-                players.sort((a, b) => a.dist - b.dist);
-                let nextIdx = 0;
-                if (currentId) {
-                  const curIdx = players.findIndex((e) => e.id === currentId);
-                  if (curIdx >= 0) nextIdx = (curIdx + 1) % players.length;
-                }
-                const nextPlayerId = players[nextIdx].id;
-                targetStore.selectPlayer(nextPlayerId);
-              },
+              // Setup wall occlusion (with wall decoration map for toggling)
+              this.wallOcclusion = new WallOcclusionSystem(
+                this.deps.scene,
+                this.deps.isoCamera.camera,
+                this.deps.dungeonRenderer.getWallMeshes(),
+                this.deps.dungeonRenderer.getWallDecoMap(),
+              );
+
+              // Tell fog of war where spawn is (expanded visibility near spawn)
+              const spawnPos = this.deps.dungeonRenderer.getSpawnWorldPosition(tileMap);
+              if (spawnPos) {
+                this.deps.fogOfWar.setSpawnPosition(spawnPos.x, spawnPos.z);
+              }
+
+              // Enable shadow receiving on floor meshes
+              for (const mesh of this.deps.dungeonRenderer.getFloorMeshes()) {
+                mesh.receiveShadows = true;
+              }
+
+              // Wait for any pending item def requests before completing load (5s timeout)
+              const pendingItemIds = this.getLocalInventoryItemIds(room);
+              await Promise.race([
+                itemDefStore.ensureLoadedAsync(pendingItemIds).catch((err) => {
+                  console.error("[StateSync] Failed to load item defs:", err);
+                }),
+                new Promise<void>((r) => setTimeout(r, 5_000)),
+              ]);
+
+              // Loading complete — fade out loading screen
+              loadingStore.setPhase(LoadingPhase.COMPLETE);
+              loadingStore.startFadeOut();
+
+              this.deps.onDungeonReady();
+            })
+            .catch((err) => {
+              console.error("[StateSync] Failed to load/render dungeon:", err);
+              loadingStore.setPhase(LoadingPhase.COMPLETE);
+              loadingStore.startFadeOut();
             });
-
-            // Setup wall occlusion (with wall decoration map for toggling)
-            this.wallOcclusion = new WallOcclusionSystem(
-              this.deps.scene,
-              this.deps.isoCamera.camera,
-              this.deps.dungeonRenderer.getWallMeshes(),
-              this.deps.dungeonRenderer.getWallDecoMap(),
-            );
-
-            // Tell fog of war where spawn is (expanded visibility near spawn)
-            const spawnPos = this.deps.dungeonRenderer.getSpawnWorldPosition(tileMap);
-            if (spawnPos) {
-              this.deps.fogOfWar.setSpawnPosition(spawnPos.x, spawnPos.z);
-            }
-
-            // Enable shadow receiving on floor meshes
-            for (const mesh of this.deps.dungeonRenderer.getFloorMeshes()) {
-              mesh.receiveShadows = true;
-            }
-
-            // Wait for any pending item def requests before completing load (5s timeout)
-            const pendingItemIds = this.getLocalInventoryItemIds(room);
-            await Promise.race([
-              itemDefStore.ensureLoadedAsync(pendingItemIds).catch((err) => {
-                console.error("[StateSync] Failed to load item defs:", err);
-              }),
-              new Promise<void>((r) => setTimeout(r, 5_000)),
-            ]);
-
-            // Loading complete — fade out loading screen
-            loadingStore.setPhase(LoadingPhase.COMPLETE);
-            loadingStore.startFadeOut();
-
-            this.deps.onDungeonReady();
-          });
         };
 
         if (isRestart) {

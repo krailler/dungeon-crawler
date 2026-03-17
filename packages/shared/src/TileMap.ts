@@ -64,6 +64,11 @@ export class TileMap {
 
   /** Deserialize a flat array back into a TileMap */
   static fromSerialized(width: number, height: number, flat: number[]): TileMap {
+    if (flat.length !== width * height) {
+      throw new Error(
+        `TileMap.fromSerialized: expected ${width * height} tiles, got ${flat.length}`,
+      );
+    }
     const map = new TileMap(width, height);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {

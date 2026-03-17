@@ -161,7 +161,10 @@ export class PlayerSessionManager {
       player.tutorialsCompleted = new Set();
     }
 
-    // Load inventory + skills from DB — hash is computed after both complete
+    // Compute an initial hash so early disconnects don't skip saves
+    this.lastSavedHash.set(characterId, this.buildProgressHash(player));
+
+    // Load inventory + skills from DB — update hash after both complete
     Promise.all([
       this.loadInventory(characterId, player),
       this.loadCharacterSkills(characterId, player),
@@ -375,6 +378,7 @@ export class PlayerSessionManager {
     // If already cleaned up by kick, skip everything
     if (this.kickedSessions.has(client.sessionId)) {
       this.kickedSessions.delete(client.sessionId);
+      this.clearReconnectTimers(client.sessionId);
       // Still save progress for kicked players
       const kickedPlayer = this.bridge.state.players.get(client.sessionId);
       if (kickedPlayer) {

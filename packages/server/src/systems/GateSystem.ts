@@ -134,7 +134,7 @@ export class GateSystem {
 
   /** Open all lobby gates and unblock their tiles. */
   private openAllLobbyGates(): void {
-    this.state.gates.forEach((g: any, id: string) => {
+    this.state.gates.forEach((g: GateState, id: string) => {
       if (g.gateType === GateType.LOBBY && !g.open) {
         g.open = true;
         this.pathfinder.unblockTile(g.tileX, g.tileY);

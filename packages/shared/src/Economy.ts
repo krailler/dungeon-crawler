@@ -7,6 +7,20 @@ import {
 } from "./constants/economy.js";
 
 /**
+ * Level-difference modifier for reward scaling (gold, XP).
+ *
+ * - Creatures >5 levels below: minimum modifier (anti-farming)
+ * - Creatures below: -10% per level below
+ * - Creatures above: +5% per level above (risk/reward)
+ */
+export function computeLevelModifier(creatureLevel: number, referenceLevel: number): number {
+  const levelDiff = creatureLevel - referenceLevel;
+  if (levelDiff < -5) return LEVEL_DIFF_MIN_MODIFIER;
+  if (levelDiff < 0) return 1 + levelDiff * LEVEL_DIFF_PENALTY_PER_LEVEL;
+  return 1 + levelDiff * LEVEL_DIFF_BONUS_PER_LEVEL;
+}
+
+/**
  * Compute gold dropped per player when a creature is killed.
  *
  * Factors:
@@ -20,16 +34,6 @@ export function computeGoldDrop(
   alivePartyCount: number,
 ): number {
   const baseGold = BASE_GOLD_PER_KILL + creatureLevel * GOLD_PER_CREATURE_LEVEL;
-
-  const levelDiff = creatureLevel - averagePartyLevel;
-  let modifier: number;
-  if (levelDiff < -5) {
-    modifier = LEVEL_DIFF_MIN_MODIFIER;
-  } else if (levelDiff < 0) {
-    modifier = 1 + levelDiff * LEVEL_DIFF_PENALTY_PER_LEVEL;
-  } else {
-    modifier = 1 + levelDiff * LEVEL_DIFF_BONUS_PER_LEVEL;
-  }
-
+  const modifier = computeLevelModifier(creatureLevel, averagePartyLevel);
   return Math.max(1, Math.round((baseGold * modifier) / Math.max(1, alivePartyCount)));
 }
