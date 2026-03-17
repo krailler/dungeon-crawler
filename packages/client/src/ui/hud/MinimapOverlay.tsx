@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { TileType, TILE_SIZE } from "@dungeon/shared";
 import { minimapStore } from "../stores/minimapStore";
@@ -20,7 +21,7 @@ const COLOR_CREATURE = "#f87171";
 const PLAYER_DOT_RADIUS = 4;
 const CREATURE_DOT_RADIUS = 3;
 
-export const MinimapOverlay = (): JSX.Element | null => {
+export const MinimapOverlay = (): ReactNode => {
   const { t } = useTranslation();
   const { visible, version } = useSyncExternalStore(
     minimapStore.subscribe,

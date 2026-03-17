@@ -45,7 +45,7 @@ export const HudButton = ({
   icon,
   label,
   suffix,
-}: HudButtonProps): JSX.Element => {
+}: HudButtonProps): ReactNode => {
   const handleClick = useCallback(() => {
     playUiSfx("ui_click");
     onClick();

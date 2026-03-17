@@ -1,4 +1,5 @@
-export const PotionIcon = ({ className }: { className?: string }): JSX.Element => (
+import type { ReactNode } from "react";
+export const PotionIcon = ({ className }: { className?: string }): ReactNode => (
   <svg
     className={className}
     viewBox="0 0 24 24"

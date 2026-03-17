@@ -44,8 +44,8 @@ export function useDraggable(
   persistPosition = true,
 ): {
   position: Position;
-  handleRef: React.RefObject<HTMLDivElement>;
-  panelRef: React.RefObject<HTMLDivElement>;
+  handleRef: React.RefObject<HTMLDivElement | null>;
+  panelRef: React.RefObject<HTMLDivElement | null>;
   isDragging: boolean;
   enabled: boolean;
 } {

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { promptStore } from "../stores/promptStore";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { playUiSfx } from "../../audio/uiSfx";
 
-export const PromptOverlay = (): JSX.Element | null => {
+export const PromptOverlay = (): ReactNode => {
   const { current } = useSyncExternalStore(promptStore.subscribe, promptStore.getSnapshot);
   const prevRef = useRef(current);
 

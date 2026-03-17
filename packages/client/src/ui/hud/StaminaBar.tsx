@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { hudStore } from "../stores/hudStore";
 import { STAMINA_MAX } from "@dungeon/shared";
 
-export const StaminaBar = (): JSX.Element | null => {
+export const StaminaBar = (): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const local = snapshot.members.find((m) => m.isLocal);
 

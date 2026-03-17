@@ -1,9 +1,10 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { PROTOCOL_VERSION } from "@dungeon/shared";
 
-export const LoginScreen = (): JSX.Element | null => {
+export const LoginScreen = (): ReactNode => {
   const { t } = useTranslation();
   const auth = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
   const [email, setEmail] = useState("");

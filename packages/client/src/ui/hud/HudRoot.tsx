@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "../stores/hudStore";
 import { hudStore } from "../stores/hudStore";
@@ -33,7 +34,7 @@ import { BackpackIcon } from "../icons/BackpackIcon";
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
 
-const GoldPill = ({ gold }: { gold: number }): JSX.Element => {
+const GoldPill = ({ gold }: { gold: number }): ReactNode => {
   const [floats, setFloats] = useState<FloatEntry[]>([]);
   const prevGoldRef = useRef<number | null>(null);
 
@@ -87,7 +88,7 @@ const PartyRow = ({
 }: {
   member: PartyMember;
   onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
-}): JSX.Element => {
+}): ReactNode => {
   const { t } = useTranslation();
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
@@ -191,7 +192,7 @@ type ContextMenuState = {
   member: PartyMember;
 } | null;
 
-export const HudRoot = (): JSX.Element => {
+export const HudRoot = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);

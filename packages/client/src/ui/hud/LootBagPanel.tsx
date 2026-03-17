@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { lootBagStore } from "../stores/lootBagStore";
 import { itemDefStore } from "../stores/itemDefStore";
@@ -7,11 +8,11 @@ import { ActionSlot } from "../components/ActionSlot";
 import { PotionIcon } from "../icons/PotionIcon";
 import { playUiSfx } from "../../audio/uiSfx";
 
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => JSX.Element> = {
+const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
   potion_red: PotionIcon,
 };
 
-export const LootBagPanel = (): JSX.Element | null => {
+export const LootBagPanel = (): ReactNode => {
   const { t } = useTranslation();
   const snap = useSyncExternalStore(lootBagStore.subscribe, lootBagStore.getSnapshot);
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);

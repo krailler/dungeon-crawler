@@ -1,4 +1,5 @@
-export const LockIcon = ({ className = "h-4 w-4" }: { className?: string }): JSX.Element => (
+import type { ReactNode } from "react";
+export const LockIcon = ({ className = "h-4 w-4" }: { className?: string }): ReactNode => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"

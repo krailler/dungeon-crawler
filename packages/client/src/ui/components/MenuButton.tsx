@@ -25,7 +25,7 @@ export const MenuButton = ({
   variant = "default",
   className = "",
   children,
-}: MenuButtonProps): JSX.Element => (
+}: MenuButtonProps): ReactNode => (
   <button
     onClick={() => {
       playUiSfx("ui_click");

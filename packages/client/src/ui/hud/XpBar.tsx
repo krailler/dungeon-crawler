@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 
@@ -6,7 +7,7 @@ type XpFloat = { id: number; amount: number };
 
 let floatId = 0;
 
-export const XpBar = (): JSX.Element | null => {
+export const XpBar = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const local = snapshot.members.find((m) => m.isLocal);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import { SwordIcon } from "../icons/SwordIcon";
@@ -10,14 +11,14 @@ import type { SkillDef, SkillIdValue } from "@dungeon/shared";
 
 // ── Icon map (skill icon name → component) ───────────────────────────────────
 
-const ICON_MAP: Record<string, (props: { className?: string }) => JSX.Element> = {
+const ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
   sword: SwordIcon,
   fist: FistIcon,
 };
 
 // ── Skill tooltip content ────────────────────────────────────────────────────
 
-const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): JSX.Element => {
+const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): ReactNode => {
   const { t } = useTranslation();
   return (
     <>
@@ -46,7 +47,7 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
 
 // ── SkillBar ─────────────────────────────────────────────────────────────────
 
-export const SkillBar = (): JSX.Element => {
+export const SkillBar = (): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const localMember = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const skills = localMember?.skills ?? [];

@@ -22,8 +22,9 @@ export default defineConfig({
   plugins: [react(), fullReloadPlugin()],
   resolve: {
     alias: {
-      react: path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      // Ensure a single React copy in the monorepo (may hoist to root node_modules)
+      react: path.resolve(require.resolve("react/package.json"), ".."),
+      "react-dom": path.resolve(require.resolve("react-dom/package.json"), ".."),
     },
   },
   server: {

@@ -1,4 +1,5 @@
-export const MapIcon = ({ className = "h-4 w-4" }: { className?: string }): JSX.Element => (
+import type { ReactNode } from "react";
+export const MapIcon = ({ className = "h-4 w-4" }: { className?: string }): ReactNode => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     className={className}

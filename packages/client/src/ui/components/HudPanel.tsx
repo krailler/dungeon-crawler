@@ -60,7 +60,7 @@ export const HudPanel = ({
   panelId,
   defaultPosition,
   persistPosition,
-}: HudPanelProps): JSX.Element => {
+}: HudPanelProps): ReactNode => {
   const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 }, persistPosition);
   const [zIndex, setZIndex] = useState(() => ++zCounter);
   const bringToFront = useCallback(() => setZIndex(++zCounter), []);

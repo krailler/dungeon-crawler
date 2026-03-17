@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { announcementStore } from "../stores/announcementStore";
 import { ANNOUNCEMENT_FADE_MS } from "@dungeon/shared";
 
-export const AnnouncementOverlay = (): JSX.Element | null => {
+export const AnnouncementOverlay = (): ReactNode => {
   const { t, i18n } = useTranslation();
   const { current } = useSyncExternalStore(
     announcementStore.subscribe,

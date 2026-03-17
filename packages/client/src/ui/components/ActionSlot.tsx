@@ -13,7 +13,7 @@ const CooldownOverlay = ({
   cooldown: SkillCooldownState;
   textSize: string;
   onComplete?: () => void;
-}): JSX.Element | null => {
+}): ReactNode => {
   const [remaining, setRemaining] = useState(() => {
     const elapsed = (Date.now() - cooldown.startedAt) / 1000;
     return Math.max(0, cooldown.duration - elapsed);
@@ -181,7 +181,7 @@ export const ActionSlot = ({
   tooltipDescParams,
   tooltipHint,
   tooltip,
-}: ActionSlotProps): JSX.Element => {
+}: ActionSlotProps): ReactNode => {
   const { t } = useTranslation();
   const colors = VARIANT_COLORS[variant];
   const sizeClass = size === "md" ? "h-12 w-12" : "h-11 w-11";

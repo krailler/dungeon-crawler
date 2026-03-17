@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { TutorialStep } from "@dungeon/shared";
 import { gateStore } from "../stores/gateStore";
@@ -6,7 +7,7 @@ import { promptStore } from "../stores/promptStore";
 import { tutorialStore } from "../stores/tutorialStore";
 
 /** "Press F" interaction hint — shown when the leader is near the gate */
-export const GateHint = (): JSX.Element | null => {
+export const GateHint = (): ReactNode => {
   const { t } = useTranslation();
   const gate = useSyncExternalStore(gateStore.subscribe, gateStore.getSnapshot);
 

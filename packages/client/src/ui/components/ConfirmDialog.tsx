@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 import { MenuButton } from "./MenuButton";
 
 type ConfirmDialogProps = {
@@ -23,7 +24,7 @@ export const ConfirmDialog = ({
   cancelLabel,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps): JSX.Element => {
+}: ConfirmDialogProps): ReactNode => {
   // Close on Escape — capture phase so it runs before bubble-phase listeners (PauseMenu, etc.)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {

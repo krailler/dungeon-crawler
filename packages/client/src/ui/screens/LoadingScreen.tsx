@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { loadingStore, LoadingPhase } from "../stores/loadingStore";
 
-export const LoadingScreen = (): JSX.Element | null => {
+export const LoadingScreen = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(loadingStore.subscribe, loadingStore.getSnapshot);
 

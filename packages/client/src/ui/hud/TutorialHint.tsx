@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { tutorialStore } from "../stores/tutorialStore";
 import { playUiSfx } from "../../audio/uiSfx";
 
-export const TutorialHint = (): JSX.Element | null => {
+export const TutorialHint = (): ReactNode => {
   const { t, i18n } = useTranslation();
   const { currentHint } = useSyncExternalStore(tutorialStore.subscribe, tutorialStore.getSnapshot);
 

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AllocatableStat, TutorialStep } from "@dungeon/shared";
 import type { AllocatableStatValue } from "@dungeon/shared";
@@ -45,7 +46,7 @@ const StatRow = ({
   </div>
 );
 
-export const CharacterPanel = ({ onClose }: { onClose: () => void }): JSX.Element | null => {
+export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const local = snapshot.members.find((m) => m.isLocal);

@@ -1,4 +1,5 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { debugStore } from "../stores/debugStore";
 import type { DebugSnapshot } from "../stores/debugStore";
 import { adminStore } from "../stores/adminStore";
@@ -24,7 +25,7 @@ const TOGGLES: ToggleEntry[] = [
   { key: "showCoords", label: "Show Coords" },
 ];
 
-export const DebugPanel = (): JSX.Element => {
+export const DebugPanel = (): ReactNode => {
   const [open, setOpen] = useState(false);
   const [seedInput, setSeedInput] = useState("");
   const admin = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useTranslation } from "react-i18next";
+import type { ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
@@ -99,7 +100,7 @@ const senderColor = (role?: string): string => {
   return "text-sky-400";
 };
 
-const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): JSX.Element => {
+const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): ReactNode => {
   const { t } = useTranslation();
   const baseStyle = categoryStyles[msg.category] || categoryStyles.player;
   const variant = msg.variant ? variantStyles[msg.variant] : null;
@@ -143,7 +144,7 @@ const CommandHelpOverlay = ({
   commands: CommandInfo[];
   isAdmin: boolean;
   onSelect: (name: string) => void;
-}): JSX.Element | null => {
+}): ReactNode => {
   const filtered = useMemo(() => {
     const lower = prefix.toLowerCase();
     return commands
@@ -193,7 +194,7 @@ const PlayerSuggestOverlay = ({
   argPrefix: string;
   playerNames: string[];
   onSelect: (name: string) => void;
-}): JSX.Element | null => {
+}): ReactNode => {
   const { t } = useTranslation();
   const filtered = useMemo(() => {
     const lower = argPrefix.toLowerCase();
@@ -240,7 +241,7 @@ const PlayerSuggestOverlay = ({
 /** Max number of sent messages to remember */
 const HISTORY_MAX = 50;
 
-export const ChatPanel = (): JSX.Element => {
+export const ChatPanel = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot);
   const authSnapshot = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
@@ -465,21 +466,14 @@ export const ChatPanel = (): JSX.Element => {
       {/* Hint when chat is not open */}
       {!snapshot.inputOpen && snapshot.messages.length === 0 && (
         <div className="px-2 py-1 text-[11px] text-slate-600">
-          {t("chat.hintOpen", { interpolation: { escapeValue: false } })
-            .split(/(<kbd>.*?<\/kbd>)/g)
-            .map((part, i) => {
-              const m = part.match(/^<kbd>(.*)<\/kbd>$/);
-              return m ? (
-                <kbd
-                  key={i}
-                  className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500"
-                >
-                  {m[1]}
-                </kbd>
-              ) : (
-                <span key={i}>{part}</span>
-              );
-            })}
+          <Trans
+            i18nKey="chat.hintOpen"
+            components={{
+              kbd: (
+                <kbd className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500" />
+              ),
+            }}
+          />
         </div>
       )}
     </div>

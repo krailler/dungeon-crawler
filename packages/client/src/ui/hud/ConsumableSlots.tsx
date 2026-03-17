@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
@@ -7,7 +8,7 @@ import { ActionSlot } from "../components/ActionSlot";
 
 // ── Icon map (item icon name → component) ────────────────────────────────────
 
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => JSX.Element> = {
+const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
   potion_red: PotionIcon,
 };
 
@@ -22,7 +23,7 @@ type ConsumableEntry = {
 
 // ── ConsumableSlots ──────────────────────────────────────────────────────────
 
-export const ConsumableSlots = (): JSX.Element => {
+export const ConsumableSlots = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);

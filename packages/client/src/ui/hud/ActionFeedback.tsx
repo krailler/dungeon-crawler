@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { feedbackStore } from "../stores/feedbackStore";
 
-export const ActionFeedback = (): JSX.Element | null => {
+export const ActionFeedback = (): ReactNode => {
   const { t } = useTranslation();
   const entries = useSyncExternalStore(feedbackStore.subscribe, feedbackStore.getSnapshot);
 

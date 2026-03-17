@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { MenuButton } from "../components/MenuButton";
 
-export const PauseMenu = (): JSX.Element | null => {
+export const PauseMenu = (): ReactNode => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);

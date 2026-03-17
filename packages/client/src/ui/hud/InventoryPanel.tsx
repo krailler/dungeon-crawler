@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { INVENTORY_MAX_SLOTS } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
@@ -10,13 +11,13 @@ import { playUiSfx } from "../../audio/uiSfx";
 
 // ── Icon map ─────────────────────────────────────────────────────────────────
 
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => JSX.Element> = {
+const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
   potion_red: PotionIcon,
 };
 
 // ── InventoryPanel ───────────────────────────────────────────────────────────
 
-export const InventoryPanel = ({ onClose }: { onClose: () => void }): JSX.Element | null => {
+export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);

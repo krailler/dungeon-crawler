@@ -17,7 +17,7 @@ export const HudPill = ({
   children,
   variant = "default",
   mono = false,
-}: HudPillProps): JSX.Element => (
+}: HudPillProps): ReactNode => (
   <div
     className={[
       "rounded-full border bg-slate-900/60 px-3 py-1 text-[11px] backdrop-blur",
