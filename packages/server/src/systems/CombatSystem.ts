@@ -37,6 +37,8 @@ interface PlayerCombat {
   damageDefense: number;
   /** Active skill cooldowns (seconds remaining), keyed by skill ID */
   skillCooldowns: Map<string, number>;
+  /** Player's manually-selected target creature (null = auto-target closest) */
+  targetCreatureId: string | null;
 }
 
 /** Result of finding the closest alive creature in range */
@@ -60,6 +62,7 @@ export class CombatSystem {
       damageAttack: 0,
       damageDefense: 0,
       skillCooldowns: new Map(),
+      targetCreatureId: null,
     });
   }
 
@@ -67,13 +70,42 @@ export class CombatSystem {
     this.playerCooldowns.delete(sessionId);
   }
 
+  /** Set the player's manually-selected target creature. */
+  setTarget(sessionId: string, targetId: string | null): void {
+    const combat = this.playerCooldowns.get(sessionId);
+    if (combat) combat.targetCreatureId = targetId;
+  }
+
+  /** Clear target for all players that had this creature selected (e.g. on death). */
+  clearTargetFor(creatureId: string): void {
+    for (const combat of this.playerCooldowns.values()) {
+      if (combat.targetCreatureId === creatureId) {
+        combat.targetCreatureId = null;
+      }
+    }
+  }
+
   // ── Shared helpers ───────────────────────────────────────────────────────
 
-  /** Find the closest alive creature within player's attack range. */
+  /** Find an alive creature to attack. Prefers the player's selected target if in range. */
   private findTarget(
     player: PlayerState,
     creatures: Map<string, CreatureState>,
+    preferredId: string | null = null,
   ): TargetResult | null {
+    // Prefer manually-selected target if alive and in range
+    if (preferredId) {
+      const preferred = creatures.get(preferredId);
+      if (preferred && !preferred.isDead) {
+        const dx = preferred.x - player.x;
+        const dz = preferred.z - player.z;
+        if (Math.sqrt(dx * dx + dz * dz) <= player.attackRange) {
+          return { creature: preferred, creatureId: preferredId };
+        }
+      }
+    }
+
+    // Fallback: closest alive creature in range
     let closest: CreatureState | null = null;
     let closestId = "";
     let closestDist = Infinity;
@@ -143,8 +175,8 @@ export class CombatSystem {
     const hasSkill = Array.from(player.skills as Iterable<string>).includes(skillId);
     if (!hasSkill) return null;
 
-    // Need a target in range
-    const target = this.findTarget(player, creatures);
+    // Need a target in range (prefer player's selected target)
+    const target = this.findTarget(player, creatures, combat.targetCreatureId);
     if (!target) return null;
 
     // Put skill on cooldown
@@ -236,7 +268,7 @@ export class CombatSystem {
       // Skip auto-attack if player has it disabled
       if (!player.autoAttackEnabled) continue;
 
-      const target = this.findTarget(player, creatures);
+      const target = this.findTarget(player, creatures, combat.targetCreatureId);
       if (target) {
         combat.attackCooldown = player.attackCooldown;
         const damage = computeDamage(player.attackDamage, target.creature.defense);

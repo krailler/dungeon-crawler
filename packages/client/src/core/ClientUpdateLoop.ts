@@ -14,6 +14,7 @@ import type { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import type { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
+
 import { debugStore } from "../ui/stores/debugStore";
 import type { DebugSnapshot } from "../ui/stores/debugStore";
 import { gateStore } from "../ui/stores/gateStore";

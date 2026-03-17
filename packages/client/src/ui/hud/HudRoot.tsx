@@ -23,6 +23,8 @@ import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { ActionFeedback } from "./ActionFeedback";
 import { LootBagPanel } from "./LootBagPanel";
+import { TargetFrame } from "./TargetFrame";
+import { targetStore } from "../stores/targetStore";
 import { HudButton } from "../components/HudButton";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -33,14 +35,10 @@ import { BackpackIcon } from "../icons/BackpackIcon";
 import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 
+import { healthColor } from "../components/healthColor";
+
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
-
-const healthColor = (pct: number): string => {
-  if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
-  if (pct > 30) return "from-amber-400/90 via-amber-400/70 to-amber-500/80";
-  return "from-orange-400/90 via-orange-400/70 to-orange-500/80";
-};
 
 const formatHealth = (member: PartyMember): string => {
   const current = Math.max(0, Math.ceil(member.health));
@@ -50,9 +48,13 @@ const formatHealth = (member: PartyMember): string => {
 
 const PartyRow = ({
   member,
+  isTargeted,
+  onClick,
   onContextMenu,
 }: {
   member: PartyMember;
+  isTargeted: boolean;
+  onClick: (member: PartyMember) => void;
   onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
 }): ReactNode => {
   const { t } = useTranslation();
@@ -82,14 +84,22 @@ const PartyRow = ({
   }, [member.health]);
 
   return (
-    <div onContextMenu={(e) => onContextMenu(e, member)} className="animate-rise-in">
+    <div
+      onClick={() => onClick(member)}
+      onContextMenu={(e) => onContextMenu(e, member)}
+      className="animate-rise-in cursor-pointer"
+    >
       <div
         className={[
           "rounded-2xl border px-3 py-2 shadow-lg shadow-black/30",
           "backdrop-blur-md transition-[border-color,box-shadow] duration-500",
           "bg-[color:var(--ui-panel)]",
-          isLowHp ? "animate-low-hp border-red-500/40" : "border-[color:var(--ui-panel-border)]",
-          member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10",
+          isTargeted
+            ? "border-amber-400/50 ring-1 ring-amber-400/40"
+            : isLowHp
+              ? "animate-low-hp border-red-500/40"
+              : "border-[color:var(--ui-panel-border)]",
+          !isTargeted && (member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10"),
           !member.online && "opacity-40",
           isDead && "saturate-[0.3]",
         ]
@@ -168,6 +178,7 @@ export const HudRoot = (): ReactNode => {
   const toggleMinimap = useCallback(() => minimapStore.toggle(), []);
   const debugSnapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
   const adminSnapshot = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
+  const targetSnap = useSyncExternalStore(targetStore.subscribe, targetStore.getSnapshot);
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
   const [characterOpen, setCharacterOpen] = useState(false);
@@ -196,6 +207,25 @@ export const HudRoot = (): ReactNode => {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
   const ctxMenuRef = useRef<HTMLDivElement>(null);
   const localMember = useMemo(() => members.find((m) => m.isLocal), [members]);
+
+  const handlePartyClick = useCallback(
+    (member: PartyMember) => {
+      // Toggle: if already targeted, deselect; otherwise select
+      if (targetSnap.targetId === member.id && targetSnap.targetType === "player") {
+        targetStore.clear();
+      } else {
+        playUiSfx("ui_click");
+        targetStore.selectPlayer(
+          member.id,
+          member.name,
+          member.health,
+          member.maxHealth,
+          member.level,
+        );
+      }
+    },
+    [targetSnap.targetId, targetSnap.targetType],
+  );
 
   const handlePartyContextMenu = useCallback((e: React.MouseEvent, member: PartyMember) => {
     e.preventDefault();
@@ -245,6 +275,7 @@ export const HudRoot = (): ReactNode => {
       <GateHint />
       <PromptOverlay />
       <AnnouncementOverlay />
+      <TargetFrame />
       <TutorialHint />
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
@@ -284,7 +315,13 @@ export const HudRoot = (): ReactNode => {
             </div>
           )}
           {members.map((member) => (
-            <PartyRow key={member.id} member={member} onContextMenu={handlePartyContextMenu} />
+            <PartyRow
+              key={member.id}
+              member={member}
+              isTargeted={targetSnap.targetId === member.id && targetSnap.targetType === "player"}
+              onClick={handlePartyClick}
+              onContextMenu={handlePartyContextMenu}
+            />
           ))}
         </div>
       </div>

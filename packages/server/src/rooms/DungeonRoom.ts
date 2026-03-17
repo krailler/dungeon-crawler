@@ -63,6 +63,7 @@ import type {
   ItemSwapMessage,
   ItemDefsRequestMessage,
   LootTakeMessage,
+  SetTargetMessage,
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
@@ -402,6 +403,18 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const def = getItemDef(itemId);
         return def?.maxStack ?? 1;
       });
+    });
+
+    // Target selection: player selects or clears their attack target
+    this.onMessage(MessageType.SET_TARGET, (client: Client, data: SetTargetMessage) => {
+      if (data.targetId === null) {
+        this.combatSystem.setTarget(client.sessionId, null);
+        return;
+      }
+      if (typeof data.targetId !== "string") return;
+      const creature = this.state.creatures.get(data.targetId);
+      if (!creature || creature.isDead) return;
+      this.combatSystem.setTarget(client.sessionId, data.targetId);
     });
 
     // Item definitions: client requests defs lazily by id
@@ -789,6 +802,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         creature.x = tileX * TILE_SIZE;
         creature.z = tileY * TILE_SIZE;
         creature.creatureType = typeDef.id;
+        creature.nameKey = typeDef.name;
         creature.detectionRange = typeDef.detectionRange;
         creature.applyStats(baseDerived, creatureLevel);
 

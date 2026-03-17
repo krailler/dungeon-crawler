@@ -14,6 +14,7 @@ export const BindableAction = {
   MINIMAP: "minimap",
   INTERACT: "interact",
   FULLSCREEN: "fullscreen",
+  TAB_TARGET: "tabTarget",
 } as const;
 
 export type BindableActionValue = (typeof BindableAction)[keyof typeof BindableAction];
@@ -57,6 +58,7 @@ const DEFAULT_KEYBINDINGS: KeybindingSettings = {
   minimap: "m",
   interact: "f",
   fullscreen: "F11",
+  tabTarget: "Tab",
 };
 
 // ── Persistence ─────────────────────────────────────────────────────────────

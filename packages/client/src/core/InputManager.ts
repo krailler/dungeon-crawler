@@ -47,6 +47,12 @@ export interface InputManagerDeps {
   room: Room;
   /** Optional interactable click system (gates, chests, etc.) */
   interactable?: InteractableConfig;
+  /** Called when a creature or player mesh is clicked */
+  onEntityPicked?: (pickType: string, pickId: string) => void;
+  /** Called when left-click hits nothing (floor/empty) — used to deselect target */
+  onNothingPicked?: () => void;
+  /** Called when Tab is pressed — cycle through nearby targets */
+  onTabTarget?: () => void;
 }
 
 /** Tracks a click on an interactable that was out of range — player walks toward it */
@@ -66,6 +72,9 @@ export class InputManager {
   private isHolding: boolean = false;
   private lastSendTime: number = 0;
   private interactable: InteractableConfig | undefined;
+  private onEntityPicked: ((pickType: string, pickId: string) => void) | undefined;
+  private onNothingPicked: (() => void) | undefined;
+  private onTabTarget: (() => void) | undefined;
 
   /** Pending interaction — player is walking toward an interactable */
   private pendingInteract: PendingInteract | null = null;
@@ -95,6 +104,9 @@ export class InputManager {
     this.floorMeshSet = new Set(deps.floorMeshes);
     this.room = deps.room;
     this.interactable = deps.interactable;
+    this.onEntityPicked = deps.onEntityPicked;
+    this.onNothingPicked = deps.onNothingPicked;
+    this.onTabTarget = deps.onTabTarget;
 
     this.canvas = this.scene.getEngine().getRenderingCanvas()!;
 
@@ -112,6 +124,12 @@ export class InputManager {
 
       // Left-click cancels any pending interaction
       this.pendingInteract = null;
+
+      // Try to pick an entity (creature or player) first
+      if (this.tryEntityPick()) return;
+
+      // Clicking on empty space deselects any current target
+      this.onNothingPicked?.();
 
       // If clicking on an interactable mesh, walk toward it (but don't interact)
       if (this.tryWalkToInteractable()) {
@@ -142,6 +160,12 @@ export class InputManager {
 
     // Sprint: configurable key hold (default Shift)
     this.handleKeyDown = (ev: KeyboardEvent) => {
+      // Tab target cycling
+      if (ev.key === settingsStore.getBinding("tabTarget")) {
+        ev.preventDefault();
+        this.onTabTarget?.();
+        return;
+      }
       if (ev.key === settingsStore.getBinding("sprint") && !this.sprintActive) {
         this.sprintActive = true;
         this.room.send(MessageType.SPRINT, { active: true } satisfies SprintMessage);
@@ -318,22 +342,61 @@ export class InputManager {
     return true;
   }
 
+  /**
+   * Try to pick a creature or player entity under the pointer.
+   * Returns true if an entity was picked (cancels movement).
+   */
+  private tryEntityPick(): boolean {
+    if (!this.onEntityPicked) return false;
+
+    const pick = this.scene.pick(
+      this.scene.pointerX,
+      this.scene.pointerY,
+      (mesh) => !!(mesh.metadata && mesh.metadata.pickType),
+    );
+    if (!pick?.hit || !pick.pickedMesh) return false;
+
+    const meta = pick.pickedMesh.metadata;
+    if (!meta?.pickType || !meta?.pickId) return false;
+
+    this.onEntityPicked(meta.pickType, meta.pickId);
+    return true;
+  }
+
   /** Update the canvas cursor based on what's under the pointer. */
   private updateCursorStyle(): void {
-    if (this.isHolding || !this.interactable) {
+    if (this.isHolding) {
       this.setCursor("");
       return;
     }
-    const meshes = this.interactable.getMeshes();
-    if (meshes.length === 0) {
-      this.setCursor("");
-      return;
-    }
-    const meshSet = new Set(meshes);
-    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
-      meshSet.has(mesh),
+
+    // Check for entity hover (creatures, players)
+    const entityPick = this.scene.pick(
+      this.scene.pointerX,
+      this.scene.pointerY,
+      (mesh) => !!(mesh.metadata && mesh.metadata.pickType),
     );
-    this.setCursor(pick?.hit ? "pointer" : "");
+    if (entityPick?.hit) {
+      this.setCursor("pointer");
+      return;
+    }
+
+    // Check for interactable hover (gates, loot bags)
+    if (this.interactable) {
+      const meshes = this.interactable.getMeshes();
+      if (meshes.length > 0) {
+        const meshSet = new Set(meshes);
+        const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
+          meshSet.has(mesh),
+        );
+        if (pick?.hit) {
+          this.setCursor("pointer");
+          return;
+        }
+      }
+    }
+
+    this.setCursor("");
   }
 
   private setCursor(cursor: string): void {

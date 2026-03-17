@@ -88,7 +88,8 @@
     "characterPanel": "Character",
     "inventoryPanel": "Inventory",
     "minimapPanel": "Minimap",
-    "fullscreen": "Fullscreen"
+    "fullscreen": "Fullscreen",
+    "tabTarget": "Cycle Target"
   },
   "character": {
     "title": "Character",
@@ -155,6 +156,9 @@
   "announce": {
     "gateCountdownStart": "{{name}} is opening the gate in {{seconds}} seconds...",
     "gateOpened": "The gate opens... The dungeon awaits!"
+  },
+  "creatures": {
+    "zombie": "Zombie"
   },
   "skills": {
     "basicAttack": "Basic Attack",

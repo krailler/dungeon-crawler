@@ -12,6 +12,7 @@ import type { AnimName } from "./CharacterAssetLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { SelectionRing } from "./SelectionRing";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import { Control } from "@babylonjs/gui/2D/controls/control";
@@ -55,6 +56,8 @@ const BUBBLE_MAX_WIDTH = 220;
 const LEVEL_UP_DURATION = 2.5;
 
 export class ClientPlayer {
+  /** Session ID */
+  public readonly sessionId: string;
   /** Invisible anchor mesh used for positioning and torch parenting */
   public mesh: Mesh;
   /** GLB model root — child of mesh */
@@ -96,6 +99,8 @@ export class ClientPlayer {
   /** Client-side facing override — player looks toward this point while holding click */
   private facingTarget: { x: number; z: number } | null = null;
 
+  private selectionRing: SelectionRing;
+
   constructor(
     scene: Scene,
     isLocal: boolean,
@@ -104,6 +109,7 @@ export class ClientPlayer {
     guiTexture: AdvancedDynamicTexture,
     soundManager?: SoundManager,
   ) {
+    this.sessionId = id;
     this.isLocal = isLocal;
     this.scene = scene;
     this.guiTexture = guiTexture;
@@ -113,6 +119,8 @@ export class ClientPlayer {
     this.mesh.visibility = 0;
     this.mesh.isPickable = false;
     this.mesh.position.y = 0;
+
+    this.selectionRing = new SelectionRing(id, new Color3(0.2, 0.5, 0.9), this.mesh, scene);
 
     // 3D anchor for name label (world-space Y so it scales with camera)
     this.nameAnchor = new TransformNode(`nameAnchor_${id}`, scene);
@@ -182,6 +190,11 @@ export class ClientPlayer {
         mat.alpha = 1;
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.backFaceCulling = true;
+      }
+      // Make clickable for target selection (skip local player)
+      if (!this.isLocal) {
+        m.isPickable = true;
+        m.metadata = { ...(m.metadata ?? {}), pickType: "player", pickId: this.sessionId };
       }
     }
 
@@ -410,7 +423,13 @@ export class ClientPlayer {
     );
   }
 
+  /** Show or hide the selection ring below the player. */
+  setSelected(selected: boolean): void {
+    this.selectionRing.setSelected(selected);
+  }
+
   dispose(): void {
+    this.selectionRing.dispose();
     for (const t of this.pendingTimers) clearTimeout(t);
     this.pendingTimers = [];
     this.animController.dispose();

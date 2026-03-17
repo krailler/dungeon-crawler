@@ -34,6 +34,7 @@ export type {
   ItemDefsResponseMessage,
   ActionFeedbackMessage,
   LootTakeMessage,
+  SetTargetMessage,
 } from "./protocol.js";
 
 export {

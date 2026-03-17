@@ -14,6 +14,7 @@ import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTe
 import type { AnimName, CharacterInstance } from "./CharacterAssetLoader";
 import { AnimationController } from "./AnimationController";
 import type { SoundManager } from "../audio/SoundManager";
+import { SelectionRing } from "./SelectionRing";
 
 /** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
 const LERP_FACTOR = 12;
@@ -23,6 +24,8 @@ const HIT_FLASH_DURATION = 0.12;
 const MOVE_THRESHOLD = 0.05;
 
 export class ClientCreature {
+  /** Creature ID from server state */
+  public readonly id: string;
   /** Invisible anchor mesh used for positioning */
   public mesh: Mesh;
   /** GLB model root — child of mesh */
@@ -33,6 +36,7 @@ export class ClientCreature {
   public isAggro: boolean = false;
 
   private animController: AnimationController;
+  private selectionRing: SelectionRing;
 
   // Target state from server
   private targetX: number = 0;
@@ -68,6 +72,7 @@ export class ClientCreature {
     guiTexture: AdvancedDynamicTexture,
     soundManager?: SoundManager,
   ) {
+    this.id = id;
     this.animController = new AnimationController(soundManager ?? null);
     this.guiTexture = guiTexture;
     this.previousHealth = initialHealth;
@@ -77,6 +82,8 @@ export class ClientCreature {
     this.mesh.visibility = 0;
     this.mesh.isPickable = false;
     this.mesh.position.y = 0;
+
+    this.selectionRing = new SelectionRing(id, new Color3(0.9, 0.2, 0.2), this.mesh, scene);
 
     // White PBR material for hit flash
     this.hitMaterial = new PBRMaterial(`creatureHitMat_${id}`, scene);
@@ -150,6 +157,9 @@ export class ClientCreature {
       }
       // Store original materials for hit flash restore
       this.baseMaterials.set(m, m.material);
+      // Make clickable for target selection
+      m.isPickable = true;
+      m.metadata = { ...(m.metadata ?? {}), pickType: "creature", pickId: this.id };
     }
 
     // Start idle animation
@@ -339,7 +349,13 @@ export class ClientCreature {
     this.damageTexts.push({ label, anchor, age: 0, duration });
   }
 
+  /** Show or hide the selection ring below the creature. */
+  setSelected(selected: boolean): void {
+    this.selectionRing.setSelected(selected && !this.isDead);
+  }
+
   dispose(): void {
+    this.selectionRing.dispose();
     for (const entry of this.damageTexts) {
       entry.label.dispose();
       entry.anchor.dispose();

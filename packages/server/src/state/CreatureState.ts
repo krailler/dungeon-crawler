@@ -12,6 +12,7 @@ export class CreatureState extends Schema {
   @type("boolean") isAggro: boolean = false;
   @type("string") animState: string = "";
   @type("string") creatureType: string = "zombie";
+  @type("string") nameKey: string = "creatures.zombie";
   @type("int16") level: number = 1;
 
   // Server-only (not synced)

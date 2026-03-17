@@ -193,6 +193,11 @@ export class GameLoop {
     };
     this.bridge.sendToClient(event.sessionId, MessageType.DAMAGE_DEALT, dmgMsg);
 
+    // Clear target for all players that had this creature selected
+    if (event.killed) {
+      this.bridge.combatSystem.clearTargetFor(event.creatureId);
+    }
+
     // Remove dead creature from state after a short delay so clients see the death
     if (event.killed) {
       // Distribute gold to alive party members

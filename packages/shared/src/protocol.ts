@@ -32,6 +32,7 @@ export const MessageType = {
   ITEM_DEFS_REQUEST: "item:defs:req",
   ITEM_DEFS_RESPONSE: "item:defs:res",
   LOOT_TAKE: "loot:take",
+  SET_TARGET: "target:set",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -271,6 +272,14 @@ export interface LootTakeMessage {
 export interface ActionFeedbackMessage {
   /** i18n translation key for the feedback text */
   i18nKey: string;
+}
+
+// ── Targeting ───────────────────────────────────────────────────────────────
+
+/** Client → Server: set or clear the player's attack target */
+export interface SetTargetMessage {
+  /** Creature ID to target, or null to clear */
+  targetId: string | null;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

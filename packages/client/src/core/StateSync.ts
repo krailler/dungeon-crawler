@@ -21,6 +21,7 @@ import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { lootBagStore } from "../ui/stores/lootBagStore";
+import { targetStore } from "../ui/stores/targetStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { minimapStore } from "../ui/stores/minimapStore";
@@ -246,6 +247,64 @@ export class StateSync {
                 range: INTERACT_RANGE,
                 onClick: (type, id) => this.handleInteractableClick(room, type, id),
               },
+              onEntityPicked: (pickType, pickId) => {
+                if (pickType === "creature") {
+                  const creatureState = (room.state as any).creatures.get(pickId);
+                  if (!creatureState || creatureState.isDead) return;
+                  targetStore.selectCreature(
+                    pickId,
+                    t(creatureState.nameKey || `creatures.${creatureState.creatureType}`),
+                    creatureState.health,
+                    creatureState.maxHealth,
+                    creatureState.level,
+                  );
+                } else if (pickType === "player") {
+                  if (pickId === this.localSessionId) return; // don't target self
+                  const playerState = (room.state as any).players.get(pickId);
+                  if (!playerState) return;
+                  targetStore.selectPlayer(
+                    pickId,
+                    playerState.characterName || pickId.slice(0, 4).toUpperCase(),
+                    playerState.health,
+                    playerState.maxHealth,
+                    playerState.level,
+                  );
+                }
+              },
+              onNothingPicked: () => targetStore.clear(),
+              onTabTarget: () => {
+                const local = this.players.get(room.sessionId);
+                if (!local) return;
+                const pPos = local.getWorldPosition();
+                // Collect alive creatures sorted by distance
+                const sorted: { id: string; dist: number }[] = [];
+                for (const [id, creature] of this.creatures) {
+                  if (creature.isDead) continue;
+                  const cPos = creature.getWorldPosition();
+                  const dx = cPos.x - pPos.x;
+                  const dz = cPos.z - pPos.z;
+                  sorted.push({ id, dist: dx * dx + dz * dz });
+                }
+                if (sorted.length === 0) return;
+                sorted.sort((a, b) => a.dist - b.dist);
+                // Find current target in sorted list; select next (wrap around)
+                const currentId = targetStore.getSnapshot().targetId;
+                let nextIdx = 0;
+                if (currentId) {
+                  const curIdx = sorted.findIndex((e) => e.id === currentId);
+                  if (curIdx >= 0) nextIdx = (curIdx + 1) % sorted.length;
+                }
+                const nextId = sorted[nextIdx].id;
+                const creatureState = (room.state as any).creatures.get(nextId);
+                if (!creatureState) return;
+                targetStore.selectCreature(
+                  nextId,
+                  creatureState.creatureType || nextId,
+                  creatureState.health,
+                  creatureState.maxHealth,
+                  creatureState.level,
+                );
+              },
             });
 
             // Setup wall occlusion (with wall decoration map for toggling)
@@ -442,6 +501,11 @@ export class StateSync {
             isLeader: player.isLeader,
             level: player.level,
           });
+          // Keep target frame in sync when targeting a player
+          const tSnap = targetStore.getSnapshot();
+          if (tSnap.targetId === sessionId && tSnap.targetType === "player") {
+            targetStore.updateHealth(player.health, player.maxHealth, player.health <= 0);
+          }
         });
       }),
     );
@@ -457,6 +521,10 @@ export class StateSync {
         }
         hudStore.removeMember(sessionId);
         minimapStore.removePlayer(sessionId);
+        // Clear target if the removed player was selected
+        if (targetStore.getSnapshot().targetId === sessionId) {
+          targetStore.clear();
+        }
       }),
     );
 
@@ -503,6 +571,15 @@ export class StateSync {
             creature.animState,
             creature.isAggro,
           );
+          // Keep target frame in sync
+          const tSnap = targetStore.getSnapshot();
+          if (tSnap.targetId === id && tSnap.targetType === "creature") {
+            if (creature.isDead) {
+              targetStore.clear();
+            } else {
+              targetStore.updateHealth(creature.health, creature.maxHealth, false);
+            }
+          }
         });
       }),
     );
@@ -515,8 +592,36 @@ export class StateSync {
           clientCreature.dispose();
           this.creatures.delete(id);
         }
+        // Clear target if the removed creature was selected
+        if (targetStore.getSnapshot().targetId === id) {
+          targetStore.clear();
+        }
       }),
     );
+
+    // ── Targeting ──────────────────────────────────────────────────────────
+    targetStore.setRoom(room);
+
+    // Update selection rings reactively (only when target changes, not every frame)
+    let prevTargetId: string | null = null;
+    const unsubTarget = targetStore.subscribe(() => {
+      const snap = targetStore.getSnapshot();
+      // Deselect previous target
+      if (prevTargetId && prevTargetId !== snap.targetId) {
+        this.creatures.get(prevTargetId)?.setSelected(false);
+        this.players.get(prevTargetId)?.setSelected(false);
+      }
+      // Select new target
+      if (snap.targetId) {
+        if (snap.targetType === "creature") {
+          this.creatures.get(snap.targetId)?.setSelected(true);
+        } else if (snap.targetType === "player") {
+          this.players.get(snap.targetId)?.setSelected(true);
+        }
+      }
+      prevTargetId = snap.targetId;
+    });
+    this.stateListeners.push(unsubTarget);
 
     // ── Loot bags ──────────────────────────────────────────────────────────
     lootBagStore.setRoom(room);
@@ -636,6 +741,7 @@ export class StateSync {
     }
     this.lootBags.clear();
     lootBagStore.reset();
+    targetStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();
