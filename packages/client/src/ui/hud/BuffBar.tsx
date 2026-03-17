@@ -24,7 +24,6 @@ export const BuffBar = (): ReactNode => {
             duration={effect.duration}
             stacks={effect.stacks}
             def={defSnap.get(effect.effectId)}
-            size="normal"
           />
         ))}
       </div>

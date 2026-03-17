@@ -163,7 +163,7 @@ export const TargetFrame = (): ReactNode => {
         </div>
         {/* Effects below the frame */}
         {targetEffects && targetEffects.length > 0 && (
-          <div className="mt-1.5 flex justify-center gap-1">
+          <div className="mt-1.5 flex gap-1">
             {targetEffects.map((effect) => (
               <EffectIcon
                 key={effect.effectId}
@@ -172,7 +172,7 @@ export const TargetFrame = (): ReactNode => {
                 duration={effect.duration}
                 stacks={effect.stacks}
                 def={defSnap.get(effect.effectId)}
-                size="small"
+                tooltipDir="down"
               />
             ))}
           </div>
