@@ -101,6 +101,7 @@ const ACTION_ORDER: { action: BindableActionValue; i18nKey: string }[] = [
   { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
   { action: BindableAction.FULLSCREEN, i18nKey: "settings.fullscreen" },
   { action: BindableAction.TAB_TARGET, i18nKey: "settings.tabTarget" },
+  { action: BindableAction.REVIVE, i18nKey: "settings.revive" },
 ];
 
 // ── Keybindings tab ─────────────────────────────────────────────────────────

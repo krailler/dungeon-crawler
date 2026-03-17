@@ -482,6 +482,8 @@ export class StateSync {
 
         // Track level to detect level-up (level is public, visible to all)
         let prevLevel = player.level as number;
+        // Track life state changes to switch death audio loops (local player only)
+        let prevLifeState: string = player.lifeState ?? LifeState.ALIVE;
 
         // Listen to changes on public player state
         $(player).onChange(() => {
@@ -548,6 +550,19 @@ export class StateSync {
               player.reviveProgress ?? 0,
               reviverName,
             );
+
+            // Switch death audio loop when life state changes
+            const curLife = player.lifeState ?? LifeState.ALIVE;
+            if (curLife !== prevLifeState) {
+              if (curLife === LifeState.DOWNED) {
+                this.deps.soundManager.setDeathLoop("downed");
+              } else if (curLife === LifeState.DEAD) {
+                this.deps.soundManager.setDeathLoop("dead");
+              } else {
+                this.deps.soundManager.setDeathLoop("none");
+              }
+              prevLifeState = curLife;
+            }
           }
         });
       }),

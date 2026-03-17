@@ -26,6 +26,7 @@ import {
   REVIVE_CHANNEL_DURATION,
   REVIVE_RANGE,
   REVIVE_HP_PERCENT,
+  TutorialStep,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -568,6 +569,25 @@ export class GameLoop {
 
     const name = player.characterName || sessionId.slice(0, 6);
     this.bridge.chatSystem.broadcastSystemI18n("chat.downed", { name }, `${name} has been downed!`);
+
+    // Tutorial: tell the downed player what happened
+    if (!player.tutorialsCompleted.has(TutorialStep.YOU_DOWNED)) {
+      this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.YOU_DOWNED,
+        i18nKey: "tutorial.youDowned",
+      });
+    }
+
+    // Tutorial: tell alive teammates they can revive
+    this.bridge.state.players.forEach((other: PlayerState, otherSid: string) => {
+      if (otherSid === sessionId) return;
+      if (other.lifeState !== LifeState.ALIVE) return;
+      if (other.tutorialsCompleted.has(TutorialStep.TEAMMATE_DOWNED)) return;
+      this.bridge.sendToClient(otherSid, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.TEAMMATE_DOWNED,
+        i18nKey: "tutorial.teammateDowned",
+      });
+    });
   }
 
   /** Transition a player from DOWNED to DEAD (bleed-out expired). */
@@ -580,6 +600,12 @@ export class GameLoop {
     const rawTimer = RESPAWN_BASE_TIME + player.deathCount * RESPAWN_TIME_INCREMENT;
     player.respawnTimer = Math.min(rawTimer, RESPAWN_MAX_TIME);
     player.deathCount++;
+
+    // Auto-complete the "you downed" tutorial (player is now dead, hint no longer relevant)
+    player.tutorialsCompleted.add(TutorialStep.YOU_DOWNED);
+    this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_DISMISS, {
+      step: TutorialStep.YOU_DOWNED,
+    });
 
     const name = player.characterName || sessionId.slice(0, 6);
     this.bridge.chatSystem.broadcastSystemI18n("chat.died", { name }, `${name} has died!`);
@@ -636,7 +662,8 @@ export class GameLoop {
               player.health = Math.max(1, Math.floor(player.maxHealth * REVIVE_HP_PERCENT));
               player.bleedTimer = 0;
               player.reviveProgress = 0;
-              const reviverName = reviver.characterName || player.reviverSessionId.slice(0, 6);
+              const reviverSid = player.reviverSessionId;
+              const reviverName = reviver.characterName || reviverSid.slice(0, 6);
               player.reviverSessionId = "";
               const name = player.characterName || sessionId.slice(0, 6);
               this.bridge.chatSystem.broadcastSystemI18n(
@@ -644,6 +671,16 @@ export class GameLoop {
                 { name, reviver: reviverName },
                 `${name} has been revived by ${reviverName}!`,
               );
+
+              // Auto-complete death tutorials for both parties
+              player.tutorialsCompleted.add(TutorialStep.YOU_DOWNED);
+              this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_DISMISS, {
+                step: TutorialStep.YOU_DOWNED,
+              });
+              reviver.tutorialsCompleted.add(TutorialStep.TEAMMATE_DOWNED);
+              this.bridge.sendToClient(reviverSid, MessageType.TUTORIAL_DISMISS, {
+                step: TutorialStep.TEAMMATE_DOWNED,
+              });
               continue;
             }
             // Bleedout paused while revive is channeling — skip timer decrement

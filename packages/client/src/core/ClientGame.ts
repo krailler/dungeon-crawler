@@ -37,6 +37,7 @@ import type {
   CommandInfo,
   DebugPathsMessage,
   TutorialHintMessage,
+  TutorialDismissMessage,
   DamageDealtMessage,
   ItemCooldownMessage,
   ActionFeedbackMessage,
@@ -348,6 +349,11 @@ export class ClientGame {
       // Tutorial hints from server
       room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
         tutorialStore.showHint(msg);
+      });
+
+      // Server-initiated tutorial dismiss (e.g. revive completed, player died)
+      room.onMessage(MessageType.TUTORIAL_DISMISS, (msg: TutorialDismissMessage) => {
+        tutorialStore.dismiss(msg.step, false);
       });
 
       // Connect item def store to room for lazy loading

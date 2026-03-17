@@ -18,6 +18,11 @@ const AMBIENT_VOLUME = 1;
 /** Base path for footstep audio files */
 const FOOTSTEP_BASE_PATH = "/audio/footsteps/footstep";
 const AMBIENT_URL = "/audio/ambient/cave_loop.ogg";
+const DOWNED_LOOP_URL = "/audio/ambient/downed_loop.ogg";
+const DEAD_LOOP_URL = "/audio/ambient/dead_loop.ogg";
+
+/** Volume for death loops (before master/ambient multipliers) */
+const DEATH_LOOP_VOLUME = 0.8;
 
 /** Tracks a set of sound variants for a single animation */
 interface AnimSoundEntry {
@@ -41,6 +46,10 @@ export class SoundManager {
   private sfxEntries: Map<string, SfxEntry> = new Map();
   private ambient: Sound | null = null;
   private ambientBaseVol: number = AMBIENT_VOLUME;
+  private downedLoop: Sound | null = null;
+  private deadLoop: Sound | null = null;
+  /** Which death loop is currently active: "none" | "downed" | "dead" */
+  private activeDeathLoop: "none" | "downed" | "dead" = "none";
   private loaded: boolean = false;
 
   /** Current volume multipliers (updated via applyVolumes) */
@@ -91,6 +100,7 @@ export class SoundManager {
     this.registerSfx("chat_receive", "/audio/sfx/chat_receive.ogg", SFX_VOLUME);
     this.registerSfx("chat_send", "/audio/sfx/chat_send.ogg", SFX_VOLUME);
     this.registerSfx("level_up", "/audio/sfx/level_up.ogg", SFX_VOLUME);
+    this.registerSfx("downed_hit", "/audio/sfx/downed_hit.ogg", SFX_VOLUME);
 
     // Ambient cave loop (starts paused — call playAmbient() to start)
     await new Promise<void>((resolve) => {
@@ -99,6 +109,18 @@ export class SoundManager {
         autoplay: false,
         loop: true,
       });
+    });
+
+    // Death state loops (start paused — activated via setDeathLoop)
+    this.downedLoop = new Sound("downed_loop", DOWNED_LOOP_URL, this.scene, null, {
+      volume: 0,
+      autoplay: false,
+      loop: true,
+    });
+    this.deadLoop = new Sound("dead_loop", DEAD_LOOP_URL, this.scene, null, {
+      volume: 0,
+      autoplay: false,
+      loop: true,
     });
 
     this.loaded = true;
@@ -226,13 +248,58 @@ export class SoundManager {
     this.applyAmbientVolume();
   }
 
+  /**
+   * Switch the death-state ambient loop.
+   * - "none" = normal ambient (cave loop)
+   * - "downed" = downed tension loop
+   * - "dead" = dead tension loop
+   *
+   * Fades the normal ambient down when a death loop plays, restores on "none".
+   */
+  setDeathLoop(state: "none" | "downed" | "dead"): void {
+    if (state === this.activeDeathLoop) return;
+    this.activeDeathLoop = state;
+
+    // Stop whichever death loop was playing
+    if (this.downedLoop?.isPlaying) this.downedLoop.stop();
+    if (this.deadLoop?.isPlaying) this.deadLoop.stop();
+
+    if (state === "none") {
+      // Restore normal ambient volume
+      this.applyAmbientVolume();
+      return;
+    }
+
+    // Duck normal ambient while death loop plays
+    if (this.ambient) this.ambient.setVolume(0);
+
+    const loop = state === "downed" ? this.downedLoop : this.deadLoop;
+    if (loop) {
+      loop.setVolume(DEATH_LOOP_VOLUME * this.ambientVol * this.masterVol);
+      loop.play();
+    }
+
+    // Play a one-shot dramatic hit when downed
+    if (state === "downed") {
+      this.playSfx("downed_hit");
+    }
+  }
+
   /** Recalculate ambient volume considering both settings and debug mute */
   private applyAmbientVolume(): void {
     if (!this.ambient) return;
-    if (this.ambientMuted) {
+    if (this.ambientMuted || this.activeDeathLoop !== "none") {
       this.ambient.setVolume(0);
     } else {
       this.ambient.setVolume(this.ambientBaseVol * this.ambientVol * this.masterVol);
+    }
+
+    // Also update active death loop volume
+    if (this.activeDeathLoop === "downed" && this.downedLoop?.isPlaying) {
+      this.downedLoop.setVolume(DEATH_LOOP_VOLUME * this.ambientVol * this.masterVol);
+    }
+    if (this.activeDeathLoop === "dead" && this.deadLoop?.isPlaying) {
+      this.deadLoop.setVolume(DEATH_LOOP_VOLUME * this.ambientVol * this.masterVol);
     }
   }
 
@@ -255,6 +322,15 @@ export class SoundManager {
       this.ambient.dispose();
       this.ambient = null;
     }
+    if (this.downedLoop) {
+      this.downedLoop.dispose();
+      this.downedLoop = null;
+    }
+    if (this.deadLoop) {
+      this.deadLoop.dispose();
+      this.deadLoop = null;
+    }
+    this.activeDeathLoop = "none";
     this.loaded = false;
   }
 }

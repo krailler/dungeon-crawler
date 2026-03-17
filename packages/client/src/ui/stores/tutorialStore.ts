@@ -51,8 +51,13 @@ export const tutorialStore = {
     playUiSfx("ui_tutorial");
   },
 
-  /** Dismiss the current hint. If `expectedStep` is provided, only dismiss if it matches. */
-  dismiss(expectedStep?: string): void {
+  /**
+   * Dismiss the current hint.
+   * @param expectedStep — only dismiss if this matches the current hint step
+   * @param notifyServer — whether to send TUTORIAL_DISMISS to the server (default: true).
+   *                        Pass false when the dismiss originates from the server.
+   */
+  dismiss(expectedStep?: string, notifyServer: boolean = true): void {
     if (!currentHint) return;
     if (expectedStep && currentHint.step !== expectedStep) return;
     const step = currentHint.step;
@@ -61,7 +66,7 @@ export const tutorialStore = {
     emit();
 
     // Notify server that this tutorial step was dismissed/completed
-    if (room) {
+    if (notifyServer && room) {
       room.send(MessageType.TUTORIAL_DISMISS, { step });
     }
   },

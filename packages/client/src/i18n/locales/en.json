@@ -90,7 +90,8 @@
     "inventoryPanel": "Inventory",
     "minimapPanel": "Minimap",
     "fullscreen": "Fullscreen",
-    "tabTarget": "Cycle Target"
+    "tabTarget": "Cycle Target",
+    "revive": "Revive"
   },
   "character": {
     "title": "Character",
@@ -182,7 +183,9 @@
   "tutorial": {
     "startDungeon": "You are the party leader! Right-click the gate or press F nearby to start the dungeon.",
     "allocateStats": "You have attribute points! Press C to open the character panel and assign them.",
-    "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!"
+    "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!",
+    "youDowned": "You've been downed! A teammate can revive you before you bleed out. You can still use the chat.",
+    "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them."
   },
   "reconnect": {
     "title": "Connection Lost",

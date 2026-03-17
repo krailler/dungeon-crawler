@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { targetStore } from "../stores/targetStore";
@@ -7,6 +7,7 @@ import { creatureStore } from "../stores/creatureStore";
 import { deathStore } from "../stores/deathStore";
 import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
+import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { LifeState } from "@dungeon/shared";
 
 export const TargetFrame = (): ReactNode => {
@@ -16,12 +17,7 @@ export const TargetFrame = (): ReactNode => {
   const hudSnap = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const creatureSnap = useSyncExternalStore(creatureStore.subscribe, creatureStore.getSnapshot);
 
-  const handleRevive = useCallback(() => {
-    if (snap.targetId) deathStore.startRevive(snap.targetId);
-  }, [snap.targetId]);
-
   // Resolve target entity data from the appropriate store.
-  // For creatures we read directly via .get() to avoid depending on the full Map snapshot.
   const targetCreature =
     snap.targetType === "creature" && snap.targetId ? creatureSnap.get(snap.targetId) : undefined;
   const targetMember =
@@ -53,14 +49,35 @@ export const TargetFrame = (): ReactNode => {
     return null;
   }, [targetMember, targetCreature]);
 
+  // Compute canRevive before hooks (entity may be null — that's fine, just false)
+  const canRevive =
+    snap.targetType === "player" &&
+    entity !== null &&
+    entity.isDead &&
+    deathSnap.lifeState === LifeState.ALIVE;
+
+  const handleRevive = useCallback(() => {
+    if (snap.targetId && snap.inReviveRange && canRevive) {
+      deathStore.startRevive(snap.targetId);
+    }
+  }, [snap.targetId, snap.inReviveRange, canRevive]);
+
+  // Listen for the revive keybinding
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === settingsStore.getBinding("revive")) {
+        handleRevive();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [handleRevive]);
+
   if (!snap.targetId || !entity) return null;
 
   const safeMax = Math.max(1, entity.maxHealth);
   const pct = Math.max(0, Math.min(100, (entity.health / safeMax) * 100));
-
-  // Show revive button when targeting a downed player and local player is alive
-  const canRevive =
-    snap.targetType === "player" && entity.isDead && deathSnap.lifeState === LifeState.ALIVE;
 
   return (
     <div className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2">
@@ -124,7 +141,10 @@ export const TargetFrame = (): ReactNode => {
                       : "cursor-not-allowed border-slate-600/30 bg-slate-800/30 text-slate-500",
                   ].join(" ")}
                 >
-                  {t("death.revive")}
+                  {t("death.revive")}{" "}
+                  <kbd className="ml-1 rounded border border-current/30 px-1 py-0.5 text-[9px] font-mono opacity-70">
+                    {displayKeyName(settingsStore.getBinding("revive"))}
+                  </kbd>
                 </button>
                 {!snap.inReviveRange && (
                   <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/95 px-2 py-0.5 text-[10px] text-slate-400 opacity-0 shadow-lg ring-1 ring-slate-700/50 transition-opacity group-hover:opacity-100">

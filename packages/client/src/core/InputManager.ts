@@ -2,7 +2,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Room } from "@colyseus/sdk";
-import { MessageType, TutorialStep } from "@dungeon/shared";
+import { MessageType, TutorialStep, ENTITY_COLLISION_RADIUS } from "@dungeon/shared";
 import type { SprintMessage } from "@dungeon/shared";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { settingsStore } from "../ui/stores/settingsStore";
@@ -344,7 +344,8 @@ export class InputManager {
 
   /**
    * Try to pick a creature or player entity under the pointer.
-   * Returns true if an entity was picked (cancels movement).
+   * Returns true if an entity was picked (cancels hold-to-move).
+   * Also walks toward the entity so the player can reach revive range.
    */
   private tryEntityPick(): boolean {
     if (!this.onEntityPicked) return false;
@@ -360,6 +361,29 @@ export class InputManager {
     if (!meta?.pickType || !meta?.pickId) return false;
 
     this.onEntityPicked(meta.pickType, meta.pickId);
+
+    // Walk toward the picked entity, stopping just outside collision range.
+    const pos = pick.pickedMesh.getAbsolutePosition();
+    const playerPos = this.interactable?.getPlayerPosition();
+    if (playerPos) {
+      const dx = pos.x - playerPos.x;
+      const dz = pos.z - playerPos.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const stopDist = ENTITY_COLLISION_RADIUS * 2 + 0.1; // just outside collision diameter
+      if (dist > stopDist) {
+        const ratio = (dist - stopDist) / dist;
+        this.room.send(MessageType.MOVE, {
+          x: playerPos.x + dx * ratio,
+          z: playerPos.z + dz * ratio,
+        });
+      }
+      // If already within range, no need to move
+    } else {
+      // Fallback: walk to exact position (collision will resolve)
+      this.room.send(MessageType.MOVE, { x: pos.x, z: pos.z });
+    }
+    this.lastSendTime = performance.now();
+
     return true;
   }
 

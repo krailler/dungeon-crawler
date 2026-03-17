@@ -15,6 +15,7 @@ export const BindableAction = {
   INTERACT: "interact",
   FULLSCREEN: "fullscreen",
   TAB_TARGET: "tabTarget",
+  REVIVE: "revive",
 } as const;
 
 export type BindableActionValue = (typeof BindableAction)[keyof typeof BindableAction];
@@ -59,6 +60,7 @@ const DEFAULT_KEYBINDINGS: KeybindingSettings = {
   interact: "f",
   fullscreen: "F11",
   tabTarget: "Tab",
+  revive: "r",
 };
 
 // ── Persistence ─────────────────────────────────────────────────────────────
