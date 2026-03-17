@@ -18,7 +18,7 @@ auth.settings.onRegisterWithEmailAndPassword = async (email: string, password: s
   if (process.env.NODE_ENV === "production") {
     throw new Error("Registration is disabled");
   }
-  if (password.length < 4) {
+  if (process.env.NODE_ENV === "production" && password.length < 4) {
     throw new Error("Password must be at least 4 characters");
   }
 
