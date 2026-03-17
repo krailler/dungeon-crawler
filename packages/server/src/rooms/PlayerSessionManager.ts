@@ -7,7 +7,14 @@ import { characters, characterInventory } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
-import { TileType, TILE_SIZE, xpToNextLevel, MessageType, TutorialStep } from "@dungeon/shared";
+import {
+  TileType,
+  TILE_SIZE,
+  xpToNextLevel,
+  MessageType,
+  TutorialStep,
+  GateType,
+} from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import {
   registerSession,
@@ -593,7 +600,7 @@ export class PlayerSessionManager {
     // Check that lobby gates are still closed (dungeon not yet started)
     let dungeonStarted = false;
     this.bridge.state.gates.forEach((gate: { gateType: string; open: boolean }) => {
-      if (gate.gateType === "lobby" && gate.open) dungeonStarted = true;
+      if (gate.gateType === GateType.LOBBY && gate.open) dungeonStarted = true;
     });
     if (dungeonStarted) return;
 

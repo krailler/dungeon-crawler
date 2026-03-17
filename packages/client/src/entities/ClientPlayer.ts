@@ -83,6 +83,9 @@ export class ClientPlayer {
   private bubbleText: TextBlock | null = null;
   private bubbleTimer: number = 0;
 
+  /** Pending timers (e.g. particle effect cleanup) — cleared on dispose */
+  private pendingTimers: ReturnType<typeof setTimeout>[] = [];
+
   // Target state from server
   private targetX: number = 0;
   private targetZ: number = 0;
@@ -392,18 +395,24 @@ export class ClientPlayer {
     ps.start();
 
     // Stop emitting after a short burst, then dispose after particles die
-    setTimeout(() => {
-      ps.stop();
-    }, LEVEL_UP_DURATION * 1000);
-    setTimeout(
-      () => {
-        ps.dispose();
-      },
-      (LEVEL_UP_DURATION + 1.5) * 1000,
+    this.pendingTimers.push(
+      setTimeout(() => {
+        ps.stop();
+      }, LEVEL_UP_DURATION * 1000),
+    );
+    this.pendingTimers.push(
+      setTimeout(
+        () => {
+          ps.dispose();
+        },
+        (LEVEL_UP_DURATION + 1.5) * 1000,
+      ),
     );
   }
 
   dispose(): void {
+    for (const t of this.pendingTimers) clearTimeout(t);
+    this.pendingTimers = [];
     this.animController.dispose();
     if (this.nameLabel) {
       this.guiTexture?.removeControl(this.nameLabel);

@@ -1,7 +1,7 @@
-import { TileMap } from "./TileMap";
-import { TILE_SETS, TILE_SET_NAMES } from "./TileSets";
-import type { TileSetName } from "./TileSets";
-import { mulberry32 } from "./random";
+import { TileMap } from "./TileMap.js";
+import { TILE_SETS, TILE_SET_NAMES } from "./TileSets.js";
+import type { TileSetName } from "./TileSets.js";
+import { mulberry32 } from "./random.js";
 
 /** Number of floor tile variants in a set */
 export const FLOOR_VARIANT_COUNT = 8;

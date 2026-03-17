@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
@@ -465,14 +465,21 @@ export const ChatPanel = (): JSX.Element => {
       {/* Hint when chat is not open */}
       {!snapshot.inputOpen && snapshot.messages.length === 0 && (
         <div className="px-2 py-1 text-[11px] text-slate-600">
-          <Trans
-            i18nKey="chat.hintOpen"
-            components={{
-              kbd: (
-                <kbd className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500" />
-              ),
-            }}
-          />
+          {t("chat.hintOpen", { interpolation: { escapeValue: false } })
+            .split(/(<kbd>.*?<\/kbd>)/g)
+            .map((part, i) => {
+              const m = part.match(/^<kbd>(.*)<\/kbd>$/);
+              return m ? (
+                <kbd
+                  key={i}
+                  className="rounded bg-slate-800/60 px-1 py-0.5 text-[10px] font-mono text-slate-500"
+                >
+                  {m[1]}
+                </kbd>
+              ) : (
+                <span key={i}>{part}</span>
+              );
+            })}
         </div>
       )}
     </div>

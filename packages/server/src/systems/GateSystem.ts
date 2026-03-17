@@ -2,6 +2,7 @@ import type { Client } from "colyseus";
 import type { ClockTimer } from "@colyseus/timer";
 import type { Logger } from "pino";
 import type { DungeonState } from "../state/DungeonState";
+import type { GateState } from "../state/GateState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import type { ChatSystem } from "../chat/ChatSystem";
@@ -81,7 +82,7 @@ export class GateSystem {
     // Lobby gates use countdown; other types open immediately
     if (gate.gateType === GateType.LOBBY) {
       // Mark ALL lobby gates as counting down
-      this.state.gates.forEach((g: any, id: string) => {
+      this.state.gates.forEach((g: GateState, id: string) => {
         if (g.gateType === GateType.LOBBY) this.gateCountdowns.add(id);
       });
 

@@ -45,6 +45,7 @@ import {
   TutorialStep,
   ALLOCATABLE_STATS,
   INTERACT_RANGE,
+  MAX_LEVEL,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -67,7 +68,9 @@ import { mulberry32, generateRoomName } from "@dungeon/shared";
 const TICK_RATE = 64; // ms between simulation ticks
 
 /** Fixed seed for deterministic dungeon generation (set to null for random). */
-const DUNGEON_SEED: number | null = 42;
+const DUNGEON_SEED: number | null = process.env.DUNGEON_SEED
+  ? Number(process.env.DUNGEON_SEED)
+  : null;
 
 export class DungeonRoom extends Room<{ state: DungeonState }> {
   private pathfinder!: Pathfinder;
@@ -464,14 +467,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.roomName = generateRoomName(seed);
     this.state.dungeonVersion++;
 
-    // Calculate dungeon level from average party level (default 1 if no players yet)
-    let levelSum = 0;
-    let playerCount = 0;
-    this.state.players.forEach((p: PlayerState) => {
-      levelSum += p.level;
-      playerCount++;
-    });
-    const dungeonLevel = playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
+    const dungeonLevel = this.computeAveragePartyLevel();
     this.state.dungeonLevel = dungeonLevel;
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
@@ -767,9 +763,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const tileX = room.x + 1 + Math.floor(rng() * (room.w - 2));
         const tileY = room.y + 1 + Math.floor(rng() * (room.h - 2));
 
-        // Assign creature level in range [dungeonLevel - 1, dungeonLevel + 2] (min 1)
+        // Assign creature level in range [dungeonLevel - 1, dungeonLevel + 2] (clamped to [1, MAX_LEVEL])
         const levelOffset = Math.floor(rng() * 4) - 1; // -1 to +2
-        const creatureLevel = Math.max(1, dungeonLevel + levelOffset);
+        const creatureLevel = Math.min(MAX_LEVEL, Math.max(1, dungeonLevel + levelOffset));
 
         const creature = new CreatureState();
         creature.x = tileX * TILE_SIZE;
@@ -785,15 +781,20 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
   }
 
-  /** Recalculate dungeon level from current party and re-scale all creatures */
-  private recalcDungeonLevel(): void {
+  /** Compute dungeon level from the average party level (min 1). */
+  private computeAveragePartyLevel(): number {
     let levelSum = 0;
     let playerCount = 0;
     this.state.players.forEach((p: PlayerState) => {
       levelSum += p.level;
       playerCount++;
     });
-    const newLevel = playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
+    return playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
+  }
+
+  /** Recalculate dungeon level from current party and re-scale all creatures */
+  private recalcDungeonLevel(): void {
+    const newLevel = this.computeAveragePartyLevel();
     if (newLevel === this.state.dungeonLevel) return;
 
     const oldLevel = this.state.dungeonLevel;
@@ -805,11 +806,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       if (!typeDef) return;
       const baseDerived = computeCreatureDerivedStats(typeDef);
       const levelOffset = creature.level - oldLevel;
-      const creatureLevel = Math.max(1, newLevel + levelOffset);
+      const creatureLevel = Math.min(MAX_LEVEL, Math.max(1, newLevel + levelOffset));
       creature.applyStats(baseDerived, creatureLevel);
     });
 
-    this.log.info({ dungeonLevel: newLevel, playerCount }, "Recalculated dungeon level");
+    this.log.info(
+      { dungeonLevel: newLevel, playerCount: this.state.players.size },
+      "Recalculated dungeon level",
+    );
   }
 
   /** Returns true if any lobby gate has been opened (dungeon expedition active) */

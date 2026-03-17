@@ -1,8 +1,8 @@
-import { TileMap, TileType } from "./TileMap";
-import { TILE_SETS } from "./TileSets";
-import { packFloorTile } from "./FloorVariants";
-import type { RoomSetAssignment } from "./FloorVariants";
-import { mulberry32 } from "./random";
+import { TileMap, TileType } from "./TileMap.js";
+import { TILE_SETS } from "./TileSets.js";
+import { packFloorTile } from "./FloorVariants.js";
+import type { RoomSetAssignment } from "./FloorVariants.js";
+import { mulberry32 } from "./random.js";
 
 /** Number of wall decoration variants in a set */
 export const WALL_VARIANT_COUNT = 3;

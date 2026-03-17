@@ -102,5 +102,5 @@ export function computeDerivedStats(
  * Simple, predictable, easy to balance.
  */
 export function computeDamage(attackDamage: number, targetDefense: number): number {
-  return Math.max(1, attackDamage - targetDefense);
+  return Math.max(1, attackDamage - Math.max(0, targetDefense));
 }

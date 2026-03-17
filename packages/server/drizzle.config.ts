@@ -5,6 +5,10 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./src/migrations",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://dungeon:dungeon@localhost:5432/dungeon",
+    url:
+      process.env.DATABASE_URL ??
+      (() => {
+        throw new Error("DATABASE_URL env var is required");
+      })(),
   },
 });

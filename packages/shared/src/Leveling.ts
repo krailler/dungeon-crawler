@@ -16,7 +16,7 @@ import {
  * Formula: floor(XP_CURVE_BASE × level ^ XP_CURVE_EXPONENT)
  */
 export function xpToNextLevel(level: number): number {
-  if (level >= MAX_LEVEL) return 0;
+  if (level < 1 || level >= MAX_LEVEL) return 0;
   return Math.floor(XP_CURVE_BASE * Math.pow(level, XP_CURVE_EXPONENT));
 }
 
