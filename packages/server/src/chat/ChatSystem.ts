@@ -101,6 +101,29 @@ export class ChatSystem {
     });
   }
 
+  /** Broadcast a system event with i18n key to all clients except one. */
+  broadcastSystemI18nExcept(
+    excludeSessionId: string,
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+  ): void {
+    const entry: ChatEntry = {
+      id: this.nextId++,
+      category: ChatCategory.MESSAGE,
+      variant: ChatVariant.SYSTEM,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
+    };
+    for (const client of this.bridge.getClients()) {
+      if (client.sessionId !== excludeSessionId) {
+        client.send(MessageType.CHAT_ENTRY, entry);
+      }
+    }
+  }
+
   /** Send a system event with i18n key to a single client. */
   sendSystemI18nTo(
     sessionId: string,

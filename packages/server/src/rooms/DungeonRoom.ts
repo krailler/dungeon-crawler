@@ -496,12 +496,20 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Remove item from bag (stable key — no index shifting)
       bag.items.delete(slotKey);
 
-      // Chat notification
+      // Chat notification — to the player who picked up
       this.chatSystem.sendSystemI18nTo(
         client.sessionId,
         "chat.itemPickup",
         { item: def.name, amount: added },
         `+${added} ${def.id}`,
+      );
+
+      // Notify other players
+      this.chatSystem.broadcastSystemI18nExcept(
+        client.sessionId,
+        "chat.otherItemPickup",
+        { player: player.characterName, item: def.name, amount: added },
+        `${player.characterName} picked up ${added} ${def.id}`,
       );
 
       // If bag empty → remove from world

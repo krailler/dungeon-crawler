@@ -150,6 +150,7 @@
     "gateOpened": "The gate opens... The dungeon awaits!",
     "goldGained": "+{{amount}} gold from {{enemy}}!",
     "itemPickup": "+{{amount}} $t({{item}})",
+    "otherItemPickup": "{{player}} picked up {{amount}} $t({{item}})",
     "levelUp": "{{name}} reached level {{level}}!",
     "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign."
   },
