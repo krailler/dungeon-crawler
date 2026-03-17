@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-export const BackpackIcon = ({ className }: { className?: string }): ReactNode => (
+export const BackpackIcon = ({ className = "h-4 w-4" }: { className?: string }): ReactNode => (
   <svg
     className={className}
     viewBox="0 0 24 24"
