@@ -1,13 +1,19 @@
 import type { CreatureState } from "../state/CreatureState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder, WorldPos } from "../navigation/Pathfinder";
-import { ATTACK_ANIM_DURATION, CREATURE_REPATH_INTERVAL, computeDamage } from "@dungeon/shared";
+import {
+  ATTACK_ANIM_DURATION,
+  CREATURE_REPATH_INTERVAL,
+  TILE_SIZE,
+  computeDamage,
+} from "@dungeon/shared";
 
 const AIState = {
   IDLE: 0,
   CHASE: 1,
   ATTACK: 2,
   LEASH: 3,
+  ROAM: 4,
 } as const;
 
 type AIStateType = (typeof AIState)[keyof typeof AIState];
@@ -26,6 +32,21 @@ const THREAT_PROXIMITY_TICK = 1;
 const THREAT_DECAY_RATE = 10;
 /** Threshold below which threat is removed entirely */
 const THREAT_EPSILON = 0.1;
+
+// ── Roaming tuning ──────────────────────────────────────────────────────────
+
+/** Max roam distance from spawn in tiles */
+const ROAM_RADIUS = 3;
+/** Min seconds between roam attempts */
+const ROAM_MIN_WAIT = 2.0;
+/** Max seconds between roam attempts */
+const ROAM_MAX_WAIT = 6.0;
+/** Max attempts to find a walkable roam target */
+const ROAM_MAX_ATTEMPTS = 3;
+
+function randomRoamWait(): number {
+  return ROAM_MIN_WAIT + Math.random() * (ROAM_MAX_WAIT - ROAM_MIN_WAIT);
+}
 
 export interface AIHitEvent {
   creatureId: string;
@@ -54,6 +75,8 @@ interface CreatureAI {
   leashRange: number;
   /** Per-player threat table */
   threatTable: Map<string, number>;
+  /** Countdown until next roam attempt */
+  roamTimer: number;
 }
 
 export class AISystem {
@@ -82,6 +105,7 @@ export class AISystem {
       spawnZ: creature.z,
       leashRange,
       threatTable: new Map(),
+      roamTimer: randomRoamWait(),
     };
     this.entries.push(entry);
     this.entryById.set(creatureId, entry);
@@ -171,8 +195,22 @@ export class AISystem {
       const target = this.getHighestThreatTarget(entry, players);
 
       if (!target) {
-        entry.state = AIState.IDLE;
-        entry.creature.isMoving = false;
+        // No threat — idle or roam
+        if (entry.state === AIState.ROAM) {
+          this.moveCreature(entry.creature, dt);
+          if (!entry.creature.isMoving) {
+            // Arrived at roam destination
+            entry.state = AIState.IDLE;
+            entry.roamTimer = randomRoamWait();
+          }
+        } else {
+          // IDLE — tick roam timer
+          entry.creature.isMoving = false;
+          entry.roamTimer -= dt;
+          if (entry.roamTimer <= 0) {
+            this.tryStartRoam(entry);
+          }
+        }
         continue;
       }
 
@@ -260,7 +298,13 @@ export class AISystem {
       const distSq = this.distanceSq(entry.creature, player);
       const detectionRangeSq = entry.creature.detectionRange * entry.creature.detectionRange;
 
-      if (distSq <= detectionRangeSq) {
+      if (
+        distSq <= detectionRangeSq &&
+        this.pathfinder.hasLineOfSight(
+          { x: entry.creature.x, z: entry.creature.z },
+          { x: player.x, z: player.z },
+        )
+      ) {
         const current = entry.threatTable.get(sessionId);
         if (current === undefined) {
           // First time in range — initial aggro burst
@@ -353,7 +397,35 @@ export class AISystem {
       entry.creature.path = [];
       entry.repathTimer = 0;
       entry.attackTimer = 0;
+      entry.roamTimer = randomRoamWait();
     }
+  }
+
+  // ── Roaming ─────────────────────────────────────────────────────────────────
+
+  /** Try to pick a random walkable point near spawn and start roaming toward it. */
+  private tryStartRoam(entry: CreatureAI): void {
+    for (let attempt = 0; attempt < ROAM_MAX_ATTEMPTS; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = (1 + Math.random() * (ROAM_RADIUS - 1)) * TILE_SIZE;
+      const targetX = entry.spawnX + Math.cos(angle) * dist;
+      const targetZ = entry.spawnZ + Math.sin(angle) * dist;
+
+      const from: WorldPos = { x: entry.creature.x, z: entry.creature.z };
+      const to: WorldPos = { x: targetX, z: targetZ };
+      const path = this.pathfinder.findPath(from, to);
+
+      if (path.length > 0) {
+        entry.creature.path = path;
+        entry.creature.currentPathIndex = 0;
+        entry.creature.isMoving = true;
+        entry.state = AIState.ROAM;
+        return;
+      }
+    }
+
+    // All attempts failed — retry later
+    entry.roamTimer = randomRoamWait();
   }
 
   // ── Movement ────────────────────────────────────────────────────────────────

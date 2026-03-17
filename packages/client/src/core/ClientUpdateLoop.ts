@@ -50,6 +50,8 @@ export class ClientUpdateLoop {
 
   constructor(deps: UpdateLoopDeps) {
     this.deps = deps;
+    // Apply persisted debug state immediately (fog, freeCamera, wireframe, etc.)
+    this.applyDebugFlagsForced();
   }
 
   update(dt: number): void {
@@ -177,6 +179,17 @@ export class ClientUpdateLoop {
 
     // FPS
     hudStore.updateFPS(dt);
+  }
+
+  /** Apply all debug flags unconditionally (used on startup to restore persisted state). */
+  private applyDebugFlagsForced(): void {
+    const debug = debugStore.getSnapshot();
+    this.deps.fogOfWar.setEnabled(debug.fog);
+    this.deps.isoCamera.setFreeCamera(debug.freeCamera);
+    this.deps.scene.forceWireframe = debug.wireframe;
+    this.deps.soundManager.setAmbientMuted(!debug.ambient);
+    // showPaths requires a room connection — skip here, will be sent on first toggle
+    this.lastDebug = debug;
   }
 
   private applyDebugFlags(): void {

@@ -120,7 +120,9 @@ export class ClientGame {
       addShadowCaster: (mesh: AbstractMesh) => this.addShadowCaster(mesh),
       onDungeonReady: () => {
         this.ambientReady = true;
-        this.tryStartAmbient();
+        if (this.tryStartAmbient() && this.onPointerDown) {
+          window.removeEventListener("pointerdown", this.onPointerDown);
+        }
       },
     });
 
@@ -186,12 +188,17 @@ export class ClientGame {
         Engine.audioEngine.useCustomUnlockedButton = true;
       }
 
-      // Unlock AudioContext on first user gesture and start ambient if ready
+      // Unlock AudioContext on user gesture and start ambient when ready
       this.onPointerDown = () => {
         Engine.audioEngine?.audioContext?.resume();
-        this.tryStartAmbient();
+        if (this.tryStartAmbient()) {
+          // Ambient started — no need to keep listening
+          if (this.onPointerDown) {
+            window.removeEventListener("pointerdown", this.onPointerDown);
+          }
+        }
       };
-      window.addEventListener("pointerdown", this.onPointerDown, { once: true });
+      window.addEventListener("pointerdown", this.onPointerDown);
 
       loadingStore.setPhase(LoadingPhase.SERVER);
 
@@ -311,6 +318,10 @@ export class ClientGame {
       room.onMessage(MessageType.DEBUG_PATHS, (msg: DebugPathsMessage) => {
         this.updateLoop.handleDebugPaths(msg);
       });
+      // Restore persisted showPaths toggle on reconnect
+      if (debugStore.getSnapshot().showPaths) {
+        room.send(MessageType.DEBUG_PATHS, { enabled: true });
+      }
 
       // Tutorial hints from server
       room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
@@ -405,15 +416,16 @@ export class ClientGame {
     }
   }
 
-  /** Try to start the ambient loop — only succeeds if dungeon loaded AND AudioContext unlocked */
-  private tryStartAmbient(): void {
-    if (!this.ambientReady) return;
+  /** Try to start the ambient loop — returns true if started successfully */
+  private tryStartAmbient(): boolean {
+    if (!this.ambientReady) return false;
     const ctx = Engine.audioEngine?.audioContext;
-    if (ctx && ctx.state === "suspended") return; // Not yet unlocked
+    if (ctx && ctx.state === "suspended") return false; // Not yet unlocked
     this.soundManager.playAmbient();
     if (!debugStore.getSnapshot().ambient) {
       this.soundManager.setAmbientMuted(true);
     }
+    return true;
   }
 
   dispose(): void {

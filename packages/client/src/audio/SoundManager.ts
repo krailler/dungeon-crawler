@@ -93,10 +93,12 @@ export class SoundManager {
     this.registerSfx("level_up", "/audio/sfx/level_up.ogg", SFX_VOLUME);
 
     // Ambient cave loop (starts paused — call playAmbient() to start)
-    this.ambient = new Sound("ambient_cave", AMBIENT_URL, this.scene, null, {
-      volume: AMBIENT_VOLUME,
-      autoplay: false,
-      loop: true,
+    await new Promise<void>((resolve) => {
+      this.ambient = new Sound("ambient_cave", AMBIENT_URL, this.scene, () => resolve(), {
+        volume: AMBIENT_VOLUME,
+        autoplay: false,
+        loop: true,
+      });
     });
 
     this.loaded = true;
