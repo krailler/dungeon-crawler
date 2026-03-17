@@ -33,8 +33,7 @@ npm run server:dev   # Start game server with watch (auto-restart)
 packages/
   shared/           # Code shared between client and server
     src/
-      constants/      # Game balance constants (economy.ts, items.ts, etc.)
-      Constants.ts    # Core constants (TILE_SIZE, PLAYER_*, CREATURE_*, etc.)
+      constants/      # Game balance constants (economy, items, death, stamina, camera, lighting, etc.)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + CloseCode + all message interfaces
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
@@ -42,34 +41,44 @@ packages/
       Economy.ts      # computeGoldDrop() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
       Items.ts        # ItemDef type, InventorySlot type
+      Skills.ts       # SkillDef type, SKILL_DEFS (basic_attack, heavy_strike)
+      Roles.ts        # Role type (admin, user)
+      GateTypes.ts    # GateType (lobby)
+      Tutorial.ts     # TutorialStep type
+      RoomNames.ts    # generateRoomName() — procedural dungeon names
       FloorVariants.ts, WallVariants.ts, TileSets.ts, random.ts
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
-      state/          # Schema state classes (PlayerState, CreatureState, DungeonState, GateState, InventorySlotState)
-      rooms/          # DungeonRoom (game loop, economy, message handlers)
-      systems/        # AISystem, CombatSystem, GameLoop (server-side logic)
-      chat/           # ChatSystem, CommandRegistry, commands
+      state/          # Schema state classes (PlayerState, PlayerSecretState, CreatureState, DungeonState, GateState, LootBagState, InventorySlotState)
+      rooms/          # DungeonRoom + PlayerSessionManager (lifecycle, persistence)
+      systems/        # AISystem, CombatSystem, GameLoop, GateSystem
+      chat/           # ChatSystem, CommandRegistry, commands, notifyLevelProgress
       items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, etc.)
+      creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables)
       dungeon/        # DungeonGenerator (procedural, no Babylon deps)
       navigation/     # Pathfinder (A* on TileMap)
       sessions/       # activeSessionRegistry (duplicate login detection)
+      tutorials/      # resetTutorials (admin command helper)
+      auth/           # authConfig (JWT authentication)
       db/             # Drizzle ORM schema + migrations (PostgreSQL, characters/world schemas)
+      logger.ts       # Pino-based structured logging
       main.ts         # Server entry point
   client/           # Babylon.js renderer + Colyseus client
     src/
-      core/           # ClientGame, InputManager
+      core/           # ClientGame, StateSync, InputManager, ClientUpdateLoop
       camera/         # IsometricCamera
-      entities/       # ClientPlayer, ClientCreature, CharacterAssetLoader
+      entities/       # ClientPlayer, ClientCreature, ClientLootBag, SelectionRing, CharacterAssetLoader, AnimationController
       dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
-      systems/        # WallOcclusionSystem, FogOfWarSystem
-      audio/          # SoundManager
+      systems/        # WallOcclusionSystem, WallFadePlugin, FogOfWarSystem
+      audio/          # SoundManager (ambient + spatial audio), uiSfx
       i18n/           # i18next config + locales (en.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, etc.)
-        components/   # Reusable UI (HudButton, HudPill, ActionSlot, HudPanel)
-        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, etc.)
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, creature, target, death, lootBag, settings, tutorial, feedback)
+        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
+        hooks/        # useDraggable
+        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, SwordIcon, FistIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
       main.ts         # Client entry point
 ```
@@ -138,10 +147,52 @@ packages/
 ### Chat
 
 - Server-side ChatSystem with rate limiting, command parsing, broadcasting
-- Slash commands: /help, /players, /kill, /heal, /tp, /leader, /setlevel, /kick, /give (admin)
+- Slash commands: /help, /players, /kill, /heal, /revive, /tp, /leader, /setlevel, /kick, /give, /reset-tutorials (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
 - Messages fade after 10s, hover to reveal all
+
+### Death & Revive
+
+- Life states: ALIVE → DOWNED (bleedout 30s) → DEAD (respawn timer)
+- Revive: other players can channel (R key, 3.5s) within range 3.0 to revive downed allies at 30% HP
+- Respawn: base 5s + 5s per death (max 30s), full heal at spawn point
+- Client: DeathOverlay with timers, downed/dead audio loops, tutorial hints
+- Server: GameLoop ticks life state transitions, CombatSystem stops targeting dead players
+
+### Loot System
+
+- Creatures drop loot bags on death (per-creature loot tables from DB)
+- Loot bags: golden sphere with bobbing animation, clickable to open grid panel
+- Each alive player rolls drops independently; notifications sent to other players
+- Server: LootBagState (MapSchema), CreatureTypeRegistry loads loot tables
+- Client: ClientLootBag entity, lootBagStore, LootBagPanel
+
+### Stamina & Sprint
+
+- Shift to sprint: 1.5x speed, drains 20/s (5s full drain), regens 10/s after 1s delay
+- StaminaBar appears above XP bar when not full
+- Server-authoritative: GameLoop ticks drain/regen, validates sprint state
+
+### Skills
+
+- 2 skills: basic_attack (passive auto-attack), heavy_strike (active, 5s cooldown, 2.5x damage)
+- SkillBar with 1-5 hotkeys, cooldown overlay via ActionSlot component
+- Server: CombatSystem applies skill cooldowns and damage multipliers
+
+### Spatial Audio
+
+- Remote player/creature footsteps and attacks play from their world position
+- Babylon.js spatial audio with linear rolloff (max 20 units, ref 2 units)
+- Audio listener follows camera target (local player on ground plane)
+- Pooled Sound instances (8 footsteps, 4 per attack anim) with round-robin cycling
+
+### Tutorial System
+
+- LIFO hint stack — multiple hints queue up and display sequentially
+- Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed
+- Server sends hints contextually; client dismisses on action
+- Admin: /reset-tutorials command re-sends applicable hints
 
 ## Vite Configuration
 
