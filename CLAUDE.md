@@ -38,10 +38,11 @@ packages/
       protocol.ts     # MessageType + CloseCode + all message interfaces
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
       CreatureTypes.ts # Creature type definitions + computeCreatureDerivedStats() + scaleCreatureDerivedStats()
-      Economy.ts      # computeGoldDrop() — gold distribution formula
+      Economy.ts      # computeGoldDrop(), computeLevelModifier() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
       Items.ts        # ItemDef type, InventorySlot type
       Skills.ts       # SkillDef type, SKILL_DEFS (basic_attack, heavy_strike)
+      Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType — buff/debuff types
       Roles.ts        # Role type (admin, user)
       GateTypes.ts    # GateType (lobby)
       Tutorial.ts     # TutorialStep type
@@ -50,12 +51,13 @@ packages/
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
-      state/          # Schema state classes (PlayerState, PlayerSecretState, CreatureState, DungeonState, GateState, LootBagState, InventorySlotState)
+      state/          # Schema state classes (PlayerState, PlayerSecretState, CreatureState, DungeonState, GateState, LootBagState, InventorySlotState, ActiveEffectState)
       rooms/          # DungeonRoom + PlayerSessionManager (lifecycle, persistence)
-      systems/        # AISystem, CombatSystem, GameLoop, GateSystem
+      systems/        # AISystem, CombatSystem, EffectSystem, GameLoop, GateSystem
       chat/           # ChatSystem, CommandRegistry, commands, notifyLevelProgress
       items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, etc.)
-      creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables)
+      effects/        # EffectRegistry (DB-loaded effect defs)
+      creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables + effect triggers)
       dungeon/        # DungeonGenerator (procedural, no Babylon deps)
       navigation/     # Pathfinder (A* on TileMap)
       sessions/       # activeSessionRegistry (duplicate login detection)
@@ -74,11 +76,11 @@ packages/
       audio/          # SoundManager (ambient + spatial audio), uiSfx
       i18n/           # i18next config + locales (en.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, creature, target, death, lootBag, settings, tutorial, feedback)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay)
-        components/   # Reusable UI (HudButton, HudPill, ActionSlot, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, creature, target, death, lootBag, settings, tutorial, feedback)
+        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
         hooks/        # useDraggable
-        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, SwordIcon, FistIcon, etc.)
+        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, SwordIcon, FistIcon, WeaknessIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
       main.ts         # Client entry point
 ```
@@ -186,6 +188,22 @@ packages/
 - Babylon.js spatial audio with linear rolloff (max 20 units, ref 2 units)
 - Audio listener follows camera target (local player on ground plane)
 - Pooled Sound instances (8 footsteps, 4 per attack anim) with round-robin cycling
+
+### Effects (Buffs & Debuffs)
+
+- Data-driven: effect definitions in DB (`world.effects`), loaded by EffectRegistry at startup
+- Creature effect triggers in DB (`world.creature_effects`): trigger type, chance, stacks
+- EffectDef: id, name (i18n), icon, duration, maxStacks, stackBehavior (refresh/intensity), isDebuff, statModifiers, tickEffect
+- StatModifiers: flat or percent, keyed by stat name (e.g. `attackDamage: {type:"percent", value:-0.25}`)
+- Stack behaviors: REFRESH (reset timer), INTENSITY (add stacks up to max, multiply modifier)
+- Server: EffectSystem ticks remaining timers, recomputes derived stats with modifiers applied
+- ActiveEffectState synced via Colyseus MapSchema on PlayerState (visible to all players)
+- Effects cleared on death (downed), respawn, and revive
+- Client: effectDefStore (lazy-loaded like itemDefStore), BuffBar below player center, EffectIcon with styled tooltip
+- TargetFrame shows target's active effects below the frame
+- Current effects: Weakness (zombie, 30% chance on hit, -25% attack damage, 5s, refresh)
+- Shared: `Effects.ts` (EffectDef, StatModifier, StackBehavior, StatModType)
+- Server: `EffectSystem`, `EffectRegistry`, `ActiveEffectState`, `CreatureTypeRegistry` (effect triggers)
 
 ### Tutorial System
 

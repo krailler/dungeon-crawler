@@ -97,6 +97,12 @@ export class GameLoop {
 
     const dtSec = dt / 1000;
 
+    // Build player map once per tick (reused by effects, AI, and combat)
+    this.tickPlayersMap.clear();
+    this.bridge.state.players.forEach((player: PlayerState, sessionId: string) => {
+      this.tickPlayersMap.set(sessionId, player);
+    });
+
     // Update sprint stamina before movement so speed is correct this tick
     this.updateStamina(dtSec);
 
@@ -104,10 +110,6 @@ export class GameLoop {
     this.tickItemCooldowns(dtSec);
 
     // Tick active effects (debuffs/buffs)
-    this.tickPlayersMap.clear();
-    this.bridge.state.players.forEach((player: PlayerState, sessionId: string) => {
-      this.tickPlayersMap.set(sessionId, player);
-    });
     this.bridge.effectSystem.update(dtSec, this.tickPlayersMap);
 
     // Update life states (downed, dead, respawn, revive channels)
@@ -123,10 +125,6 @@ export class GameLoop {
     }
 
     // AI system: creatures chase and attack players
-    this.tickPlayersMap.clear();
-    this.bridge.state.players.forEach((player: PlayerState, sessionId: string) => {
-      this.tickPlayersMap.set(sessionId, player);
-    });
 
     this.bridge.aiSystem.update(
       dtSec,
@@ -230,81 +228,85 @@ export class GameLoop {
 
     // Remove dead creature from state after a short delay so clients see the death
     if (event.killed) {
+      this.processCreatureKill(event);
+    }
+  }
+
+  /** Distribute gold, XP, loot and schedule creature removal after a kill. */
+  private processCreatureKill(event: CombatHitEvent): void {
+    const killedCreature = this.bridge.state.creatures.get(event.creatureId);
+    if (killedCreature) {
       // Distribute gold to alive party members
-      const killedCreature = this.bridge.state.creatures.get(event.creatureId);
-      if (killedCreature) {
-        let aliveCount = 0;
-        let levelSum = 0;
-        this.bridge.state.players.forEach((p: PlayerState) => {
-          if (p.lifeState === LifeState.ALIVE) {
-            aliveCount++;
-            levelSum += p.level;
-          }
-        });
-        const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
-        const goldPerPlayer = computeGoldDrop(killedCreature.level, avgPartyLevel, aliveCount);
+      let aliveCount = 0;
+      let levelSum = 0;
+      this.bridge.state.players.forEach((p: PlayerState) => {
+        if (p.lifeState === LifeState.ALIVE) {
+          aliveCount++;
+          levelSum += p.level;
+        }
+      });
+      const avgPartyLevel = aliveCount > 0 ? levelSum / aliveCount : 1;
+      const goldPerPlayer = computeGoldDrop(killedCreature.level, avgPartyLevel, aliveCount);
 
-        this.bridge.state.players.forEach((p: PlayerState) => {
-          if (p.lifeState === LifeState.ALIVE) {
-            p.gold += goldPerPlayer;
-          }
-        });
+      this.bridge.state.players.forEach((p: PlayerState) => {
+        if (p.lifeState === LifeState.ALIVE) {
+          p.gold += goldPerPlayer;
+        }
+      });
 
-        // Broadcast gold earned in chat
-        this.bridge.chatSystem.broadcastSystemI18n(
-          "chat.goldGained",
-          { amount: goldPerPlayer, enemy: killedCreature.creatureType },
-          `+${goldPerPlayer} gold from ${killedCreature.creatureType}!`,
-        );
+      this.bridge.chatSystem.broadcastSystemI18n(
+        "chat.goldGained",
+        { amount: goldPerPlayer, enemy: killedCreature.creatureType },
+        `+${goldPerPlayer} gold from ${killedCreature.creatureType}!`,
+      );
 
-        // Distribute XP to alive players (not split — each player gets full XP)
-        this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
-          if (p.lifeState !== LifeState.ALIVE || p.level >= MAX_LEVEL) return;
+      // Distribute XP to alive players (not split — each player gets full XP)
+      this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
+        if (p.lifeState !== LifeState.ALIVE || p.level >= MAX_LEVEL) return;
 
-          const xpGain = computeXpDrop(killedCreature.level, p.level);
-          const levelUps = p.addXp(xpGain);
+        const xpGain = computeXpDrop(killedCreature.level, p.level);
+        const levelUps = p.addXp(xpGain);
 
-          if (levelUps.length > 0) {
-            notifyLevelProgress(
-              sessionId,
-              p,
-              levelUps,
-              this.bridge.chatSystem,
-              this.bridge.sendToClient.bind(this.bridge),
-            );
-          }
-        });
+        if (levelUps.length > 0) {
+          notifyLevelProgress(
+            sessionId,
+            p,
+            levelUps,
+            this.bridge.chatSystem,
+            this.bridge.sendToClient.bind(this.bridge),
+          );
+        }
+      });
 
-        // Drop loot bag on the ground (per-creature loot table)
-        const lootEntries = getCreatureLoot(killedCreature.creatureType);
-        if (lootEntries.length > 0) {
-          const bag = new LootBagState();
-          let slotIndex = 0;
-          for (const entry of lootEntries) {
-            if (Math.random() < entry.dropChance) {
-              const qty =
-                entry.minQuantity +
-                Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1));
-              const slot = new InventorySlotState();
-              slot.itemId = entry.itemId;
-              slot.quantity = qty;
-              bag.items.set(String(slotIndex++), slot);
-            }
-          }
-          if (bag.items.size > 0) {
-            bag.x = killedCreature.x;
-            bag.z = killedCreature.z;
-            this.bridge.state.lootBags.set(`loot_${event.creatureId}_${Date.now()}`, bag);
+      // Drop loot bag on the ground (per-creature loot table)
+      const lootEntries = getCreatureLoot(killedCreature.creatureType);
+      if (lootEntries.length > 0) {
+        const bag = new LootBagState();
+        let slotIndex = 0;
+        for (const entry of lootEntries) {
+          if (Math.random() < entry.dropChance) {
+            const qty =
+              entry.minQuantity +
+              Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1));
+            const slot = new InventorySlotState();
+            slot.itemId = entry.itemId;
+            slot.quantity = qty;
+            bag.items.set(String(slotIndex++), slot);
           }
         }
+        if (bag.items.size > 0) {
+          bag.x = killedCreature.x;
+          bag.z = killedCreature.z;
+          this.bridge.state.lootBags.set(`loot_${event.creatureId}_${Date.now()}`, bag);
+        }
       }
-
-      this.bridge.clock.setTimeout(() => {
-        this.bridge.state.creatures.delete(event.creatureId);
-        this.bridge.aiSystem.unregister(event.creatureId);
-        this.bridge.onCreatureRemoved?.(event.creatureId);
-      }, 1000);
     }
+
+    this.bridge.clock.setTimeout(() => {
+      this.bridge.state.creatures.delete(event.creatureId);
+      this.bridge.aiSystem.unregister(event.creatureId);
+      this.bridge.onCreatureRemoved?.(event.creatureId);
+    }, 1000);
   }
 
   /** Drain / regenerate stamina for all players each tick. */
