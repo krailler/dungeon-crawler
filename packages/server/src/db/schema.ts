@@ -67,6 +67,21 @@ export const characterInventory = charactersSchema.table(
   ],
 );
 
+export const characterSkills = charactersSchema.table(
+  "character_skills",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    skillId: text("skill_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_char_skills_skill").on(table.characterId, table.skillId),
+    index("idx_char_skills_char").on(table.characterId),
+  ],
+);
+
 // ── World schema (game definitions — regenerable) ───────────────────────────
 
 export const items = worldSchema.table("items", {
@@ -80,6 +95,17 @@ export const items = worldSchema.table("items", {
   effectType: text("effect_type").notNull().default(""),
   effectParams: jsonb("effect_params").notNull().default({}),
   useSound: text("use_sound").notNull().default(""),
+});
+
+export const skills = worldSchema.table("skills", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  icon: text("icon").notNull(),
+  passive: boolean("passive").notNull().default(false),
+  cooldown: real("cooldown").notNull().default(0),
+  damageMultiplier: real("damage_multiplier").notNull().default(1),
+  animState: text("anim_state").notNull().default("punch"),
 });
 
 export const creatures = worldSchema.table("creatures", {

@@ -7,7 +7,6 @@ import type {
   PartyKickMessage,
   SkillToggleMessage,
   SkillUseMessage,
-  SkillIdValue,
   AllocatableStatValue,
   StatAllocateMessage,
   ItemUseMessage,
@@ -269,12 +268,12 @@ export const hudStore = {
     const local = cachedSnapshot.members.find((m) => m.isLocal);
     return local?.gold ?? 0;
   },
-  toggleSkill(skillId: SkillIdValue): void {
+  toggleSkill(skillId: string): void {
     if (!room) return;
     const msg: SkillToggleMessage = { skillId };
     room.send(MessageType.SKILL_TOGGLE, msg);
   },
-  useSkill(skillId: SkillIdValue): void {
+  useSkill(skillId: string): void {
     if (!room) return;
     const msg: SkillUseMessage = { skillId };
     room.send(MessageType.SKILL_USE, msg);

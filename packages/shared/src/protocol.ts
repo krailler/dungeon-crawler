@@ -1,7 +1,7 @@
-import type { SkillIdValue } from "./Skills.js";
 import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
 import type { ItemDef } from "./Items.js";
+import type { SkillDef } from "./Skills.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -31,6 +31,8 @@ export const MessageType = {
   ACTION_FEEDBACK: "action:feedback",
   ITEM_DEFS_REQUEST: "item:defs:req",
   ITEM_DEFS_RESPONSE: "item:defs:res",
+  SKILL_DEFS_REQUEST: "skill:defs:req",
+  SKILL_DEFS_RESPONSE: "skill:defs:res",
   LOOT_TAKE: "loot:take",
   SET_TARGET: "target:set",
   TOGGLE_AOI: "debug:aoi",
@@ -162,21 +164,33 @@ export interface GateInteractMessage {
 
 /** Client → Server: toggle a skill on/off */
 export interface SkillToggleMessage {
-  skillId: SkillIdValue;
+  skillId: string;
 }
 
 /** Client → Server: use an active skill */
 export interface SkillUseMessage {
-  skillId: SkillIdValue;
+  skillId: string;
 }
 
 /** Server → Client: skill cooldown started (for UI overlay) */
 export interface SkillCooldownMessage {
-  skillId: SkillIdValue;
+  skillId: string;
   /** Total cooldown duration in seconds */
   duration: number;
   /** Remaining cooldown in seconds */
   remaining: number;
+}
+
+/** Client → Server: request skill definitions by id */
+export interface SkillDefsRequestMessage {
+  skillIds: string[];
+}
+
+/** Server → Client: skill definitions response */
+export interface SkillDefsResponseMessage {
+  /** Cache version — changes when skill definitions are modified */
+  version: number;
+  skills: SkillDef[];
 }
 
 // ── Tutorial ─────────────────────────────────────────────────────────────────

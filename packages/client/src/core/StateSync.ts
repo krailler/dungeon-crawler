@@ -17,6 +17,7 @@ import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
+import { skillDefStore } from "../ui/stores/skillDefStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
@@ -85,6 +86,9 @@ export class StateSync {
       if (typeof unsub === "function") this.stateListeners.push(unsub as () => void);
       return unsub;
     };
+
+    // Connect skill def store — lazy-loads skill definitions from server
+    skillDefStore.connect(room);
 
     // Listen for skill cooldown messages from server
     room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {
@@ -434,9 +438,10 @@ export class StateSync {
         if (isLocal && secret) {
           // Sync skills array — onAdd/onRemove fire when server modifies the ArraySchema
           const syncSkills = (): void => {
-            hudStore.updateMember(sessionId, {
-              skills: Array.from(secret.skills as Iterable<string>),
-            });
+            const skillIds = Array.from(secret.skills as Iterable<string>);
+            hudStore.updateMember(sessionId, { skills: skillIds });
+            // Prefetch skill definitions from server
+            if (skillIds.length > 0) skillDefStore.ensureLoaded(skillIds);
           };
           $(secret).skills.onAdd(syncSkills);
           $(secret).skills.onRemove(syncSkills);
@@ -819,6 +824,7 @@ export class StateSync {
     targetStore.reset();
     creatureStore.reset();
     deathStore.reset();
+    skillDefStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();

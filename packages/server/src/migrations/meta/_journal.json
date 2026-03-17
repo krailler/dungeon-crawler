@@ -15,6 +15,20 @@
       "when": 1774400000000,
       "tag": "0001_add_item_use_sound",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774500000000,
+      "tag": "0002_add_skills_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774600000000,
+      "tag": "0003_add_skill_anim_state",
+      "breakpoints": true
     }
   ]
 }

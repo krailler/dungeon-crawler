@@ -4,7 +4,7 @@ import { eq, and, notInArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
 import type { DbTransaction } from "../db/database";
-import { characters, characterInventory } from "../db/schema";
+import { characters, characterInventory, characterSkills } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
@@ -15,6 +15,7 @@ import {
   MessageType,
   TutorialStep,
   GateType,
+  DEFAULT_SKILL_IDS,
 } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import {
@@ -160,8 +161,11 @@ export class PlayerSessionManager {
       player.tutorialsCompleted = new Set();
     }
 
-    // Load inventory from DB — hash is computed after load completes
-    this.loadInventory(characterId, player).then(() => {
+    // Load inventory + skills from DB — hash is computed after both complete
+    Promise.all([
+      this.loadInventory(characterId, player),
+      this.loadCharacterSkills(characterId, player),
+    ]).then(() => {
       this.lastSavedHash.set(characterId, this.buildProgressHash(player));
     });
 
@@ -529,13 +533,15 @@ export class PlayerSessionManager {
       .where(eq(characters.id, characterId));
 
     await this.saveInventoryTx(tx, characterId, player);
+    await this.saveSkillsTx(tx, characterId, player);
   }
 
   private buildProgressHash(player: PlayerState): string {
     const { gold, xp, level, strength, vitality, agility, statPoints } = player;
     const tut = [...player.tutorialsCompleted].sort().join(",");
     const inv = this.buildInventoryHash(player);
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}:${inv}`;
+    const sk = this.buildSkillsHash(player);
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}:${inv}:${sk}`;
   }
 
   private buildInventoryHash(player: PlayerState): string {
@@ -606,6 +612,57 @@ export class PlayerSessionManager {
       // Inventory is empty — delete all
       await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
     }
+  }
+
+  private async loadCharacterSkills(characterId: string, player: PlayerState): Promise<void> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(characterSkills)
+      .where(eq(characterSkills.characterId, characterId));
+
+    if (rows.length > 0) {
+      for (const row of rows) {
+        player.skills.push(row.skillId);
+      }
+      this.log.debug({ characterId, skills: rows.length }, "Skills loaded");
+    } else {
+      // Legacy character — assign default skills and persist them
+      for (const skillId of DEFAULT_SKILL_IDS) {
+        player.skills.push(skillId);
+      }
+      await db
+        .insert(characterSkills)
+        .values(DEFAULT_SKILL_IDS.map((skillId) => ({ characterId, skillId })));
+      this.log.debug({ characterId }, "Default skills assigned to legacy character");
+    }
+  }
+
+  private async saveSkillsTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
+    await tx.delete(characterSkills).where(eq(characterSkills.characterId, characterId));
+
+    const skillIds: string[] = [];
+    player.skills.forEach((skillId: string) => {
+      skillIds.push(skillId);
+    });
+
+    if (skillIds.length > 0) {
+      await tx
+        .insert(characterSkills)
+        .values(skillIds.map((skillId) => ({ characterId, skillId })));
+    }
+  }
+
+  private buildSkillsHash(player: PlayerState): string {
+    const parts: string[] = [];
+    player.skills.forEach((skillId: string) => {
+      parts.push(skillId);
+    });
+    return parts.sort().join(",");
   }
 
   /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */

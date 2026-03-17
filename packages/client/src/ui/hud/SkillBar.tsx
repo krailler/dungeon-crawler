@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
+import { skillDefStore } from "../stores/skillDefStore";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import type { BindableActionValue } from "../stores/settingsStore";
 import { SwordIcon } from "../icons/SwordIcon";
 import { FistIcon } from "../icons/FistIcon";
 import { LockIcon } from "../icons/LockIcon";
 import { ActionSlot } from "../components/ActionSlot";
-import { MAX_SKILL_SLOTS, SKILL_DEFS } from "@dungeon/shared";
-import type { SkillDef, SkillIdValue } from "@dungeon/shared";
+import { MAX_SKILL_SLOTS } from "@dungeon/shared";
+import type { SkillDef } from "@dungeon/shared";
 
 // ── Icon map (skill icon name → component) ───────────────────────────────────
 
@@ -24,9 +25,9 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
   const { t } = useTranslation();
   return (
     <>
-      <div className="text-[12px] font-semibold text-slate-100">{t(skill.i18nKey)}</div>
+      <div className="text-[12px] font-semibold text-slate-100">{t(skill.name)}</div>
       <div className="mt-0.5 text-[11px] text-slate-400">
-        {t(skill.i18nDescKey, { multiplier: skill.damageMultiplier })}
+        {t(skill.description, { multiplier: skill.damageMultiplier })}
       </div>
       {skill.passive && (
         <div
@@ -35,7 +36,7 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
           {active ? t("skills.passive") : t("skills.disabled")}
         </div>
       )}
-      {!skill.passive && skill.cooldown && (
+      {!skill.passive && skill.cooldown > 0 && (
         <div className="mt-1 text-[10px] text-amber-400/80">
           {t("skills.cooldown", { seconds: skill.cooldown })}
         </div>
@@ -51,6 +52,7 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
 
 export const SkillBar = (): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
+  const skillDefs = useSyncExternalStore(skillDefStore.subscribe, skillDefStore.getSnapshot);
   const localMember = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const skills = localMember?.skills ?? [];
   const autoAttackEnabled = localMember?.autoAttackEnabled ?? true;
@@ -64,17 +66,17 @@ export const SkillBar = (): ReactNode => {
   const slots = useMemo(() => {
     const result: (SkillDef | null)[] = [];
     for (let i = 0; i < MAX_SKILL_SLOTS; i++) {
-      const skillId = skills[i] as SkillIdValue | undefined;
-      result.push(skillId && skillId in SKILL_DEFS ? SKILL_DEFS[skillId] : null);
+      const skillId = skills[i];
+      result.push(skillId ? (skillDefs.get(skillId) ?? null) : null);
     }
     return result;
-  }, [skills]);
+  }, [skills, skillDefs]);
 
   // Check if a skill slot is active
   const isSlotActive = useCallback(
     (skill: SkillDef | null): boolean => {
       if (!skill) return false;
-      if (skill.id === "basic_attack") return autoAttackEnabled;
+      if (skill.passive) return autoAttackEnabled;
       return true;
     },
     [autoAttackEnabled],

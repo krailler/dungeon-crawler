@@ -1,5 +1,5 @@
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
-import { DEFAULT_SKILLS, Role } from "@dungeon/shared";
+import { Role } from "@dungeon/shared";
 import type { RoleValue } from "@dungeon/shared";
 import { InventorySlotState } from "./InventorySlotState";
 
@@ -26,7 +26,7 @@ export class PlayerSecretState extends Schema {
   @type("int32") xpToNext: number = 0;
 
   // Skills
-  @type(["string"]) skills = new ArraySchema<string>(...DEFAULT_SKILLS);
+  @type(["string"]) skills = new ArraySchema<string>();
   @type("boolean") autoAttackEnabled: boolean = true;
 
   // Stamina (sprint resource — ephemeral, not persisted)

@@ -1,13 +1,7 @@
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
-import {
-  ATTACK_ANIM_DURATION,
-  computeDamage,
-  SKILL_DEFS,
-  SkillId,
-  LifeState,
-} from "@dungeon/shared";
-import type { SkillIdValue } from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, computeDamage, LifeState } from "@dungeon/shared";
+import { getSkillDef } from "../skills/SkillRegistry";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
@@ -25,7 +19,7 @@ export interface CombatHitEvent {
 /** Fired when a skill goes on cooldown (server → client feedback) */
 export interface SkillCooldownEvent {
   sessionId: string;
-  skillId: SkillIdValue;
+  skillId: string;
   duration: number;
   remaining: number;
 }
@@ -167,7 +161,7 @@ export class CombatSystem {
    */
   useSkill(
     sessionId: string,
-    skillId: SkillIdValue,
+    skillId: string,
     player: PlayerState,
     creatures: Map<string, CreatureState>,
   ): SkillCooldownEvent | null {
@@ -175,7 +169,7 @@ export class CombatSystem {
     if (!combat) return null;
     if (player.lifeState !== LifeState.ALIVE) return null;
 
-    const def = SKILL_DEFS[skillId];
+    const def = getSkillDef(skillId);
     if (!def || def.passive) return null;
     if (!def.cooldown) return null;
 
@@ -196,10 +190,9 @@ export class CombatSystem {
 
     // Compute damage with multiplier
     const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
-    const finalDamage = Math.max(1, Math.round(baseDamage * (def.damageMultiplier ?? 1)));
+    const finalDamage = Math.max(1, Math.round(baseDamage * def.damageMultiplier));
 
-    const skillAnim = skillId === SkillId.HEAVY_STRIKE ? "heavy_punch" : "punch";
-    this.scheduleHit(combat, player, target, finalDamage, skillAnim);
+    this.scheduleHit(combat, player, target, finalDamage, def.animState);
 
     // Reset auto-attack cooldown so heavy strike doesn't "waste" the next auto
     combat.attackCooldown = player.attackCooldown;

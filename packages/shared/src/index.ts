@@ -32,6 +32,8 @@ export type {
   ItemCooldownMessage,
   ItemDefsRequestMessage,
   ItemDefsResponseMessage,
+  SkillDefsRequestMessage,
+  SkillDefsResponseMessage,
   ActionFeedbackMessage,
   LootTakeMessage,
   SetTargetMessage,
@@ -74,8 +76,8 @@ export { computeGoldDrop } from "./Economy.js";
 
 export { xpToNextLevel, computeXpDrop } from "./Leveling.js";
 
-export { MAX_SKILL_SLOTS, SkillId, SKILL_DEFS, DEFAULT_SKILLS } from "./Skills.js";
-export type { SkillIdValue, SkillIcon, SkillDef } from "./Skills.js";
+export { MAX_SKILL_SLOTS, DEFAULT_SKILL_IDS } from "./Skills.js";
+export type { SkillDef } from "./Skills.js";
 
 export { Role } from "./Roles.js";
 export type { RoleValue } from "./Roles.js";

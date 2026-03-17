@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { Hash } from "colyseus";
-import { Role } from "@dungeon/shared";
+import { Role, DEFAULT_SKILL_IDS } from "@dungeon/shared";
 import { initDatabase } from "./database";
-import { accounts, characters, items } from "./schema";
+import { accounts, characters, items, skills, characterSkills } from "./schema";
 
 interface SeedAccount {
   email: string;
@@ -41,10 +41,15 @@ async function seed() {
       })
       .returning({ id: accounts.id });
 
-    await db.insert(characters).values({
-      accountId: account.id,
-      name: entry.characterName,
-    });
+    const [character] = await db
+      .insert(characters)
+      .values({ accountId: account.id, name: entry.characterName })
+      .returning({ id: characters.id });
+
+    // Assign default skills to the new character
+    await db
+      .insert(characterSkills)
+      .values(DEFAULT_SKILL_IDS.map((skillId) => ({ characterId: character.id, skillId })));
 
     console.log(`Created account "${entry.email}" with character "${entry.characterName}"`);
   }
@@ -66,6 +71,34 @@ async function seed() {
     })
     .onConflictDoNothing();
   console.log("World items seeded.");
+
+  // Seed world skills (upsert)
+  await db
+    .insert(skills)
+    .values([
+      {
+        id: "basic_attack",
+        name: "skills.basicAttack",
+        description: "skills.basicAttackDesc",
+        icon: "sword",
+        passive: true,
+        cooldown: 0,
+        damageMultiplier: 1,
+        animState: "punch",
+      },
+      {
+        id: "heavy_strike",
+        name: "skills.heavyStrike",
+        description: "skills.heavyStrikeDesc",
+        icon: "fist",
+        passive: false,
+        cooldown: 5,
+        damageMultiplier: 2.5,
+        animState: "heavy_punch",
+      },
+    ])
+    .onConflictDoNothing();
+  console.log("World skills seeded.");
 
   console.log("Seed complete.");
   process.exit(0);

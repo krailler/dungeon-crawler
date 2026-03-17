@@ -23,6 +23,7 @@ import { registerCommands } from "../chat/commands";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
 import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
+import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
@@ -38,7 +39,6 @@ import {
   computeCreatureDerivedStats,
   GOLD_SAVE_INTERVAL,
   CloseCode,
-  SkillId,
   Role,
   GateType,
   MIN_PROTOCOL_VERSION,
@@ -54,7 +54,6 @@ import type {
   ChatSendPayload,
   PromoteLeaderMessage,
   PartyKickMessage,
-  SkillIdValue,
   AllocatableStatValue,
   TutorialDismissMessage,
   StatAllocateMessage,
@@ -291,11 +290,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const player = this.state.players.get(client.sessionId);
       if (player) this.gateSystem.handleInteract(client, player, data);
     });
-    // Skill toggle: enable/disable a skill (e.g. auto-attack)
+    // Skill toggle: enable/disable a passive skill (e.g. auto-attack)
     this.onMessage(MessageType.SKILL_TOGGLE, (client: Client, data: { skillId: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
-      if (data.skillId === SkillId.BASIC_ATTACK) {
+      const def = getSkillDef(data.skillId);
+      if (def?.passive) {
         player.autoAttackEnabled = !player.autoAttackEnabled;
       }
     });
@@ -312,7 +312,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.state.creatures.forEach((c: CreatureState, id: string) => creaturesMap.set(id, c));
       const result = this.combatSystem.useSkill(
         client.sessionId,
-        data.skillId as SkillIdValue,
+        data.skillId,
         player,
         creaturesMap,
       );
@@ -324,8 +324,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         });
       } else {
         // Determine reason for failure
-        const skillId = data.skillId as SkillIdValue;
-        const cd = this.combatSystem.getSkillCooldown(client.sessionId, skillId);
+        const cd = this.combatSystem.getSkillCooldown(client.sessionId, data.skillId);
         if (cd > 0) {
           client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.onCooldown" });
         } else {
@@ -461,6 +460,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(MessageType.ITEM_DEFS_RESPONSE, {
           version: getItemRegistryVersion(),
           items: getItemDefs(ids),
+        });
+      },
+    );
+
+    // Skill definitions: client requests defs lazily by id
+    this.onMessage(
+      MessageType.SKILL_DEFS_REQUEST,
+      (client: Client, data: { skillIds?: string[] }) => {
+        const ids = data.skillIds?.slice(0, 50) ?? [];
+        if (ids.length === 0) return;
+        client.send(MessageType.SKILL_DEFS_RESPONSE, {
+          version: getSkillRegistryVersion(),
+          skills: getSkillDefs(ids),
         });
       },
     );

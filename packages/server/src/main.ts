@@ -4,6 +4,7 @@ import { DungeonRoom } from "./rooms/DungeonRoom";
 import { initDatabase } from "./db/database";
 import { loadItemRegistry } from "./items/ItemRegistry";
 import { loadCreatureTypeRegistry } from "./creatures/CreatureTypeRegistry";
+import { loadSkillRegistry } from "./skills/SkillRegistry";
 import { logger } from "./logger";
 import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
@@ -20,6 +21,7 @@ const server = new Server({
     await initDatabase();
     await loadItemRegistry();
     await loadCreatureTypeRegistry();
+    await loadSkillRegistry();
   },
   express: (app) => {
     app.use("/auth", auth.routes());
