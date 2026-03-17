@@ -475,7 +475,15 @@ export class DungeonRenderer {
     gate.position.set(worldX, gateHeight / 2, worldZ);
     gate.isPickable = true;
     gate.visibility = 0;
-    gate.metadata = { interactType: "gate", interactId: gateId };
+    gate.metadata = {
+      interactType: "gate",
+      interactId: gateId,
+      // Canonical tile position for distance checks (matches server validation).
+      // The mesh is visually offset toward the room, but interaction range
+      // must be computed from the tile center — same as the server.
+      interactX: tileX * TILE_SIZE,
+      interactZ: tileY * TILE_SIZE,
+    };
 
     // Vertical bars
     for (let i = 0; i < barCount; i++) {

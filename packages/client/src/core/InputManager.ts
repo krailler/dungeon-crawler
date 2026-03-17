@@ -19,6 +19,13 @@ const RAYCAST_INTERVAL = 50;
 export interface InteractableMetadata {
   interactType: string; // e.g. "gate", "chest"
   interactId: string; // unique id within that type
+  /**
+   * Canonical interaction position (world units).
+   * Used for distance checks instead of mesh.getAbsolutePosition() when set,
+   * so that visually-offset meshes still respect the authoritative tile position.
+   */
+  interactX?: number;
+  interactZ?: number;
 }
 
 /** Configuration for the generic interactable-click system. */
@@ -45,7 +52,7 @@ export interface InputManagerDeps {
 interface PendingInteract {
   type: string;
   id: string;
-  /** World position of the interactable mesh (XZ) */
+  /** Canonical interaction position for the range check (tile-based) */
   x: number;
   z: number;
 }
@@ -248,6 +255,8 @@ export class InputManager {
     );
     if (!pick?.hit || !pick.pickedMesh) return false;
 
+    // Walk to the mesh position (not the canonical tile position) because
+    // the mesh is offset toward the room and is always reachable.
     const meshPos = pick.pickedMesh.getAbsolutePosition();
     this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
     this.lastSendTime = performance.now();
@@ -277,8 +286,14 @@ export class InputManager {
     if (!playerPos) return false;
 
     const meshPos = pick.pickedMesh.getAbsolutePosition();
-    const dx = meshPos.x - playerPos.x;
-    const dz = meshPos.z - playerPos.z;
+
+    // Use the canonical interaction position (tile-based) for range checks
+    // so they match the server and the "Press F" hint.
+    // The mesh may be visually offset from the tile center.
+    const ix = meta.interactX ?? meshPos.x;
+    const iz = meta.interactZ ?? meshPos.z;
+    const dx = ix - playerPos.x;
+    const dz = iz - playerPos.z;
     const distSq = dx * dx + dz * dz;
     const rangeSq = this.interactable.range * this.interactable.range;
 
@@ -287,13 +302,15 @@ export class InputManager {
       this.pendingInteract = null;
       this.interactable.onClick(meta.interactType, meta.interactId);
     } else {
-      // Out of range — walk toward it, interact on arrival
+      // Out of range — walk toward the mesh (reachable), interact on arrival
       this.pendingInteract = {
         type: meta.interactType,
         id: meta.interactId,
-        x: meshPos.x,
-        z: meshPos.z,
+        x: ix,
+        z: iz,
       };
+      // Walk to the mesh position (not the tile position) because the mesh
+      // is offset toward the room and is always reachable by pathfinding.
       this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
       this.lastSendTime = performance.now();
     }
