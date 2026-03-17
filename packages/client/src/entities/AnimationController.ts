@@ -1,4 +1,5 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AnimName } from "./CharacterAssetLoader";
 import type { SoundManager } from "../audio/SoundManager";
 import { ATTACK_ANIM_DURATION } from "@dungeon/shared";
@@ -22,9 +23,16 @@ export class AnimationController {
   private pendingSoundName: string | null = null;
   private pendingSoundTimer: number = 0;
   private soundManager: SoundManager | null;
+  /** When set, attack sounds play as spatial audio at this position. */
+  private spatialPositionFn: (() => Vector3) | null = null;
 
   constructor(soundManager: SoundManager | null) {
     this.soundManager = soundManager;
+  }
+
+  /** Enable spatial audio — attack sounds will play at the returned position. */
+  setSpatialPosition(fn: () => Vector3): void {
+    this.spatialPositionFn = fn;
   }
 
   /** Set animations from a loaded character instance. */
@@ -109,7 +117,11 @@ export class AnimationController {
     if (this.pendingSoundTimer > 0) {
       this.pendingSoundTimer -= dt;
       if (this.pendingSoundTimer <= 0 && this.pendingSoundName) {
-        this.soundManager?.playAnimSound(this.pendingSoundName);
+        if (this.spatialPositionFn) {
+          this.soundManager?.playSpatialAnimSound(this.pendingSoundName, this.spatialPositionFn());
+        } else {
+          this.soundManager?.playAnimSound(this.pendingSoundName);
+        }
         this.pendingSoundName = null;
       }
     }

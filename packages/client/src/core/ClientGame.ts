@@ -107,6 +107,10 @@ export class ClientGame {
     this.creatureLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
+
+    // Audio listener follows the local player (camera target) on the ground plane
+    // so spatial sounds attenuate based on gameplay distance, not camera distance
+    this.scene.audioListenerPositionProvider = () => this.isoCamera.camera.target;
     this.guiTexture = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
 
     // Initialize extracted modules

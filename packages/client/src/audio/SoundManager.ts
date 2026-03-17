@@ -1,4 +1,5 @@
 import { Sound } from "@babylonjs/core/Audio/sound";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { VolumeSettings } from "../ui/stores/settingsStore";
 
@@ -23,6 +24,17 @@ const DEAD_LOOP_URL = "/audio/ambient/dead_loop.ogg";
 
 /** Volume for death loops (before master/ambient multipliers) */
 const DEATH_LOOP_VOLUME = 0.8;
+
+/** Spatial audio — distance-based attenuation for remote entity sounds */
+const SPATIAL_MAX_DISTANCE = 20;
+const SPATIAL_REF_DISTANCE = 2;
+const SPATIAL_ROLLOFF = 1;
+/** Number of pooled spatial Sound instances per category */
+const SPATIAL_FOOTSTEP_POOL = 8;
+const SPATIAL_ANIM_POOL = 4;
+
+const PUNCH_URLS = ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"];
+const HEAVY_PUNCH_URLS = ["/audio/sfx/heavy_strike.ogg"];
 
 /** Tracks a set of sound variants for a single animation */
 interface AnimSoundEntry {
@@ -60,6 +72,12 @@ export class SoundManager {
   /** Debug mute override (from debugStore ambient toggle) */
   private ambientMuted: boolean = false;
 
+  /** Spatial footstep pool (round-robin) */
+  private spatialFootsteps: Sound[] = [];
+  private spatialFootstepIdx: number = 0;
+  /** Spatial animation sound pools (round-robin per anim name) */
+  private spatialAnimPools: Map<string, { sounds: Sound[]; idx: number }> = new Map();
+
   constructor(scene: Scene) {
     this.scene = scene;
   }
@@ -85,12 +103,8 @@ export class SoundManager {
     }
 
     // Register animation sounds
-    this.registerAnimSound(
-      "punch",
-      ["/audio/sfx/punch_1.ogg", "/audio/sfx/punch_2.ogg", "/audio/sfx/punch_3.ogg"],
-      ATTACK_VOLUME,
-    );
-    this.registerAnimSound("heavy_punch", ["/audio/sfx/heavy_strike.ogg"], ATTACK_VOLUME);
+    this.registerAnimSound("punch", PUNCH_URLS, ATTACK_VOLUME);
+    this.registerAnimSound("heavy_punch", HEAVY_PUNCH_URLS, ATTACK_VOLUME);
 
     // One-shot SFX
     this.registerSfx("gold_pickup", "/audio/sfx/gold_pickup.ogg", SFX_VOLUME);
@@ -127,8 +141,48 @@ export class SoundManager {
       loop: true,
     });
 
+    // Spatial sound pools for remote players / creatures
+    this.loadSpatialSounds();
+
     this.loaded = true;
     console.log("[SoundManager] Loaded", this.footsteps.length, "footstep sounds");
+  }
+
+  /** Create pooled spatial Sound instances for distance-based audio. */
+  private loadSpatialSounds(): void {
+    const spatialOpts = (volume: number) => ({
+      volume,
+      autoplay: false,
+      loop: false,
+      spatialSound: true,
+      maxDistance: SPATIAL_MAX_DISTANCE,
+      refDistance: SPATIAL_REF_DISTANCE,
+      rolloffFactor: SPATIAL_ROLLOFF,
+      distanceModel: "linear" as const,
+    });
+
+    // Spatial footstep pool — cycle through footstep variants
+    for (let i = 0; i < SPATIAL_FOOTSTEP_POOL; i++) {
+      const variantIdx = i % FOOTSTEP_COUNT;
+      const idx = String(variantIdx).padStart(2, "0");
+      const url = `${FOOTSTEP_BASE_PATH}${idx}.ogg`;
+      this.spatialFootsteps.push(
+        new Sound(`sp_foot_${i}`, url, this.scene, null, spatialOpts(FOOTSTEP_VOLUME)),
+      );
+    }
+
+    // Spatial attack sound pools
+    this.loadSpatialAnimPool("punch", PUNCH_URLS, spatialOpts(ATTACK_VOLUME));
+    this.loadSpatialAnimPool("heavy_punch", HEAVY_PUNCH_URLS, spatialOpts(ATTACK_VOLUME));
+  }
+
+  private loadSpatialAnimPool(name: string, urls: string[], opts: Record<string, unknown>): void {
+    const sounds: Sound[] = [];
+    for (let i = 0; i < SPATIAL_ANIM_POOL; i++) {
+      const url = urls[i % urls.length];
+      sounds.push(new Sound(`sp_${name}_${i}`, url, this.scene, null, opts));
+    }
+    this.spatialAnimPools.set(name, { sounds, idx: 0 });
   }
 
   /**
@@ -156,6 +210,16 @@ export class SoundManager {
     // One-shot SFX
     for (const [, entry] of this.sfxEntries) {
       entry.sound.setVolume(entry.baseVolume * this.sfxVol * this.masterVol);
+    }
+
+    // Spatial footsteps
+    const spFootVol = FOOTSTEP_VOLUME * this.sfxVol * this.masterVol;
+    for (const s of this.spatialFootsteps) s.setVolume(spFootVol);
+
+    // Spatial anim sounds
+    const spAtkVol = ATTACK_VOLUME * this.sfxVol * this.masterVol;
+    for (const [, pool] of this.spatialAnimPools) {
+      for (const s of pool.sounds) s.setVolume(spAtkVol);
     }
 
     // Ambient
@@ -221,6 +285,25 @@ export class SoundManager {
 
     this.lastFootstepIndex = index;
     this.footsteps[index].play();
+  }
+
+  /** Play a spatial footstep at the given world position (for remote entities). */
+  playSpatialFootstep(position: Vector3): void {
+    if (this.spatialFootsteps.length === 0) return;
+    const sound = this.spatialFootsteps[this.spatialFootstepIdx];
+    this.spatialFootstepIdx = (this.spatialFootstepIdx + 1) % this.spatialFootsteps.length;
+    sound.setPosition(position);
+    sound.play();
+  }
+
+  /** Play a spatial animation sound at the given world position (for remote entities). */
+  playSpatialAnimSound(animName: string, position: Vector3): void {
+    const pool = this.spatialAnimPools.get(animName);
+    if (!pool || pool.sounds.length === 0) return;
+    const sound = pool.sounds[pool.idx];
+    pool.idx = (pool.idx + 1) % pool.sounds.length;
+    sound.setPosition(position);
+    sound.play();
   }
 
   /** Register a single one-shot sound effect */
@@ -322,6 +405,12 @@ export class SoundManager {
       entry.sound.dispose();
     }
     this.sfxEntries.clear();
+    for (const s of this.spatialFootsteps) s.dispose();
+    this.spatialFootsteps = [];
+    for (const [, pool] of this.spatialAnimPools) {
+      for (const s of pool.sounds) s.dispose();
+    }
+    this.spatialAnimPools.clear();
     if (this.ambient) {
       this.ambient.dispose();
       this.ambient = null;

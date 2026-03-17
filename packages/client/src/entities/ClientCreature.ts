@@ -23,6 +23,9 @@ const HIT_FLASH_DURATION = 0.12;
 /** Distance threshold to consider the creature "moving" */
 const MOVE_THRESHOLD = 0.05;
 
+/** Interval between footstep sounds for creatures (seconds) */
+const CREATURE_FOOTSTEP_INTERVAL = 0.35;
+
 export class ClientCreature {
   /** Creature ID from server state */
   public readonly id: string;
@@ -36,6 +39,8 @@ export class ClientCreature {
   public isAggro: boolean = false;
 
   private animController: AnimationController;
+  private soundManager: SoundManager | null = null;
+  private footstepTimer: number = 0;
   private selectionRing: SelectionRing;
 
   // Target state from server
@@ -75,6 +80,10 @@ export class ClientCreature {
     this.id = id;
     this.animController = new AnimationController(soundManager ?? null);
     this.guiTexture = guiTexture;
+    if (soundManager) {
+      this.soundManager = soundManager;
+      this.animController.setSpatialPosition(() => this.mesh.position);
+    }
     this.previousHealth = initialHealth;
 
     // Invisible anchor for position/rotation
@@ -252,8 +261,18 @@ export class ClientCreature {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
         this.animController.playLoop("run");
+
+        // Spatial footstep sounds
+        if (this.soundManager) {
+          this.footstepTimer += dt;
+          if (this.footstepTimer >= CREATURE_FOOTSTEP_INTERVAL) {
+            this.soundManager.playSpatialFootstep(this.mesh.position);
+            this.footstepTimer = 0;
+          }
+        }
       } else {
         this.animController.playLoop("idle");
+        this.footstepTimer = 0;
       }
     }
 

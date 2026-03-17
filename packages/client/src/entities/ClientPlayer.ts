@@ -170,6 +170,11 @@ export class ClientPlayer {
     if (soundManager) {
       this.soundManager = soundManager;
     }
+
+    // Remote players use spatial audio (distance-based attenuation)
+    if (!isLocal && soundManager) {
+      this.animController.setSpatialPosition(() => this.mesh.position);
+    }
   }
 
   /** Attach the loaded GLB character instance. */
@@ -285,12 +290,16 @@ export class ClientPlayer {
         const animSpeed = this.sprinting ? SPRINT_ANIM_SPEED : WALK_ANIM_SPEED;
         this.animController.setSpeedRatio(animSpeed);
 
-        // Footstep sound at regular intervals (local player only)
+        // Footstep sounds at regular intervals
         if (this.soundManager) {
           const stepInterval = this.sprinting ? SPRINT_FOOTSTEP_INTERVAL : FOOTSTEP_INTERVAL;
           this.footstepTimer += dt;
           if (this.footstepTimer >= stepInterval) {
-            this.soundManager.playRandomFootstep();
+            if (this.isLocal) {
+              this.soundManager.playRandomFootstep();
+            } else {
+              this.soundManager.playSpatialFootstep(this.mesh.position);
+            }
             this.footstepTimer = 0;
           }
         }
