@@ -43,6 +43,10 @@ const ROAM_MIN_WAIT = 2.0;
 const ROAM_MAX_WAIT = 6.0;
 /** Max attempts to find a walkable roam target */
 const ROAM_MAX_ATTEMPTS = 3;
+/** Seconds without progress before a roaming creature is considered stuck */
+const ROAM_STUCK_TIMEOUT = 1.5;
+/** Minimum distance² a creature must travel per stuck-check window to not be stuck */
+const ROAM_STUCK_DIST_SQ = 0.1 * 0.1;
 
 function randomRoamWait(): number {
   return ROAM_MIN_WAIT + Math.random() * (ROAM_MAX_WAIT - ROAM_MIN_WAIT);
@@ -77,6 +81,11 @@ interface CreatureAI {
   threatTable: Map<string, number>;
   /** Countdown until next roam attempt */
   roamTimer: number;
+  /** Stuck detection: timer counts up while roaming */
+  roamStuckTimer: number;
+  /** Stuck detection: last known position */
+  roamLastX: number;
+  roamLastZ: number;
 }
 
 export class AISystem {
@@ -106,6 +115,9 @@ export class AISystem {
       leashRange,
       threatTable: new Map(),
       roamTimer: randomRoamWait(),
+      roamStuckTimer: 0,
+      roamLastX: creature.x,
+      roamLastZ: creature.z,
     };
     this.entries.push(entry);
     this.entryById.set(creatureId, entry);
@@ -205,6 +217,25 @@ export class AISystem {
             // Arrived at roam destination
             entry.state = AIState.IDLE;
             entry.roamTimer = randomRoamWait();
+          } else {
+            // Stuck detection: if creature hasn't moved enough, abort roam
+            entry.roamStuckTimer += dt;
+            if (entry.roamStuckTimer >= ROAM_STUCK_TIMEOUT) {
+              const movedSq =
+                (entry.creature.x - entry.roamLastX) ** 2 +
+                (entry.creature.z - entry.roamLastZ) ** 2;
+              if (movedSq < ROAM_STUCK_DIST_SQ) {
+                // Stuck — abort and return to idle
+                entry.creature.isMoving = false;
+                entry.creature.path = [];
+                entry.state = AIState.IDLE;
+                entry.roamTimer = randomRoamWait();
+              }
+              // Reset check window
+              entry.roamStuckTimer = 0;
+              entry.roamLastX = entry.creature.x;
+              entry.roamLastZ = entry.creature.z;
+            }
           }
         } else {
           // IDLE — tick roam timer
@@ -424,6 +455,9 @@ export class AISystem {
         entry.creature.currentPathIndex = 0;
         entry.creature.isMoving = true;
         entry.state = AIState.ROAM;
+        entry.roamStuckTimer = 0;
+        entry.roamLastX = entry.creature.x;
+        entry.roamLastZ = entry.creature.z;
         return;
       }
     }

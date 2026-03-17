@@ -60,11 +60,20 @@ export class Pathfinder {
       if (!this.isWalkable(x0, y0)) return false;
       if (x0 === x1 && y0 === y1) break;
       const e2 = 2 * err;
-      if (e2 > -dy) {
+      const stepX = e2 > -dy;
+      const stepY = e2 < dx;
+      // Prevent diagonal corner-cutting: if stepping diagonally,
+      // both adjacent cardinal tiles must also be walkable
+      if (stepX && stepY) {
+        if (!this.isWalkable(x0 + sx, y0) || !this.isWalkable(x0, y0 + sy)) {
+          return false;
+        }
+      }
+      if (stepX) {
         err -= dy;
         x0 += sx;
       }
-      if (e2 < dx) {
+      if (stepY) {
         err += dx;
         y0 += sy;
       }
@@ -80,6 +89,11 @@ export class Pathfinder {
 
     if (!this.isWalkable(ex, ey)) return [];
 
+    // Fast path: if direct line-of-sight, skip A* entirely
+    if (this.hasLineOfSight(start, end)) {
+      return [{ x: end.x, z: end.z }];
+    }
+
     const tilePath = this.astar(sx, sy, ex, ey);
     if (tilePath.length === 0) return [];
 
@@ -89,7 +103,37 @@ export class Pathfinder {
       z: node.y * TILE_SIZE,
     }));
     path[path.length - 1] = { x: end.x, z: end.z };
-    return path;
+
+    // Smooth path: remove unnecessary waypoints using line-of-sight checks
+    return this.smoothPath(start, path);
+  }
+
+  /**
+   * Remove redundant waypoints by checking line-of-sight.
+   * Greedy algorithm: from current anchor, find the farthest reachable
+   * waypoint with clear LoS, skip everything in between.
+   */
+  private smoothPath(start: WorldPos, path: WorldPos[]): WorldPos[] {
+    if (path.length <= 1) return path;
+
+    const smoothed: WorldPos[] = [];
+    let anchor: WorldPos = start;
+    let i = 0;
+
+    while (i < path.length) {
+      // Look ahead as far as possible from the current anchor
+      let farthest = i;
+      for (let j = i + 1; j < path.length; j++) {
+        if (this.hasLineOfSight(anchor, path[j])) {
+          farthest = j;
+        }
+      }
+      smoothed.push(path[farthest]);
+      anchor = path[farthest];
+      i = farthest + 1;
+    }
+
+    return smoothed;
   }
 
   /** Numeric key for tile coordinates — avoids string allocation */
