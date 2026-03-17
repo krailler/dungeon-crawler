@@ -9,6 +9,9 @@ import { tutorialStore } from "../ui/stores/tutorialStore";
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
 
+/** Min interval (ms) between floor raycasts while holding (≈20 Hz) */
+const RAYCAST_INTERVAL = 50;
+
 /**
  * Metadata placed on any mesh that the player can click to interact with.
  * Future interactables (chests, NPCs, …) reuse the same shape.
@@ -76,6 +79,8 @@ export class InputManager {
   private sprintActive: boolean = false;
   /** Current cursor style applied to the canvas */
   private currentCursor: string = "";
+  /** Last time a floor raycast was performed (ms) — used to throttle raycasts */
+  private lastRaycastTime: number = 0;
 
   constructor(deps: InputManagerDeps) {
     this.scene = deps.scene;
@@ -192,8 +197,12 @@ export class InputManager {
     return !!el && el !== this.canvas;
   }
 
-  /** Update cursor world position from raycast (called every frame while holding). */
+  /** Update cursor world position from raycast (throttled to ~20 Hz while holding). */
   private updateCursorPosition(): void {
+    const now = performance.now();
+    if (now - this.lastRaycastTime < RAYCAST_INTERVAL) return;
+    this.lastRaycastTime = now;
+
     if (this.isPointerOverUi()) return;
     const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) =>
       this.floorMeshSet.has(mesh),

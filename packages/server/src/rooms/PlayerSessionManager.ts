@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { eq, and, notInArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
+import type { DbTransaction } from "../db/database";
 import { characters, characterInventory } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
@@ -489,29 +490,42 @@ export class PlayerSessionManager {
   }
 
   savePlayerProgress(player: PlayerState): void {
-    const { characterId, gold, xp, level, strength, vitality, agility, statPoints } = player;
-    if (!characterId) return;
+    if (!player.characterId) return;
     const hash = this.buildProgressHash(player);
-    if (this.lastSavedHash.get(characterId) === hash) return;
-    const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
-    const db = getDb();
+    if (this.lastSavedHash.get(player.characterId) === hash) return;
 
-    // Save character stats + inventory in parallel
-    const statsPromise = db
+    const db = getDb();
+    db.transaction(async (tx) => {
+      await this.savePlayerTx(tx, player);
+    })
+      .then(() => {
+        this.lastSavedHash.set(player.characterId, hash);
+        this.log.debug(
+          {
+            characterId: player.characterId,
+            gold: player.gold,
+            xp: player.xp,
+            level: player.level,
+          },
+          "Progress saved",
+        );
+      })
+      .catch((err) => {
+        this.log.error({ characterId: player.characterId, err }, "Failed to save progress");
+      });
+  }
+
+  /** Write a single player's stats + inventory inside an existing transaction. */
+  private async savePlayerTx(tx: DbTransaction, player: PlayerState): Promise<void> {
+    const { characterId, gold, xp, level, strength, vitality, agility, statPoints } = player;
+    const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
+
+    await tx
       .update(characters)
       .set({ gold, xp, level, strength, vitality, agility, statPoints, tutorialsCompleted })
       .where(eq(characters.id, characterId));
 
-    const inventoryPromise = this.saveInventory(characterId, player);
-
-    Promise.all([statsPromise, inventoryPromise])
-      .then(() => {
-        this.lastSavedHash.set(characterId, hash);
-        this.log.debug({ characterId, gold, xp, level }, "Progress saved");
-      })
-      .catch((err) => {
-        this.log.error({ characterId, err }, "Failed to save progress");
-      });
+    await this.saveInventoryTx(tx, characterId, player);
   }
 
   private buildProgressHash(player: PlayerState): string {
@@ -546,9 +560,11 @@ export class PlayerSessionManager {
     }
   }
 
-  private async saveInventory(characterId: string, player: PlayerState): Promise<void> {
-    const db = getDb();
-
+  private async saveInventoryTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
     const activeSlots: number[] = [];
     const rows: { characterId: string; slotIndex: number; itemId: string; quantity: number }[] = [];
     player.inventory.forEach((slot, key) => {
@@ -559,36 +575,34 @@ export class PlayerSessionManager {
       }
     });
 
-    // Upsert active slots + delete emptied slots in a transaction
-    await db.transaction(async (tx) => {
-      if (rows.length > 0) {
-        await tx
-          .insert(characterInventory)
-          .values(rows)
-          .onConflictDoUpdate({
-            target: [characterInventory.characterId, characterInventory.slotIndex],
-            set: {
-              itemId: sql`excluded.item_id`,
-              quantity: sql`excluded.quantity`,
-            },
-          });
-      }
+    // Upsert active slots + delete emptied slots
+    if (rows.length > 0) {
+      await tx
+        .insert(characterInventory)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [characterInventory.characterId, characterInventory.slotIndex],
+          set: {
+            itemId: sql`excluded.item_id`,
+            quantity: sql`excluded.quantity`,
+          },
+        });
+    }
 
-      // Delete slots that are no longer in use
-      if (activeSlots.length > 0) {
-        await tx
-          .delete(characterInventory)
-          .where(
-            and(
-              eq(characterInventory.characterId, characterId),
-              notInArray(characterInventory.slotIndex, activeSlots),
-            ),
-          );
-      } else {
-        // Inventory is empty — delete all
-        await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
-      }
-    });
+    // Delete slots that are no longer in use
+    if (activeSlots.length > 0) {
+      await tx
+        .delete(characterInventory)
+        .where(
+          and(
+            eq(characterInventory.characterId, characterId),
+            notInArray(characterInventory.slotIndex, activeSlots),
+          ),
+        );
+    } else {
+      // Inventory is empty — delete all
+      await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
+    }
   }
 
   /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */
@@ -619,9 +633,34 @@ export class PlayerSessionManager {
   }
 
   saveAllPlayersProgress(): void {
+    const dirtyPlayers: PlayerState[] = [];
     this.bridge.state.players.forEach((player: PlayerState) => {
-      this.savePlayerProgress(player);
+      if (!player.characterId) return;
+      const hash = this.buildProgressHash(player);
+      if (this.lastSavedHash.get(player.characterId) !== hash) {
+        dirtyPlayers.push(player);
+      }
     });
+
+    if (dirtyPlayers.length === 0) return;
+
+    const db = getDb();
+
+    db.transaction(async (tx) => {
+      for (const player of dirtyPlayers) {
+        await this.savePlayerTx(tx, player);
+      }
+    })
+      .then(() => {
+        for (const player of dirtyPlayers) {
+          const hash = this.buildProgressHash(player);
+          this.lastSavedHash.set(player.characterId, hash);
+        }
+        this.log.debug({ count: dirtyPlayers.length }, "Batch progress saved");
+      })
+      .catch((err) => {
+        this.log.error({ err }, "Failed to batch save progress");
+      });
   }
 
   getSessionForAccount(accountId: string): string | undefined {

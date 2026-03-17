@@ -1,9 +1,17 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
+import type { PostgresJsTransaction } from "drizzle-orm/postgres-js";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
 import { resolve } from "node:path";
 import { logger } from "../logger";
 import * as schema from "./schema";
+
+/** Drizzle transaction type for use in function signatures */
+export type DbTransaction = PostgresJsTransaction<
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
 
 const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://dungeon:dungeon@localhost:5432/dungeon";

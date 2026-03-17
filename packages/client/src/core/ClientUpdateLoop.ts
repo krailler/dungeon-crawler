@@ -150,12 +150,25 @@ export class ClientUpdateLoop {
     }
 
     // Minimap: update active creature positions (moving or attacking only)
-    this.activeCreaturesMap.clear();
+    // Reuse existing position objects to reduce GC pressure
+    const staleIds = new Set(this.activeCreaturesMap.keys());
     for (const [id, creature] of creatures) {
       if (creature.isActive) {
         const ep = creature.getWorldPosition();
-        this.activeCreaturesMap.set(id, { x: ep.x, z: ep.z });
+        const existing = this.activeCreaturesMap.get(id);
+        if (existing) {
+          existing.x = ep.x;
+          existing.z = ep.z;
+        } else {
+          this.activeCreaturesMap.set(id, { x: ep.x, z: ep.z });
+        }
+        staleIds.delete(id);
+      } else {
+        staleIds.add(id); // ensure inactive creatures are removed
       }
+    }
+    for (const id of staleIds) {
+      this.activeCreaturesMap.delete(id);
     }
     minimapStore.setActiveCreatures(this.activeCreaturesMap);
 
