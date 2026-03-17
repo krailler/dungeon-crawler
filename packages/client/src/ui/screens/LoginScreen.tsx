@@ -44,10 +44,6 @@ export const LoginScreen = (): ReactNode => {
           {t("reconnect.backToLogin")}
         </button>
         {auth.error && <p className="mt-4 text-center text-xs text-red-400">{auth.error}</p>}
-
-        <span className="absolute bottom-3 right-4 text-[10px] text-slate-600">
-          Build Version: {PROTOCOL_VERSION}
-        </span>
       </div>
     );
   }
