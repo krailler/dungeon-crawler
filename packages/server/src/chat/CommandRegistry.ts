@@ -19,6 +19,8 @@ export interface CommandContext {
     i18nKey?: string,
     i18nParams?: Record<string, string | number>,
   ) => void;
+  /** Resolve a player target: uses args[0] name if provided, otherwise falls back to the current target. */
+  resolveTarget: () => { sessionId: string; player: PlayerState } | null;
 }
 
 export interface CommandDefinition {

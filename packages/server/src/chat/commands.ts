@@ -2,7 +2,7 @@ import type { Client } from "colyseus";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
 import type { PlayerState } from "../state/PlayerState";
-import { MAX_LEVEL } from "@dungeon/shared";
+import { MAX_LEVEL, LifeState } from "@dungeon/shared";
 import { notifyLevelProgress } from "./notifyLevelProgress";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { getItemDef } from "../items/ItemRegistry";
@@ -49,22 +49,16 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "kill",
-    usage: "/kill <player>",
-    description: "Kill a player",
+    usage: "/kill [player]",
+    description: "Kill a player (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) {
+      const target = ctx.resolveTarget();
+      if (!target) {
         ctx.replyError("Usage: /kill <player_name>", "cmd.usageKill");
         return;
       }
-      const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
-        });
-        return;
-      }
-      target.player.health = 0;
+      bridge.killPlayer(target.sessionId);
       chat.broadcastSystemI18n(
         "chat.killedByAdmin",
         { name: target.player.characterName },
@@ -76,21 +70,17 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   registry.register({
     name: "heal",
     usage: "/heal [player]",
-    description: "Heal a player to full HP (self if omitted)",
+    description: "Heal a player to full HP (target or self if omitted)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      let target: { player: PlayerState; sessionId: string };
-      if (ctx.args[0]) {
-        const found = bridge.findPlayerByName(ctx.args[0]);
-        if (!found) {
-          ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-            name: ctx.args[0],
-          });
-          return;
-        }
-        target = found;
-      } else {
-        target = { player: ctx.player, sessionId: ctx.sessionId };
+      const target = ctx.resolveTarget() ?? { player: ctx.player, sessionId: ctx.sessionId };
+      if (target.player.lifeState !== LifeState.ALIVE) {
+        ctx.replyError(
+          `${target.player.characterName} is not alive. Use /revive first.`,
+          "cmd.notAlive",
+          { name: target.player.characterName },
+        );
+        return;
       }
       target.player.health = target.player.maxHealth;
       ctx.reply(`Healed ${target.player.characterName} to full HP.`, "cmd.healed", {
@@ -100,20 +90,42 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   });
 
   registry.register({
-    name: "tp",
-    usage: "/tp <player>",
-    description: "Teleport to a player",
+    name: "revive",
+    usage: "/revive [player]",
+    description: "Revive a downed/dead player (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) {
-        ctx.replyError("Usage: /tp <player_name>", "cmd.usageTp");
+      const target = ctx.resolveTarget();
+      if (!target) {
+        ctx.replyError("Usage: /revive <player_name>", "cmd.usageRevive");
         return;
       }
-      const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
+      if (target.player.lifeState === LifeState.ALIVE) {
+        ctx.replyError(`${target.player.characterName} is already alive.`, "cmd.alreadyAlive", {
+          name: target.player.characterName,
         });
+        return;
+      }
+      const success = bridge.revivePlayer(target.sessionId);
+      if (success) {
+        chat.broadcastSystemI18n(
+          "chat.adminRevived",
+          { name: target.player.characterName },
+          `${target.player.characterName} has been revived by divine intervention!`,
+        );
+      }
+    },
+  });
+
+  registry.register({
+    name: "tp",
+    usage: "/tp [player]",
+    description: "Teleport to a player (or current target)",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const target = ctx.resolveTarget();
+      if (!target) {
+        ctx.replyError("Usage: /tp <player_name>", "cmd.usageTp");
         return;
       }
       ctx.player.x = target.player.x;
@@ -129,19 +141,13 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "leader",
-    usage: "/leader <player>",
-    description: "Transfer party leadership to a player",
+    usage: "/leader [player]",
+    description: "Transfer party leadership (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) {
-        ctx.replyError("Usage: /leader <player_name>", "cmd.usageLeader");
-        return;
-      }
-      const target = bridge.findPlayerByName(ctx.args[0]);
+      const target = ctx.resolveTarget();
       if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
-        });
+        ctx.replyError("Usage: /leader <player_name>", "cmd.usageLeader");
         return;
       }
       if (target.player.isLeader) {
@@ -167,25 +173,47 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "setlevel",
-    usage: "/setlevel <player> <level>",
-    description: "Set a player's level (1-30)",
+    usage: "/setlevel [player] <level>",
+    description: "Set a player's level (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0] || !ctx.args[1]) {
-        ctx.replyError("Usage: /setlevel <player_name> <level>", "cmd.usageSetlevel");
+      let target: { sessionId: string; player: PlayerState } | null;
+      let levelStr: string | undefined;
+
+      // If only one arg and it's a number, use target for player
+      if (ctx.args[0] && !ctx.args[1] && !isNaN(parseInt(ctx.args[0], 10))) {
+        levelStr = ctx.args[0];
+        // Resolve from current target (resolveTarget checks args[0] first which is the number, not a name)
+        const targetSessionId = bridge.getPlayerTarget(ctx.sessionId);
+        if (targetSessionId) {
+          const p = bridge.getPlayer(targetSessionId);
+          target = p ? { sessionId: targetSessionId, player: p } : null;
+        } else {
+          target = null;
+        }
+      } else if (ctx.args[0] && ctx.args[1]) {
+        levelStr = ctx.args[1];
+        target = bridge.findPlayerByName(ctx.args[0]);
+        if (!target) {
+          ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
+            name: ctx.args[0],
+          });
+          return;
+        }
+      } else {
+        ctx.replyError("Usage: /setlevel [player_name] <level>", "cmd.usageSetlevel");
         return;
       }
-      const targetLevel = parseInt(ctx.args[1], 10);
+
+      if (!target) {
+        ctx.replyError("Usage: /setlevel [player_name] <level>", "cmd.usageSetlevel");
+        return;
+      }
+
+      const targetLevel = parseInt(levelStr, 10);
       if (isNaN(targetLevel) || targetLevel < 1 || targetLevel > MAX_LEVEL) {
         ctx.replyError(`Level must be between 1 and ${MAX_LEVEL}.`, "cmd.invalidLevel", {
           max: MAX_LEVEL,
-        });
-        return;
-      }
-      const target = bridge.findPlayerByName(ctx.args[0]);
-      if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
         });
         return;
       }
@@ -210,19 +238,13 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "kick",
-    usage: "/kick <player>",
-    description: "Kick a player from the room",
+    usage: "/kick [player]",
+    description: "Kick a player (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) {
-        ctx.replyError("Usage: /kick <player_name>", "cmd.usageKick");
-        return;
-      }
-      const target = bridge.findPlayerByName(ctx.args[0]);
+      const target = ctx.resolveTarget();
       if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
-        });
+        ctx.replyError("Usage: /kick <player_name>", "cmd.usageKick");
         return;
       }
       const targetClient = findClient(bridge, target.sessionId);
@@ -238,19 +260,13 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "resettutorials",
-    usage: "/resettutorials <player>",
-    description: "Reset all completed tutorials for a player",
+    usage: "/resettutorials [player]",
+    description: "Reset tutorials (or current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0]) {
-        ctx.replyError("Usage: /resettutorials <player_name>", "cmd.usageResettutorials");
-        return;
-      }
-      const target = bridge.findPlayerByName(ctx.args[0]);
+      const target = ctx.resolveTarget();
       if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
-        });
+        ctx.replyError("Usage: /resettutorials <player_name>", "cmd.usageResettutorials");
         return;
       }
 
@@ -271,28 +287,50 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
 
   registry.register({
     name: "give",
-    usage: "/give <player> <item_id> [quantity]",
-    description: "Give an item to a player",
+    usage: "/give [player] <item_id> [quantity]",
+    description: "Give an item (target if no player specified)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      if (!ctx.args[0] || !ctx.args[1]) {
-        ctx.replyError("Usage: /give <player_name> <item_id> [quantity]", "cmd.usageGive");
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /give [player_name] <item_id> [quantity]", "cmd.usageGive");
         return;
       }
-      const target = bridge.findPlayerByName(ctx.args[0]);
+
+      let target: { sessionId: string; player: PlayerState } | null;
+      let itemId: string;
+      let qtyStr: string | undefined;
+
+      // Try first arg as player name; if not found, treat it as item_id and use target
+      const byName = bridge.findPlayerByName(ctx.args[0]);
+      if (byName && ctx.args[1]) {
+        // /give playerName itemId [qty]
+        target = byName;
+        itemId = ctx.args[1];
+        qtyStr = ctx.args[2];
+      } else {
+        // /give itemId [qty] — use current target
+        const targetSessionId = bridge.getPlayerTarget(ctx.sessionId);
+        if (targetSessionId) {
+          const p = bridge.getPlayer(targetSessionId);
+          target = p ? { sessionId: targetSessionId, player: p } : null;
+        } else {
+          target = null;
+        }
+        itemId = ctx.args[0];
+        qtyStr = ctx.args[1];
+      }
+
       if (!target) {
-        ctx.replyError(`Player not found: ${ctx.args[0]}`, "cmd.playerNotFound", {
-          name: ctx.args[0],
-        });
+        ctx.replyError("Usage: /give [player_name] <item_id> [quantity]", "cmd.usageGive");
         return;
       }
-      const itemId = ctx.args[1];
+
       const def = getItemDef(itemId);
       if (!def) {
         ctx.replyError(`Unknown item: ${itemId}`, "cmd.itemNotFound", { id: itemId });
         return;
       }
-      const qty = ctx.args[2] ? parseInt(ctx.args[2], 10) : 1;
+      const qty = qtyStr ? parseInt(qtyStr, 10) : 1;
       if (isNaN(qty) || qty < 1) {
         ctx.replyError("Quantity must be a positive number.", "cmd.invalidQuantity");
         return;

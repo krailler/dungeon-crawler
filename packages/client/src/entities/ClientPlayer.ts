@@ -428,7 +428,51 @@ export class ClientPlayer {
     this.selectionRing.setSelected(selected);
   }
 
+  private lifeAlpha: number = 1.0;
+  /** Cloned materials per-mesh so we can change transparency without affecting other players */
+  private ownMaterials: Map<AbstractMesh, PBRMaterial> = new Map();
+
+  /** Visually represent the player's life state (downed = low alpha, dead = very low alpha). */
+  setLifeState(lifeState: string): void {
+    const isAlive = lifeState === "alive";
+    this.lifeAlpha = isAlive ? 1.0 : lifeState === "downed" ? 0.5 : 0.2;
+
+    for (const m of this.modelMeshes) {
+      const mat = m.material;
+      if (!(mat instanceof PBRMaterial)) continue;
+
+      if (isAlive) {
+        // Restore shared original material if we cloned before
+        const own = this.ownMaterials.get(m);
+        if (own) {
+          // The original material is the one before we cloned — find via name
+          // Simply set the clone back to opaque
+          own.alpha = 1;
+          own.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+        }
+        m.visibility = 1;
+      } else {
+        // Clone material per-mesh so we don't affect other player instances
+        if (!this.ownMaterials.has(m)) {
+          const clone = mat.clone(`${mat.name}_death_${this.sessionId}`);
+          if (clone) {
+            m.material = clone;
+            this.ownMaterials.set(m, clone);
+          }
+        }
+        const own = this.ownMaterials.get(m);
+        if (own) {
+          own.alpha = this.lifeAlpha;
+          own.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+        }
+        m.visibility = 1;
+      }
+    }
+  }
+
   dispose(): void {
+    for (const [, mat] of this.ownMaterials) mat.dispose();
+    this.ownMaterials.clear();
     this.selectionRing.dispose();
     for (const t of this.pendingTimers) clearTimeout(t);
     this.pendingTimers = [];

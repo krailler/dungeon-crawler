@@ -22,6 +22,8 @@ import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { lootBagStore } from "../ui/stores/lootBagStore";
 import { targetStore } from "../ui/stores/targetStore";
+import { creatureStore } from "../ui/stores/creatureStore";
+import { deathStore } from "../ui/stores/deathStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { minimapStore } from "../ui/stores/minimapStore";
@@ -34,6 +36,8 @@ import {
   GateType,
   INTERACT_RANGE,
   TutorialStep,
+  LifeState,
+  REVIVE_RANGE,
 } from "@dungeon/shared";
 import { t } from "../i18n/i18n";
 import type { SkillCooldownMessage, AdminDebugInfoMessage } from "@dungeon/shared";
@@ -251,24 +255,12 @@ export class StateSync {
                 if (pickType === "creature") {
                   const creatureState = (room.state as any).creatures.get(pickId);
                   if (!creatureState || creatureState.isDead) return;
-                  targetStore.selectCreature(
-                    pickId,
-                    t(creatureState.nameKey || `creatures.${creatureState.creatureType}`),
-                    creatureState.health,
-                    creatureState.maxHealth,
-                    creatureState.level,
-                  );
+                  targetStore.selectCreature(pickId);
                 } else if (pickType === "player") {
                   if (pickId === this.localSessionId) return; // don't target self
                   const playerState = (room.state as any).players.get(pickId);
                   if (!playerState) return;
-                  targetStore.selectPlayer(
-                    pickId,
-                    playerState.characterName || pickId.slice(0, 4).toUpperCase(),
-                    playerState.health,
-                    playerState.maxHealth,
-                    playerState.level,
-                  );
+                  targetStore.selectPlayer(pickId);
                 }
               },
               onNothingPicked: () => targetStore.clear(),
@@ -276,34 +268,49 @@ export class StateSync {
                 const local = this.players.get(room.sessionId);
                 if (!local) return;
                 const pPos = local.getWorldPosition();
+                const currentId = targetStore.getSnapshot().targetId;
+
                 // Collect alive creatures sorted by distance
-                const sorted: { id: string; dist: number }[] = [];
+                const creatures: { id: string; dist: number }[] = [];
                 for (const [id, creature] of this.creatures) {
                   if (creature.isDead) continue;
                   const cPos = creature.getWorldPosition();
                   const dx = cPos.x - pPos.x;
                   const dz = cPos.z - pPos.z;
-                  sorted.push({ id, dist: dx * dx + dz * dz });
+                  creatures.push({ id, dist: dx * dx + dz * dz });
                 }
-                if (sorted.length === 0) return;
-                sorted.sort((a, b) => a.dist - b.dist);
-                // Find current target in sorted list; select next (wrap around)
-                const currentId = targetStore.getSnapshot().targetId;
+
+                if (creatures.length > 0) {
+                  // Cycle through creatures
+                  creatures.sort((a, b) => a.dist - b.dist);
+                  let nextIdx = 0;
+                  if (currentId) {
+                    const curIdx = creatures.findIndex((e) => e.id === currentId);
+                    if (curIdx >= 0) nextIdx = (curIdx + 1) % creatures.length;
+                  }
+                  const nextId = creatures[nextIdx].id;
+                  targetStore.selectCreature(nextId);
+                  return;
+                }
+
+                // No alive creatures — cycle through other players
+                const players: { id: string; dist: number }[] = [];
+                for (const [id, player] of this.players) {
+                  if (id === room.sessionId) continue; // skip self
+                  const oPos = player.getWorldPosition();
+                  const dx = oPos.x - pPos.x;
+                  const dz = oPos.z - pPos.z;
+                  players.push({ id, dist: dx * dx + dz * dz });
+                }
+                if (players.length === 0) return;
+                players.sort((a, b) => a.dist - b.dist);
                 let nextIdx = 0;
                 if (currentId) {
-                  const curIdx = sorted.findIndex((e) => e.id === currentId);
-                  if (curIdx >= 0) nextIdx = (curIdx + 1) % sorted.length;
+                  const curIdx = players.findIndex((e) => e.id === currentId);
+                  if (curIdx >= 0) nextIdx = (curIdx + 1) % players.length;
                 }
-                const nextId = sorted[nextIdx].id;
-                const creatureState = (room.state as any).creatures.get(nextId);
-                if (!creatureState) return;
-                targetStore.selectCreature(
-                  nextId,
-                  creatureState.creatureType || nextId,
-                  creatureState.health,
-                  creatureState.maxHealth,
-                  creatureState.level,
-                );
+                const nextPlayerId = players[nextIdx].id;
+                targetStore.selectPlayer(nextPlayerId);
               },
             });
 
@@ -409,6 +416,7 @@ export class StateSync {
           online: player.online,
           isLeader: player.isLeader,
           level: player.level,
+          lifeState: player.lifeState ?? LifeState.ALIVE,
           // Private fields — only for local player
           ...(secret && {
             gold: secret.gold,
@@ -485,6 +493,11 @@ export class StateSync {
             player.isSprinting,
           );
 
+          // Update visual life state (downed = semi-transparent, dead = very transparent)
+          if (player.lifeState) {
+            clientPlayer.setLifeState(player.lifeState);
+          }
+
           // Level-up: sound (local only) + particle aura (all players)
           if (player.level > prevLevel) {
             if (isLocal) {
@@ -500,11 +513,41 @@ export class StateSync {
             online: player.online,
             isLeader: player.isLeader,
             level: player.level,
+            lifeState: player.lifeState ?? LifeState.ALIVE,
+            bleedTimer: player.bleedTimer ?? 0,
+            respawnTimer: player.respawnTimer ?? 0,
+            reviveProgress: player.reviveProgress ?? 0,
           });
-          // Keep target frame in sync when targeting a player
+          // Update revive range flag only if targeting a downed player
           const tSnap = targetStore.getSnapshot();
-          if (tSnap.targetId === sessionId && tSnap.targetType === "player") {
-            targetStore.updateHealth(player.health, player.maxHealth, player.health <= 0);
+          if (
+            tSnap.targetId === sessionId &&
+            tSnap.targetType === "player" &&
+            player.lifeState === LifeState.DOWNED
+          ) {
+            let inRange = false;
+            const localPlayer = (room.state as any).players.get(this.localSessionId);
+            if (localPlayer) {
+              const dx = localPlayer.x - player.x;
+              const dz = localPlayer.z - player.z;
+              inRange = dx * dx + dz * dz <= REVIVE_RANGE * REVIVE_RANGE;
+            }
+            targetStore.setInReviveRange(inRange);
+          }
+          // Sync death store for the local player
+          if (isLocal) {
+            let reviverName = "";
+            if (player.reviverSessionId) {
+              const reviverState = (room.state as any).players.get(player.reviverSessionId);
+              reviverName = reviverState?.characterName || player.reviverSessionId.slice(0, 6);
+            }
+            deathStore.update(
+              player.lifeState ?? LifeState.ALIVE,
+              player.bleedTimer ?? 0,
+              player.respawnTimer ?? 0,
+              player.reviveProgress ?? 0,
+              reviverName,
+            );
           }
         });
       }),
@@ -559,6 +602,16 @@ export class StateSync {
           this.deps.addShadowCaster(m);
         }
 
+        // Populate creature store for UI (TargetFrame reads from here)
+        creatureStore.set(id, {
+          id,
+          name: t(creature.nameKey || `creatures.${creature.creatureType}`),
+          health: creature.health,
+          maxHealth: creature.maxHealth,
+          level: creature.level,
+          isDead: creature.isDead,
+        });
+
         // Listen to changes on this creature
         $(creature).onChange(() => {
           clientCreature.setServerState(
@@ -571,14 +624,15 @@ export class StateSync {
             creature.animState,
             creature.isAggro,
           );
-          // Keep target frame in sync
-          const tSnap = targetStore.getSnapshot();
-          if (tSnap.targetId === id && tSnap.targetType === "creature") {
-            if (creature.isDead) {
-              targetStore.clear();
-            } else {
-              targetStore.updateHealth(creature.health, creature.maxHealth, false);
-            }
+          // Update creature store
+          creatureStore.update(id, {
+            health: creature.health,
+            maxHealth: creature.maxHealth,
+            isDead: creature.isDead,
+          });
+          // Auto-clear target when creature dies
+          if (creature.isDead && targetStore.getSnapshot().targetId === id) {
+            targetStore.clear();
           }
         });
       }),
@@ -592,6 +646,7 @@ export class StateSync {
           clientCreature.dispose();
           this.creatures.delete(id);
         }
+        creatureStore.remove(id);
         // Clear target if the removed creature was selected
         if (targetStore.getSnapshot().targetId === id) {
           targetStore.clear();
@@ -601,6 +656,7 @@ export class StateSync {
 
     // ── Targeting ──────────────────────────────────────────────────────────
     targetStore.setRoom(room);
+    deathStore.setRoom(room);
 
     // Update selection rings reactively (only when target changes, not every frame)
     let prevTargetId: string | null = null;
@@ -742,6 +798,8 @@ export class StateSync {
     this.lootBags.clear();
     lootBagStore.reset();
     targetStore.reset();
+    creatureStore.reset();
+    deathStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();

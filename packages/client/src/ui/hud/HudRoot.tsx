@@ -23,6 +23,7 @@ import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { ActionFeedback } from "./ActionFeedback";
 import { LootBagPanel } from "./LootBagPanel";
+import { DeathOverlay } from "./DeathOverlay";
 import { TargetFrame } from "./TargetFrame";
 import { targetStore } from "../stores/targetStore";
 import { HudButton } from "../components/HudButton";
@@ -36,6 +37,8 @@ import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 
 import { healthColor } from "../components/healthColor";
+import { isEntityDead } from "../components/lifeState";
+import { LifeState, BLEEDOUT_DURATION } from "@dungeon/shared";
 
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
@@ -60,7 +63,9 @@ const PartyRow = ({
   const { t } = useTranslation();
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
-  const isDead = member.health <= 0;
+  const isDowned = member.lifeState === LifeState.DOWNED;
+  const isFullDead = member.lifeState === LifeState.DEAD;
+  const isDead = isEntityDead(member.lifeState, member.health);
   const isLowHp = !isDead && pct <= 30;
   const barClass = isDead ? "from-red-900/60 via-red-900/40 to-red-950/50" : healthColor(pct);
 
@@ -117,7 +122,12 @@ const PartyRow = ({
               <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
                 {t("character.level", { level: member.level })}
               </span>
-              {isDead && (
+              {isDowned && (
+                <span className="rounded bg-amber-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  {t("party.downed")}
+                </span>
+              )}
+              {isFullDead && (
                 <span className="rounded bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
                   {t("party.dead")}
                 </span>
@@ -146,14 +156,24 @@ const PartyRow = ({
             <span
               className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : isLowHp ? "text-red-400 animate-pulse" : "text-slate-300"}`}
             >
-              {formatHealth(member)}
+              {isDowned
+                ? `${Math.max(0, member.bleedTimer ?? 0).toFixed(1)}s`
+                : isFullDead
+                  ? `${Math.max(0, member.respawnTimer ?? 0).toFixed(1)}s`
+                  : formatHealth(member)}
             </span>
           </div>
         </div>
         <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">
           <div
             className={`h-full rounded-full bg-gradient-to-r ${barClass} transition-[width] duration-300`}
-            style={{ width: isDead ? "100%" : `${pct}%` }}
+            style={{
+              width: isDowned
+                ? `${Math.max(0, Math.min(100, ((member.bleedTimer ?? 0) / BLEEDOUT_DURATION) * 100))}%`
+                : isDead
+                  ? "100%"
+                  : `${pct}%`,
+            }}
           />
         </div>
       </div>
@@ -215,13 +235,7 @@ export const HudRoot = (): ReactNode => {
         targetStore.clear();
       } else {
         playUiSfx("ui_click");
-        targetStore.selectPlayer(
-          member.id,
-          member.name,
-          member.health,
-          member.maxHealth,
-          member.level,
-        );
+        targetStore.selectPlayer(member.id);
       }
     },
     [targetSnap.targetId, targetSnap.targetType],
@@ -281,6 +295,7 @@ export const HudRoot = (): ReactNode => {
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       {inventoryOpen && <InventoryPanel onClose={closeInventory} />}
       <LootBagPanel />
+      <DeathOverlay />
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">

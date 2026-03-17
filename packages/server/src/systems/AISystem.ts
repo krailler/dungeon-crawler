@@ -6,6 +6,7 @@ import {
   CREATURE_REPATH_INTERVAL,
   TILE_SIZE,
   computeDamage,
+  LifeState,
 } from "@dungeon/shared";
 
 const AIState = {
@@ -324,7 +325,7 @@ export class AISystem {
   ): void {
     // Passive proximity threat for players in range
     for (const [sessionId, player] of players) {
-      if (player.health <= 0) {
+      if (player.lifeState !== LifeState.ALIVE) {
         entry.threatTable.delete(sessionId);
         continue;
       }
@@ -381,7 +382,7 @@ export class AISystem {
     for (const [sessionId, threat] of entry.threatTable) {
       if (threat <= 0) continue;
       const player = players.get(sessionId);
-      if (!player || player.health <= 0) continue;
+      if (!player || player.lifeState !== LifeState.ALIVE) continue;
       if (threat > bestThreat) {
         bestThreat = threat;
         bestSessionId = sessionId;

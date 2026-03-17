@@ -9,21 +9,14 @@ export type TargetType = "creature" | "player";
 export type TargetSnapshot = {
   targetId: string | null;
   targetType: TargetType | null;
-  name: string;
-  health: number;
-  maxHealth: number;
-  level: number;
-  isDead: boolean;
+  /** Whether the local player is close enough to revive (computed from 3D positions). */
+  inReviveRange: boolean;
 };
 
 const EMPTY: TargetSnapshot = {
   targetId: null,
   targetType: null,
-  name: "",
-  health: 0,
-  maxHealth: 0,
-  level: 0,
-  isDead: false,
+  inReviveRange: false,
 };
 
 const listeners = new Set<Listener>();
@@ -52,48 +45,34 @@ export const targetStore = {
     room = null;
   },
 
-  selectCreature(id: string, name: string, health: number, maxHealth: number, level: number): void {
-    snapshot = {
-      targetId: id,
-      targetType: "creature",
-      name,
-      health,
-      maxHealth,
-      level,
-      isDead: false,
-    };
+  selectCreature(id: string): void {
+    snapshot = { targetId: id, targetType: "creature", inReviveRange: false };
     emit();
     room?.send(MessageType.SET_TARGET, { targetId: id } satisfies SetTargetMessage);
   },
 
-  selectPlayer(id: string, name: string, health: number, maxHealth: number, level: number): void {
-    snapshot = {
+  selectPlayer(id: string): void {
+    snapshot = { targetId: id, targetType: "player", inReviveRange: false };
+    emit();
+    room?.send(MessageType.SET_TARGET, {
       targetId: id,
       targetType: "player",
-      name,
-      health,
-      maxHealth,
-      level,
-      isDead: false,
-    };
-    emit();
-    // No server message — player targets don't affect combat (no PvP)
+    } satisfies SetTargetMessage);
   },
 
-  updateHealth(health: number, maxHealth: number, isDead: boolean): void {
-    if (snapshot.targetId === null) return;
-    snapshot = { ...snapshot, health, maxHealth, isDead };
+  /** Update the revive-range flag (computed from 3D world positions in StateSync). */
+  setInReviveRange(inRange: boolean): void {
+    if (snapshot.targetId === null || snapshot.targetType !== "player") return;
+    if (snapshot.inReviveRange === inRange) return;
+    snapshot = { ...snapshot, inReviveRange: inRange };
     emit();
   },
 
   clear(): void {
     if (snapshot.targetId === null) return;
-    const wasCreature = snapshot.targetType === "creature";
     snapshot = EMPTY;
     emit();
-    if (wasCreature) {
-      room?.send(MessageType.SET_TARGET, { targetId: null } satisfies SetTargetMessage);
-    }
+    room?.send(MessageType.SET_TARGET, { targetId: null } satisfies SetTargetMessage);
   },
 
   reset(): void {

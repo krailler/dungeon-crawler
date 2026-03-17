@@ -403,7 +403,7 @@ export const ChatPanel = (): ReactNode => {
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-5 left-5 w-96 flex flex-col"
+      className="pointer-events-auto absolute bottom-5 left-5 z-[300] w-96 flex flex-col"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

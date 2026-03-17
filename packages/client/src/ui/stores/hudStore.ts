@@ -37,6 +37,10 @@ export type PartyMember = {
   online: boolean;
   isLeader: boolean;
   level: number;
+  lifeState?: string;
+  bleedTimer?: number;
+  respawnTimer?: number;
+  reviveProgress?: number;
   // Private fields — only available for the local player (via @view)
   gold?: number;
   xp?: number;

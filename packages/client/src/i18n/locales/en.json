@@ -32,6 +32,7 @@
     "promoteLeader": "Promote to Leader",
     "kick": "Kick from Party",
     "dead": "Dead",
+    "downed": "Downed",
     "offline": "Offline",
     "dungeonLevel": "Lv.{{level}}"
   },
@@ -131,6 +132,11 @@
     "reconnectWarning": "{{name}} has {{seconds}}s to reconnect.",
     "reconnectExpired": "{{name}} failed to reconnect and has been removed.",
     "slain": "{{name}} has been slain!",
+    "downed": "{{name}} has been downed!",
+    "died": "{{name}} has died!",
+    "revived": "{{name}} has been revived by {{reviver}}!",
+    "respawned": "{{name}} has respawned.",
+    "adminRevived": "{{name}} has been revived by divine intervention!",
     "dungeonReshape": "The dungeon reshapes itself...",
     "rateLimited": "You are sending messages too fast.",
     "messageTooLong": "Message too long (max {{max}} characters).",
@@ -200,6 +206,16 @@
     "take": "Take",
     "empty": "Empty"
   },
+  "death": {
+    "downed": "You are downed!",
+    "downedSub": "Wait for a teammate to revive you...",
+    "bleedOut": "Bleeding out in:",
+    "dead": "You have died",
+    "respawning": "Respawning in:",
+    "reviving": "Being revived...",
+    "revive": "Revive",
+    "outOfRange": "Too far away"
+  },
   "feedback": {
     "dead": "You are dead",
     "noTarget": "No enemy in range",
@@ -224,6 +240,9 @@
     "itemNotFound": "Unknown item: {{id}}",
     "invalidQuantity": "Quantity must be a positive number.",
     "inventoryFull": "{{name}}'s inventory is full.",
-    "gaveItem": "Gave {{amount}}× {{item}} to {{name}}."
+    "gaveItem": "Gave {{amount}}× {{item}} to {{name}}.",
+    "notAlive": "{{name}} is not alive. Use /revive first.",
+    "usageRevive": "Usage: /revive <player_name>",
+    "alreadyAlive": "{{name}} is already alive."
   }
 }

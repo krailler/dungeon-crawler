@@ -35,6 +35,7 @@ export type {
   ActionFeedbackMessage,
   LootTakeMessage,
   SetTargetMessage,
+  ReviveStartMessage,
 } from "./protocol.js";
 
 export {

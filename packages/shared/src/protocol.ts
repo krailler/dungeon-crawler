@@ -34,6 +34,7 @@ export const MessageType = {
   LOOT_TAKE: "loot:take",
   SET_TARGET: "target:set",
   TOGGLE_AOI: "debug:aoi",
+  REVIVE_START: "revive:start",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -279,8 +280,18 @@ export interface ActionFeedbackMessage {
 
 /** Client → Server: set or clear the player's attack target */
 export interface SetTargetMessage {
-  /** Creature ID to target, or null to clear */
+  /** Entity ID to target, or null to clear */
   targetId: string | null;
+  /** Type of target: "creature" or "player". Defaults to "creature" for backward compat. */
+  targetType?: "creature" | "player";
+}
+
+// ── Revive ──────────────────────────────────────────────────────────────────
+
+/** Client → Server: start channelling revive on a downed teammate */
+export interface ReviveStartMessage {
+  /** Session ID of the downed player to revive */
+  targetSessionId: string;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

@@ -18,6 +18,14 @@ import {
   STAMINA_DRAIN_PER_SEC,
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
+  LifeState,
+  BLEEDOUT_DURATION,
+  RESPAWN_BASE_TIME,
+  RESPAWN_TIME_INCREMENT,
+  RESPAWN_MAX_TIME,
+  REVIVE_CHANNEL_DURATION,
+  REVIVE_RANGE,
+  REVIVE_HP_PERCENT,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -45,6 +53,8 @@ export interface GameLoopBridge {
   readonly clock: ClockTimer;
   /** Called when a creature is permanently removed (death cleanup). */
   onCreatureRemoved?: (creatureId: string) => void;
+  /** Get the dungeon entrance position for respawning. */
+  getSpawnPoint(): { x: number; z: number } | null;
 }
 
 export class GameLoop {
@@ -90,9 +100,12 @@ export class GameLoop {
     // Tick item cooldowns
     this.tickItemCooldowns(dtSec);
 
+    // Update life states (downed, dead, respawn, revive channels)
+    this.updateLifeStates(dtSec);
+
     // Move players along their paths
     for (const [, player] of this.bridge.state.players) {
-      if (player.health <= 0) {
+      if (player.lifeState !== LifeState.ALIVE) {
         player.isMoving = false;
         continue;
       }
@@ -110,16 +123,11 @@ export class GameLoop {
       this.tickPlayersMap,
       (sessionId, damage) => {
         const player = this.bridge.state.players.get(sessionId);
-        if (!player) return;
+        if (!player || player.lifeState !== LifeState.ALIVE) return;
         player.health -= damage;
         if (player.health < 0) player.health = 0;
         if (player.health <= 0) {
-          const name = player.characterName || sessionId.slice(0, 6);
-          this.bridge.chatSystem.broadcastSystemI18n(
-            "chat.slain",
-            { name },
-            `${name} has been slain!`,
-          );
+          this.transitionToDowned(player, sessionId);
         }
       },
       (event) => {
@@ -135,7 +143,7 @@ export class GameLoop {
           dmg: event.finalDamage,
           hp: player.health,
           maxHp: player.maxHealth,
-          kill: player.health <= 0,
+          kill: player.lifeState !== LifeState.ALIVE,
         };
         this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
       },
@@ -156,7 +164,7 @@ export class GameLoop {
 
     // Enforce wall margin for all entities (after AI movement + collision pushback)
     this.bridge.state.players.forEach((player: PlayerState) => {
-      if (player.health > 0) this.enforceWallMargin(player);
+      if (player.lifeState === LifeState.ALIVE) this.enforceWallMargin(player);
     });
     this.bridge.state.creatures.forEach((creature: CreatureState) => {
       if (!creature.isDead) this.enforceWallMargin(creature);
@@ -208,7 +216,7 @@ export class GameLoop {
         let aliveCount = 0;
         let levelSum = 0;
         this.bridge.state.players.forEach((p: PlayerState) => {
-          if (p.health > 0) {
+          if (p.lifeState === LifeState.ALIVE) {
             aliveCount++;
             levelSum += p.level;
           }
@@ -217,7 +225,7 @@ export class GameLoop {
         const goldPerPlayer = computeGoldDrop(killedCreature.level, avgPartyLevel, aliveCount);
 
         this.bridge.state.players.forEach((p: PlayerState) => {
-          if (p.health > 0) {
+          if (p.lifeState === LifeState.ALIVE) {
             p.gold += goldPerPlayer;
           }
         });
@@ -231,7 +239,7 @@ export class GameLoop {
 
         // Distribute XP to alive players (not split — each player gets full XP)
         this.bridge.state.players.forEach((p: PlayerState, sessionId: string) => {
-          if (p.health <= 0 || p.level >= MAX_LEVEL) return;
+          if (p.lifeState !== LifeState.ALIVE || p.level >= MAX_LEVEL) return;
 
           const xpGain = computeXpDrop(killedCreature.level, p.level);
           const levelUps = p.addXp(xpGain);
@@ -282,7 +290,7 @@ export class GameLoop {
   /** Drain / regenerate stamina for all players each tick. */
   private updateStamina(dt: number): void {
     for (const [, player] of this.bridge.state.players) {
-      if (player.health <= 0) {
+      if (player.lifeState !== LifeState.ALIVE) {
         player.isSprinting = false;
         player.sprintRequested = false;
         continue;
@@ -434,7 +442,7 @@ export class GameLoop {
     entities.length = 0;
 
     this.bridge.state.players.forEach((player: PlayerState) => {
-      if (player.health <= 0) return;
+      if (player.lifeState !== LifeState.ALIVE) return;
       entities.push({
         get x() {
           return player.x;
@@ -517,6 +525,172 @@ export class GameLoop {
     const tx = Math.round(worldX / TILE_SIZE);
     const tz = Math.round(worldZ / TILE_SIZE);
     return this.bridge.pathfinder.isWalkable(tx, tz);
+  }
+
+  /** Kill a player (admin /kill, etc.) — enters the normal death flow. */
+  killPlayer(sessionId: string): void {
+    const player = this.bridge.state.players.get(sessionId);
+    if (!player || player.lifeState !== LifeState.ALIVE) return;
+    player.health = 0;
+    this.transitionToDowned(player, sessionId);
+  }
+
+  /** Revive a downed or dead player instantly at full HP (no channel). */
+  revivePlayer(sessionId: string): boolean {
+    const player = this.bridge.state.players.get(sessionId);
+    if (!player) return false;
+    if (player.lifeState === LifeState.ALIVE) return false;
+
+    player.lifeState = LifeState.ALIVE;
+    player.health = player.maxHealth;
+    player.bleedTimer = 0;
+    player.respawnTimer = 0;
+    player.reviveProgress = 0;
+    player.reviverSessionId = "";
+
+    // Clear cooldowns
+    player.itemCooldowns.clear();
+    this.bridge.combatSystem.clearCooldowns(sessionId);
+
+    return true;
+  }
+
+  // ── Life state management ──────────────────────────────────────────
+
+  /** Transition a player from ALIVE to DOWNED. */
+  private transitionToDowned(player: PlayerState, sessionId: string): void {
+    player.lifeState = LifeState.DOWNED;
+    player.bleedTimer = BLEEDOUT_DURATION;
+    player.isMoving = false;
+    player.isSprinting = false;
+    player.sprintRequested = false;
+    player.path = [];
+
+    const name = player.characterName || sessionId.slice(0, 6);
+    this.bridge.chatSystem.broadcastSystemI18n("chat.downed", { name }, `${name} has been downed!`);
+  }
+
+  /** Transition a player from DOWNED to DEAD (bleed-out expired). */
+  private transitionToDead(player: PlayerState, sessionId: string): void {
+    player.lifeState = LifeState.DEAD;
+    player.bleedTimer = 0;
+    player.reviveProgress = 0;
+    player.reviverSessionId = "";
+
+    const rawTimer = RESPAWN_BASE_TIME + player.deathCount * RESPAWN_TIME_INCREMENT;
+    player.respawnTimer = Math.min(rawTimer, RESPAWN_MAX_TIME);
+    player.deathCount++;
+
+    const name = player.characterName || sessionId.slice(0, 6);
+    this.bridge.chatSystem.broadcastSystemI18n("chat.died", { name }, `${name} has died!`);
+  }
+
+  /** Respawn a dead player at the dungeon entrance. */
+  private respawnPlayer(player: PlayerState, sessionId: string): void {
+    player.lifeState = LifeState.ALIVE;
+    player.health = player.maxHealth;
+    player.respawnTimer = 0;
+    player.bleedTimer = 0;
+    player.reviveProgress = 0;
+    player.reviverSessionId = "";
+
+    // Clear cooldowns so the player starts fresh
+    player.itemCooldowns.clear();
+    this.bridge.combatSystem.clearCooldowns(sessionId);
+
+    const spawn = this.bridge.getSpawnPoint();
+    if (spawn) {
+      player.x = spawn.x;
+      player.z = spawn.z;
+    }
+
+    const name = player.characterName || "???";
+    this.bridge.chatSystem.broadcastSystemI18n(
+      "chat.respawned",
+      { name },
+      `${name} has respawned.`,
+    );
+  }
+
+  /** Called each tick to update downed/dead timers and revive channels. */
+  private updateLifeStates(dt: number): void {
+    for (const [sessionId, player] of this.bridge.state.players) {
+      if (player.lifeState === LifeState.DOWNED) {
+        // Tick revive channel if active — bleedout is paused while being revived
+        if (player.reviverSessionId) {
+          const reviver = this.bridge.state.players.get(player.reviverSessionId);
+          if (
+            !reviver ||
+            reviver.lifeState !== LifeState.ALIVE ||
+            reviver.isMoving ||
+            reviver.animState !== "" ||
+            !this.isInReviveRange(reviver, player)
+          ) {
+            // Reviver died, disconnected, moved, attacked, or out of range — cancel
+            this.cancelReviveOn(player);
+          } else {
+            player.reviveProgress += dt / REVIVE_CHANNEL_DURATION;
+            if (player.reviveProgress >= 1.0) {
+              // Revive successful!
+              player.lifeState = LifeState.ALIVE;
+              player.health = Math.max(1, Math.floor(player.maxHealth * REVIVE_HP_PERCENT));
+              player.bleedTimer = 0;
+              player.reviveProgress = 0;
+              const reviverName = reviver.characterName || player.reviverSessionId.slice(0, 6);
+              player.reviverSessionId = "";
+              const name = player.characterName || sessionId.slice(0, 6);
+              this.bridge.chatSystem.broadcastSystemI18n(
+                "chat.revived",
+                { name, reviver: reviverName },
+                `${name} has been revived by ${reviverName}!`,
+              );
+              continue;
+            }
+            // Bleedout paused while revive is channeling — skip timer decrement
+            continue;
+          }
+        }
+
+        // Tick bleed-out timer (only when no active revive)
+        player.bleedTimer -= dt;
+        if (player.bleedTimer <= 0) {
+          this.transitionToDead(player, sessionId);
+        }
+      } else if (player.lifeState === LifeState.DEAD) {
+        player.respawnTimer -= dt;
+        if (player.respawnTimer <= 0) {
+          this.respawnPlayer(player, sessionId);
+        }
+      }
+    }
+  }
+
+  private isInReviveRange(reviver: PlayerState, target: PlayerState): boolean {
+    const dx = reviver.x - target.x;
+    const dz = reviver.z - target.z;
+    return dx * dx + dz * dz <= REVIVE_RANGE * REVIVE_RANGE;
+  }
+
+  private cancelReviveOn(player: PlayerState): void {
+    player.reviveProgress = 0;
+    player.reviverSessionId = "";
+  }
+
+  /** Start a revive channel on a downed player. Returns true on success. */
+  startRevive(reviverSessionId: string, targetSessionId: string): boolean {
+    const reviver = this.bridge.state.players.get(reviverSessionId);
+    const target = this.bridge.state.players.get(targetSessionId);
+    if (!reviver || !target) return false;
+    if (reviver.lifeState !== LifeState.ALIVE) return false;
+    if (reviver.isMoving || reviver.animState !== "") return false;
+    if (target.lifeState !== LifeState.DOWNED) return false;
+    if (!this.isInReviveRange(reviver, target)) return false;
+    // Only one reviver at a time
+    if (target.reviverSessionId && target.reviverSessionId !== reviverSessionId) return false;
+
+    target.reviverSessionId = reviverSessionId;
+    target.reviveProgress = 0;
+    return true;
   }
 
   setDebugPaths(sessionId: string, enabled: boolean): void {

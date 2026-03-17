@@ -4,6 +4,7 @@ import {
   xpToNextLevel,
   MAX_LEVEL,
   INVENTORY_MAX_SLOTS,
+  LifeState,
 } from "@dungeon/shared";
 import type { AllocatableStatValue, RoleValue } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
@@ -24,12 +25,21 @@ export class PlayerState extends Schema {
   @type("int16") level: number = 1;
   @type("boolean") isSprinting: boolean = false;
 
+  // ── Death / revive fields (visible to all clients) ────────────────────────
+  @type("string") lifeState: string = LifeState.ALIVE;
+  @type("float32") bleedTimer: number = 0;
+  @type("float32") respawnTimer: number = 0;
+  @type("float32") reviveProgress: number = 0;
+  @type("string") reviverSessionId: string = "";
+
   // ── Private fields (only visible to the owning client via StateView) ───────
   @view() @type(PlayerSecretState) secret = new PlayerSecretState();
 
   // ── Server-only (not synced at all) ────────────────────────────────────────
   characterId: string = "";
   path: { x: number; z: number }[] = [];
+  /** Number of real deaths this session (for escalating respawn timer) */
+  deathCount: number = 0;
   currentPathIndex: number = 0;
   speed: number = 0;
   attackCooldown: number = 1.0;

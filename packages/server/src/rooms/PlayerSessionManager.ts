@@ -40,6 +40,8 @@ export interface SessionRoomBridge {
   sendToClient(sessionId: string, type: string, message: unknown): void;
   allowReconnection(client: Client, seconds: number): Deferred<Client>;
   onSessionCleanup(sessionId: string): void;
+  /** Called after a player is permanently removed from state. */
+  onPlayerRemoved(): void;
 }
 
 export class PlayerSessionManager {
@@ -109,9 +111,9 @@ export class PlayerSessionManager {
         "Migrating player state from old session",
       );
 
-      // Clean up old session references
+      // Clean up old session references (don't notify — player is being migrated, not removed)
       this.clearReconnectTimers(oldSessionId);
-      this.removePlayerFromAllSystems(oldSessionId);
+      this.removePlayerFromAllSystems(oldSessionId, false);
 
       // Revive the player under the new session
       existingPlayer.online = true;
@@ -401,11 +403,12 @@ export class PlayerSessionManager {
     this.kickedSessions.add(sessionId);
   }
 
-  removePlayerFromAllSystems(sessionId: string): void {
+  removePlayerFromAllSystems(sessionId: string, notify: boolean = true): void {
     this.bridge.state.players.delete(sessionId);
     this.bridge.combatSystem.removePlayer(sessionId);
     this.bridge.aiSystem.removePlayer(sessionId);
     this.bridge.chatSystem.removePlayer(sessionId);
+    if (notify) this.bridge.onPlayerRemoved();
   }
 
   findSpawnPosition(): { x: number; z: number } | null {

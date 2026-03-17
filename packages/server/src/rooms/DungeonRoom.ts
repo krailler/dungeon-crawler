@@ -46,6 +46,7 @@ import {
   ALLOCATABLE_STATS,
   INTERACT_RANGE,
   MAX_LEVEL,
+  LifeState,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -64,6 +65,7 @@ import type {
   ItemDefsRequestMessage,
   LootTakeMessage,
   SetTargetMessage,
+  ReviveStartMessage,
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
@@ -86,6 +88,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private gateSystem!: GateSystem;
   private gameLoop!: GameLoop;
   private sessionManager!: PlayerSessionManager;
+  /** Tracks which player session each player is targeting (for commands fallback). */
+  private playerTargets: Map<string, string> = new Map();
   private tileMap!: TileMap;
   private log!: Logger;
 
@@ -106,7 +110,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   onCreate(): void {
     this.log = createRoomLogger(this.roomId);
-    // Keep the room alive even when all players leave
+    // We manage room disposal ourselves via onPlayerRemoved — Colyseus
+    // autoDispose would close the room when the last *client* disconnects,
+    // but we need to keep the room alive for the reconnection window.
     this.autoDispose = false;
 
     this.state = new DungeonState();
@@ -148,6 +154,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.sessionManager.reassignLeader();
       },
       isDungeonStarted: () => this.isDungeonStarted(),
+      killPlayer: (sessionId: string) => this.gameLoop.killPlayer(sessionId),
+      revivePlayer: (sessionId: string) => this.gameLoop.revivePlayer(sessionId),
+      getPlayerTarget: (sessionId: string) => this.playerTargets.get(sessionId) ?? null,
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
@@ -189,6 +198,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         sendToClient: this.sendToClient,
         allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
         onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
+        onPlayerRemoved: () => self.checkRoomEmpty(),
       },
       this.log,
     );
@@ -222,6 +232,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       onCreatureRemoved: (creatureId: string) => {
         self.allCreatures.delete(creatureId);
       },
+      getSpawnPoint: () => self.sessionManager.findSpawnPosition(),
     });
 
     // Register message handlers
@@ -292,7 +303,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.SKILL_USE, (client: Client, data: { skillId: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
-      if (player.health <= 0) {
+      if (player.lifeState !== LifeState.ALIVE) {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
         return;
       }
@@ -353,7 +364,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     });
     this.onMessage(MessageType.SPRINT, (client: Client, data: SprintMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || player.health <= 0) return;
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
       player.sprintRequested = data.active;
       // Auto-complete the sprint tutorial on first use
       if (data.active) {
@@ -365,7 +376,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.ITEM_USE, (client: Client, data: ItemUseMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
-      if (player.health <= 0) {
+      if (player.lifeState !== LifeState.ALIVE) {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
         return;
       }
@@ -421,12 +432,22 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.SET_TARGET, (client: Client, data: SetTargetMessage) => {
       if (data.targetId === null) {
         this.combatSystem.setTarget(client.sessionId, null);
+        this.playerTargets.delete(client.sessionId);
         return;
       }
       if (typeof data.targetId !== "string") return;
-      const creature = this.state.creatures.get(data.targetId);
-      if (!creature || creature.isDead) return;
-      this.combatSystem.setTarget(client.sessionId, data.targetId);
+
+      if (data.targetType === "player") {
+        // Player target — store for command fallback, no combat effect
+        this.playerTargets.set(client.sessionId, data.targetId);
+        this.combatSystem.setTarget(client.sessionId, null);
+      } else {
+        // Creature target (default)
+        const creature = this.state.creatures.get(data.targetId);
+        if (!creature || creature.isDead) return;
+        this.combatSystem.setTarget(client.sessionId, data.targetId);
+        this.playerTargets.delete(client.sessionId);
+      }
     });
 
     // Item definitions: client requests defs lazily by id
@@ -446,7 +467,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Loot: take an item from a loot bag on the ground
     this.onMessage(MessageType.LOOT_TAKE, (client: Client, data: LootTakeMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || player.health <= 0) return;
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
 
       const bag = this.state.lootBags.get(data.lootBagId);
       if (!bag) return;
@@ -511,6 +532,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
     });
 
+    // Revive: start channelling on a downed teammate
+    this.onMessage(MessageType.REVIVE_START, (client: Client, data: ReviveStartMessage) => {
+      if (!data.targetSessionId || typeof data.targetSessionId !== "string") return;
+      this.gameLoop.startRevive(client.sessionId, data.targetSessionId);
+    });
+
     // Auto-save gold for all players periodically
     this.clock.setInterval(() => {
       this.sessionManager.saveAllPlayersProgress();
@@ -549,7 +576,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
       let inRange = false;
       for (const [, player] of this.state.players) {
-        if (player.health <= 0) continue;
+        if (player.lifeState !== LifeState.ALIVE) continue;
         const dx = creature.x - player.x;
         const dz = creature.z - player.z;
         if (dx * dx + dz * dz <= rangeSq) {
@@ -660,6 +687,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const spawnPos = this.sessionManager.findSpawnPosition();
     this.state.players.forEach((player: PlayerState) => {
       player.health = player.maxHealth;
+      player.lifeState = LifeState.ALIVE;
+      player.bleedTimer = 0;
+      player.respawnTimer = 0;
+      player.reviveProgress = 0;
+      player.reviverSessionId = "";
+      player.deathCount = 0;
       player.isMoving = false;
       player.path = [];
       player.currentPathIndex = 0;
@@ -832,9 +865,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.sessionManager.handleLeave(client);
   }
 
+  /**
+   * If no players remain in the room (neither online nor offline waiting to
+   * reconnect), dispose the room so it is freed from the server.
+   */
+  private checkRoomEmpty(): void {
+    if (this.state.players.size > 0) return;
+    this.log.info("All players removed — disposing room");
+    this.disconnect();
+  }
+
   private handleMove(client: Client, data: MoveMessage): void {
     const player = this.state.players.get(client.sessionId);
-    if (!player || player.health <= 0) return;
+    if (!player || player.lifeState !== LifeState.ALIVE) return;
 
     // Validate target is a floor tile
     const tx = Math.round(data.x / TILE_SIZE);

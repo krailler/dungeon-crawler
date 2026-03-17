@@ -1,6 +1,12 @@
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
-import { ATTACK_ANIM_DURATION, computeDamage, SKILL_DEFS, SkillId } from "@dungeon/shared";
+import {
+  ATTACK_ANIM_DURATION,
+  computeDamage,
+  SKILL_DEFS,
+  SkillId,
+  LifeState,
+} from "@dungeon/shared";
 import type { SkillIdValue } from "@dungeon/shared";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
@@ -85,6 +91,12 @@ export class CombatSystem {
     }
   }
 
+  /** Reset all skill cooldowns for a player (e.g. on respawn). */
+  clearCooldowns(sessionId: string): void {
+    const combat = this.playerCooldowns.get(sessionId);
+    if (combat) combat.skillCooldowns.clear();
+  }
+
   // ── Shared helpers ───────────────────────────────────────────────────────
 
   /** Find an alive creature to attack. Prefers the player's selected target if in range. */
@@ -161,7 +173,7 @@ export class CombatSystem {
   ): SkillCooldownEvent | null {
     const combat = this.playerCooldowns.get(sessionId);
     if (!combat) return null;
-    if (player.health <= 0) return null;
+    if (player.lifeState !== LifeState.ALIVE) return null;
 
     const def = SKILL_DEFS[skillId];
     if (!def || def.passive) return null;
@@ -263,7 +275,7 @@ export class CombatSystem {
       combat.attackCooldown -= dt;
       if (combat.attackCooldown > 0) continue;
 
-      if (!player || player.health <= 0) continue;
+      if (!player || player.lifeState !== LifeState.ALIVE) continue;
 
       // Skip auto-attack if player has it disabled
       if (!player.autoAttackEnabled) continue;

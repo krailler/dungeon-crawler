@@ -25,6 +25,12 @@ export interface ChatRoomBridge {
   kickPlayer(sessionId: string): void;
   /** Whether the dungeon expedition has started (lobby gate opened) */
   isDungeonStarted(): boolean;
+  /** Kill a player through the normal death flow (downed → dead → respawn). */
+  killPlayer(sessionId: string): void;
+  /** Admin-revive a downed/dead player instantly. Returns true on success. */
+  revivePlayer(sessionId: string): boolean;
+  /** Get the session ID of the player that this player is targeting, if any. */
+  getPlayerTarget(sessionId: string): string | null;
 }
 
 export class ChatSystem {
@@ -283,6 +289,18 @@ export class ChatSystem {
         } else {
           this.sendToClient(client, ChatCategory.MESSAGE, fallbackText, ChatVariant.ERROR);
         }
+      },
+      resolveTarget: () => {
+        // Use first arg as player name if provided
+        if (args[0]) {
+          return this.bridge.findPlayerByName(args[0]);
+        }
+        // Fall back to current target (if targeting a player)
+        const targetSessionId = this.bridge.getPlayerTarget(client.sessionId);
+        if (!targetSessionId) return null;
+        const targetPlayer = this.bridge.getPlayer(targetSessionId);
+        if (!targetPlayer) return null;
+        return { sessionId: targetSessionId, player: targetPlayer };
       },
     };
 
