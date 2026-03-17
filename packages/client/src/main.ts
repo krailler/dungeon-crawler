@@ -40,5 +40,13 @@ authStore.subscribe(() => {
   }
 });
 
+// Dispose engine + WebGL context on page unload to prevent memory accumulation
+window.addEventListener("beforeunload", () => {
+  if (game) {
+    game.dispose();
+    game = null;
+  }
+});
+
 // Try to restore a saved token on page load
 authStore.tryRestore();

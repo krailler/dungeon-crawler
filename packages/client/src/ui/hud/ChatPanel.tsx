@@ -6,6 +6,7 @@ import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
 import { CHAT_FADE_MS } from "@dungeon/shared";
 import type { CommandInfo } from "@dungeon/shared";
+import { settingsStore } from "../stores/settingsStore";
 
 // ── Send callback (set from ClientGame) ─────────────────────────────────────
 
@@ -294,7 +295,7 @@ export const ChatPanel = (): ReactNode => {
       // Don't intercept if already typing in our input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (e.key === "Enter") {
+      if (e.key === settingsStore.getBinding("chat")) {
         e.preventDefault();
         chatStore.setInputOpen(true);
       }

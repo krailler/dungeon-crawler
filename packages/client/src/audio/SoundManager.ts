@@ -1,5 +1,6 @@
 import { Sound } from "@babylonjs/core/Audio/sound";
 import type { Scene } from "@babylonjs/core/scene";
+import type { VolumeSettings } from "../ui/stores/settingsStore";
 
 // Side-effect: registers AudioSceneComponent so Engine.audioEngine gets created
 import "@babylonjs/core/Audio/audioSceneComponent";
@@ -7,44 +8,55 @@ import "@babylonjs/core/Audio/audioSceneComponent";
 /** Number of footstep variants available */
 const FOOTSTEP_COUNT = 10;
 
-/** Volume for footstep sounds (0.0 to 1.0) */
+/** Base volumes per category (before master/category multipliers) */
 const FOOTSTEP_VOLUME = 0.35;
+const ATTACK_VOLUME = 0.5;
+const SFX_VOLUME = 0.6;
+const SFX_GATE_VOLUME = 0.4;
+const AMBIENT_VOLUME = 1;
 
 /** Base path for footstep audio files */
 const FOOTSTEP_BASE_PATH = "/audio/footsteps/footstep";
-
-/** Volume for attack/animation sounds */
-const ATTACK_VOLUME = 0.5;
-
-/** SFX config */
-const SFX_VOLUME = 0.6;
-const SFX_GATE_VOLUME = 0.4;
-
-/** Ambient sound config */
 const AMBIENT_URL = "/audio/ambient/cave_loop.ogg";
-const AMBIENT_VOLUME = 1;
 
 /** Tracks a set of sound variants for a single animation */
 interface AnimSoundEntry {
   sounds: Sound[];
+  baseVolumes: number[];
   lastIndex: number;
+}
+
+/** A sound with its base volume for volume recalculation */
+interface SfxEntry {
+  sound: Sound;
+  baseVolume: number;
 }
 
 export class SoundManager {
   private scene: Scene;
   private footsteps: Sound[] = [];
+  private footstepBaseVol: number = FOOTSTEP_VOLUME;
   private lastFootstepIndex: number = -1;
   private animSounds: Map<string, AnimSoundEntry> = new Map();
-  private sfx: Map<string, Sound> = new Map();
+  private sfxEntries: Map<string, SfxEntry> = new Map();
   private ambient: Sound | null = null;
+  private ambientBaseVol: number = AMBIENT_VOLUME;
   private loaded: boolean = false;
+
+  /** Current volume multipliers (updated via applyVolumes) */
+  private masterVol: number = 1;
+  private sfxVol: number = 0.6;
+  private ambientVol: number = 1;
+
+  /** Debug mute override (from debugStore ambient toggle) */
+  private ambientMuted: boolean = false;
 
   constructor(scene: Scene) {
     this.scene = scene;
   }
 
   /**
-   * Create all footstep Sound instances.
+   * Create all Sound instances.
    * Sounds start loading their audio data immediately; they will be
    * playable once the browser audio context is unlocked (first user click).
    */
@@ -92,11 +104,43 @@ export class SoundManager {
   }
 
   /**
+   * Apply volume settings from the settings store.
+   * Re-calculates effective volume for every sound: base × category × master.
+   */
+  applyVolumes(v: VolumeSettings): void {
+    this.masterVol = v.master;
+    this.sfxVol = v.sfx;
+    this.ambientVol = v.ambient;
+
+    // Footsteps (sfx category)
+    const footVol = this.footstepBaseVol * this.sfxVol * this.masterVol;
+    for (const sound of this.footsteps) {
+      sound.setVolume(footVol);
+    }
+
+    // Animation sounds (sfx category)
+    for (const [, entry] of this.animSounds) {
+      for (let i = 0; i < entry.sounds.length; i++) {
+        entry.sounds[i].setVolume(entry.baseVolumes[i] * this.sfxVol * this.masterVol);
+      }
+    }
+
+    // One-shot SFX
+    for (const [, entry] of this.sfxEntries) {
+      entry.sound.setVolume(entry.baseVolume * this.sfxVol * this.masterVol);
+    }
+
+    // Ambient
+    this.applyAmbientVolume();
+  }
+
+  /**
    * Register sound variants for an animation name.
    * Future animations just add another call here.
    */
   private registerAnimSound(animName: string, urls: string[], volume: number): void {
     const sounds: Sound[] = [];
+    const baseVolumes: number[] = [];
     for (const url of urls) {
       const name = `${animName}_${url.split("/").pop()}`;
       const sound = new Sound(name, url, this.scene, null, {
@@ -105,8 +149,9 @@ export class SoundManager {
         loop: false,
       });
       sounds.push(sound);
+      baseVolumes.push(volume);
     }
-    this.animSounds.set(animName, { sounds, lastIndex: -1 });
+    this.animSounds.set(animName, { sounds, baseVolumes, lastIndex: -1 });
   }
 
   /**
@@ -157,13 +202,13 @@ export class SoundManager {
       autoplay: false,
       loop: false,
     });
-    this.sfx.set(name, sound);
+    this.sfxEntries.set(name, { sound, baseVolume: volume });
   }
 
   /** Play a named sound effect (registered via registerSfx) */
   playSfx(name: string): void {
-    const sound = this.sfx.get(name);
-    if (sound) sound.play();
+    const entry = this.sfxEntries.get(name);
+    if (entry) entry.sound.play();
   }
 
   /** Start the ambient cave loop */
@@ -173,10 +218,20 @@ export class SoundManager {
     }
   }
 
-  /** Mute or unmute the ambient loop (controls volume, not playback) */
+  /** Mute or unmute the ambient loop (debug toggle — overrides volume slider) */
   setAmbientMuted(muted: boolean): void {
+    this.ambientMuted = muted;
+    this.applyAmbientVolume();
+  }
+
+  /** Recalculate ambient volume considering both settings and debug mute */
+  private applyAmbientVolume(): void {
     if (!this.ambient) return;
-    this.ambient.setVolume(muted ? 0 : AMBIENT_VOLUME);
+    if (this.ambientMuted) {
+      this.ambient.setVolume(0);
+    } else {
+      this.ambient.setVolume(this.ambientBaseVol * this.ambientVol * this.masterVol);
+    }
   }
 
   dispose(): void {
@@ -190,10 +245,10 @@ export class SoundManager {
       }
     }
     this.animSounds.clear();
-    for (const [, sound] of this.sfx) {
-      sound.dispose();
+    for (const [, entry] of this.sfxEntries) {
+      entry.sound.dispose();
     }
-    this.sfx.clear();
+    this.sfxEntries.clear();
     if (this.ambient) {
       this.ambient.dispose();
       this.ambient = null;

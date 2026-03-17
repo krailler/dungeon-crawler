@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
+import { settingsStore, displayKeyName } from "../stores/settingsStore";
+import type { BindableActionValue } from "../stores/settingsStore";
 import { SwordIcon } from "../icons/SwordIcon";
 import { FistIcon } from "../icons/FistIcon";
 import { LockIcon } from "../icons/LockIcon";
@@ -99,18 +101,26 @@ export const SkillBar = (): ReactNode => {
     [slots],
   );
 
-  // Keyboard shortcuts: 1-5 activate skills
+  const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
+
+  // Build skill binding keys array from settings
+  const skillBindKeys: string[] = useMemo(() => {
+    const actions: BindableActionValue[] = ["skill_1", "skill_2", "skill_3", "skill_4", "skill_5"];
+    return actions.map((a) => settings.keybindings[a]);
+  }, [settings.keybindings]);
+
+  // Keyboard shortcuts: activate skills via configurable bindings
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const idx = parseInt(e.key, 10);
-      if (idx >= 1 && idx <= MAX_SKILL_SLOTS) {
-        activateSlot(idx - 1);
+      const idx = skillBindKeys.indexOf(e.key);
+      if (idx >= 0 && idx < MAX_SKILL_SLOTS) {
+        activateSlot(idx);
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [activateSlot]);
+  }, [activateSlot, skillBindKeys]);
 
   return (
     <div>
@@ -129,7 +139,7 @@ export const SkillBar = (): ReactNode => {
               disabledSlash={!!skill?.passive && !active}
               icon={IconComponent ? <IconComponent /> : <LockIcon className="h-4 w-4" />}
               onClick={skill ? () => activateSlot(i) : undefined}
-              keybind={String(i + 1)}
+              keybind={displayKeyName(skillBindKeys[i])}
               cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}
               activationCount={activations[i]}
               tooltip={skill ? <SkillTooltip skill={skill} active={active} /> : undefined}

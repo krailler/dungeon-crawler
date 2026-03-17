@@ -14,6 +14,11 @@ import type {
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
+/** Chrome-only performance.memory API */
+interface PerformanceWithMemory extends Performance {
+  memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+}
+
 export type CharacterStats = {
   strength: number;
   vitality: number;
@@ -65,6 +70,10 @@ export type HudSnapshot = {
   itemCooldowns: Map<string, SkillCooldownState>;
   roomName: string;
   dungeonLevel: number;
+  /** Average frame time in milliseconds (proxy for CPU load) */
+  frameMs: number;
+  /** JS heap usage in MB (Chrome only, 0 if unavailable) */
+  heapMB: number;
 };
 
 type Listener = () => void;
@@ -80,6 +89,8 @@ let fps = 0;
 let ping = 0;
 let fpsAccum = 0;
 let fpsFrames = 0;
+let frameMs = 0;
+let heapMB = 0;
 let connectionStatus: ConnectionStatus = "connecting";
 let connectionInfo: string = "";
 let localCoords: { x: number; z: number } | null = null;
@@ -99,6 +110,8 @@ let cachedSnapshot: HudSnapshot = {
   itemCooldowns: new Map(),
   roomName: "",
   dungeonLevel: 1,
+  frameMs: 0,
+  heapMB: 0,
 };
 
 const rebuildSnapshot = (): void => {
@@ -113,6 +126,8 @@ const rebuildSnapshot = (): void => {
     itemCooldowns: new Map(itemCooldowns),
     roomName,
     dungeonLevel,
+    frameMs,
+    heapMB,
   };
 };
 
@@ -176,11 +191,20 @@ export const hudStore = {
     fpsAccum += dt;
     fpsFrames++;
     if (fpsAccum >= 0.5) {
-      const value = Math.round(fpsFrames / fpsAccum);
+      const newFps = Math.round(fpsFrames / fpsAccum);
+      const newFrameMs = fpsFrames > 0 ? Math.round((fpsAccum / fpsFrames) * 1000 * 10) / 10 : 0;
+
+      // Read JS heap (Chrome only — performance.memory is non-standard)
+      const perf = performance as PerformanceWithMemory;
+      const newHeapMB = perf.memory ? Math.round(perf.memory.usedJSHeapSize / 1048576) : 0;
+
       fpsAccum = 0;
       fpsFrames = 0;
-      if (fps === value) return;
-      fps = value;
+
+      if (fps === newFps && frameMs === newFrameMs && heapMB === newHeapMB) return;
+      fps = newFps;
+      frameMs = newFrameMs;
+      heapMB = newHeapMB;
       rebuildSnapshot();
       emit();
     }
@@ -204,6 +228,8 @@ export const hudStore = {
     ping = 0;
     fpsAccum = 0;
     fpsFrames = 0;
+    frameMs = 0;
+    heapMB = 0;
     connectionStatus = "connecting";
     connectionInfo = "";
     localCoords = null;

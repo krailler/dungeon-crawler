@@ -4,6 +4,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
@@ -15,7 +16,7 @@ import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
-import { preloadUiSounds, playUiSfx } from "../audio/uiSfx";
+import { preloadUiSounds, initUiSfxVolume, playUiSfx, disposeUiSounds } from "../audio/uiSfx";
 import { StateSync } from "./StateSync";
 import { ClientUpdateLoop } from "./ClientUpdateLoop";
 import { hudStore, mountHud, disposeHud } from "../ui/stores/hudStore";
@@ -55,6 +56,7 @@ import { announcementStore } from "../ui/stores/announcementStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
+import { settingsStore } from "../ui/stores/settingsStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -82,6 +84,8 @@ export class ClientGame {
   private onResize: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
+  private settingsUnsub: (() => void) | null = null;
+  private renderObserver: Observer<Scene> | null = null;
 
   constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
     this.engine = new Engine(canvas, true, {
@@ -140,7 +144,7 @@ export class ClientGame {
     this.client = colyseusClient;
 
     // Game loop — render + interpolation
-    this.scene.onBeforeRenderObservable.add(() => {
+    this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
       this.updateLoop.update(this.engine.getDeltaTime() / 1000);
     });
 
@@ -167,6 +171,14 @@ export class ClientGame {
         this.creatureLoader.load(),
         this.soundManager.load(),
       ]);
+
+      // Apply volume settings from settingsStore and subscribe to changes
+      this.soundManager.applyVolumes(settingsStore.getSnapshot().volume);
+      initUiSfxVolume(() => settingsStore.getSnapshot().volume);
+      this.settingsUnsub = settingsStore.subscribe(() => {
+        this.soundManager.applyVolumes(settingsStore.getSnapshot().volume);
+        initUiSfxVolume(() => settingsStore.getSnapshot().volume);
+      });
 
       // Suppress Babylon.js default "click to unmute" button — we unlock
       // the AudioContext ourselves on the first user click (pointerdown).
@@ -419,10 +431,16 @@ export class ClientGame {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("resize", this.onResize);
+    this.settingsUnsub?.();
+    this.settingsUnsub = null;
     if (this.onPointerDown) {
       window.removeEventListener("pointerdown", this.onPointerDown);
     }
 
+    if (this.renderObserver) {
+      this.scene.onBeforeRenderObservable.remove(this.renderObserver);
+      this.renderObserver = null;
+    }
     this.updateLoop.dispose();
     this.stateSync.dispose();
 
@@ -430,6 +448,7 @@ export class ClientGame {
     disposeHud();
     minimapStore.reset();
     this.soundManager.dispose();
+    disposeUiSounds();
     this.playerLoader.dispose();
     this.creatureLoader.dispose();
     this.fogOfWar.dispose();

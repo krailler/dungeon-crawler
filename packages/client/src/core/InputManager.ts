@@ -5,6 +5,7 @@ import type { Room } from "@colyseus/sdk";
 import { MessageType, TutorialStep } from "@dungeon/shared";
 import type { SprintMessage } from "@dungeon/shared";
 import { tutorialStore } from "../ui/stores/tutorialStore";
+import { settingsStore } from "../ui/stores/settingsStore";
 
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
@@ -139,16 +140,16 @@ export class InputManager {
     // Prevent browser context menu on the game canvas
     this.handleContextMenu = (ev: Event) => ev.preventDefault();
 
-    // Sprint: Shift key hold
+    // Sprint: configurable key hold (default Shift)
     this.handleKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key === "Shift" && !this.sprintActive) {
+      if (ev.key === settingsStore.getBinding("sprint") && !this.sprintActive) {
         this.sprintActive = true;
         this.room.send(MessageType.SPRINT, { active: true } satisfies SprintMessage);
         tutorialStore.dismiss(TutorialStep.SPRINT);
       }
     };
     this.handleKeyUp = (ev: KeyboardEvent) => {
-      if (ev.key === "Shift" && this.sprintActive) {
+      if (ev.key === settingsStore.getBinding("sprint") && this.sprintActive) {
         this.sprintActive = false;
         this.room.send(MessageType.SPRINT, { active: false } satisfies SprintMessage);
       }

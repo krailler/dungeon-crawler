@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
+import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { PotionIcon } from "../icons/PotionIcon";
 import { ActionSlot } from "../components/ActionSlot";
 
@@ -56,17 +57,20 @@ export const ConsumableSlots = (): ReactNode => {
     hudStore.useItem(itemId);
   }, []);
 
-  // Keyboard shortcut: Q uses first consumable
+  const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
+  const consumableKey = settings.keybindings.consumable_1;
+
+  // Keyboard shortcut: configurable key uses first consumable
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key.toLowerCase() === "q" && consumables.length > 0) {
+      if (e.key.toLowerCase() === consumableKey.toLowerCase() && consumables.length > 0) {
         handleUse(consumables[0].itemId);
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [consumables, handleUse]);
+  }, [consumables, handleUse, consumableKey]);
 
   // Always show at least the first consumable slot (health potion = Q)
   const firstEntry = consumables[0] ?? null;
@@ -83,7 +87,7 @@ export const ConsumableSlots = (): ReactNode => {
         active={hasPotion}
         icon={<PotionIcon />}
         onClick={hasPotion ? () => handleUse(firstEntry.itemId) : undefined}
-        keybind="Q"
+        keybind={displayKeyName(consumableKey)}
         quantity={hasPotion ? firstEntry.totalQty : undefined}
         quantityPosition="top-right"
         cooldown={hasPotion ? (snapshot.itemCooldowns.get(firstEntry.itemId) ?? null) : null}

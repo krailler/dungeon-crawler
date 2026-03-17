@@ -29,47 +29,11 @@ import { playUiSfx } from "../../audio/uiSfx";
 import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
-import { CoinIcon } from "../icons/CoinIcon";
 import { BackpackIcon } from "../icons/BackpackIcon";
+import { settingsStore, displayKeyName } from "../stores/settingsStore";
 
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
-
-const GoldPill = ({ gold }: { gold: number }): ReactNode => {
-  const [floats, setFloats] = useState<FloatEntry[]>([]);
-  const prevGoldRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const prev = prevGoldRef.current;
-    prevGoldRef.current = gold;
-    if (prev === null || gold <= prev) return;
-
-    const gain = gold - prev;
-    const id = ++floatIdCounter;
-    setFloats((f) => [...f, { id, amount: gain }]);
-    const timer = setTimeout(() => {
-      setFloats((f) => f.filter((e) => e.id !== id));
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [gold]);
-
-  return (
-    <div className="relative">
-      {floats.map((f) => (
-        <span
-          key={f.id}
-          className="animate-xp-float absolute -top-1 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-xs font-bold text-amber-300 drop-shadow-[0_1px_3px_rgba(251,191,36,0.6)]"
-        >
-          +{f.amount}
-        </span>
-      ))}
-      <HudPill variant="amber">
-        <CoinIcon className="mr-1 inline h-3.5 w-3.5" />
-        {gold.toLocaleString()}
-      </HudPill>
-    </div>
-  );
-};
 
 const healthColor = (pct: number): string => {
   if (pct > 60) return "from-emerald-400/90 via-emerald-400/60 to-emerald-500/80";
@@ -203,6 +167,7 @@ export const HudRoot = (): ReactNode => {
   const toggleMinimap = useCallback(() => minimapStore.toggle(), []);
   const debugSnapshot = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
   const adminSnapshot = useSyncExternalStore(adminStore.subscribe, adminStore.getSnapshot);
+  const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
   const [characterOpen, setCharacterOpen] = useState(false);
   const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
@@ -366,7 +331,6 @@ export const HudRoot = (): ReactNode => {
         </div>
       )}
       <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
-        {localMember && <GoldPill gold={localMember.gold ?? 0} />}
         {debugSnapshot.showCoords && snapshot.localCoords && (
           <HudPill variant="amber" mono>
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}
@@ -378,6 +342,16 @@ export const HudRoot = (): ReactNode => {
         <HudPill>
           {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
         </HudPill>
+        {snapshot.frameMs > 0 && (
+          <HudPill mono>
+            <span className="text-slate-400">{snapshot.frameMs} ms</span>
+          </HudPill>
+        )}
+        {snapshot.heapMB > 0 && (
+          <HudPill mono>
+            <span className="text-slate-400">{snapshot.heapMB} MB</span>
+          </HudPill>
+        )}
         {debugSnapshot.showTickRate && adminSnapshot.tickRate > 0 && (
           <HudPill>
             <span
@@ -414,14 +388,14 @@ export const HudRoot = (): ReactNode => {
           isOpen={inventoryOpen}
           icon={<BackpackIcon />}
           label={t("inventory.title")}
-          shortcut="B"
+          shortcut={displayKeyName(settings.keybindings.inventory)}
         />
         <HudButton
           onClick={toggleMinimap}
           isOpen={minimapVisible}
           icon={<MapIcon />}
           label={t("hud.map")}
-          shortcut="M"
+          shortcut={displayKeyName(settings.keybindings.minimap)}
         />
         <div className="relative">
           <HudButton
@@ -429,7 +403,7 @@ export const HudRoot = (): ReactNode => {
             isOpen={characterOpen}
             icon={<CharacterIcon />}
             label={t("character.title")}
-            shortcut="C"
+            shortcut={displayKeyName(settings.keybindings.character)}
           />
           {(localMember?.statPoints ?? 0) > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white shadow animate-pulse">
