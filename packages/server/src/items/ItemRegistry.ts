@@ -22,6 +22,7 @@ export async function loadItemRegistry(): Promise<void> {
       cooldown: row.cooldown,
       effectType: row.effectType,
       effectParams: row.effectParams as Record<string, unknown>,
+      useSound: row.useSound,
     });
   }
 

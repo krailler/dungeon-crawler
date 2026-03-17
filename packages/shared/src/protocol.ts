@@ -238,11 +238,13 @@ export interface ItemSwapMessage {
   to: number;
 }
 
-/** Server → Client: item cooldown started (for UI overlay) */
+/** Server → Client: item used successfully (cooldown + optional sound) */
 export interface ItemCooldownMessage {
   itemId: string;
-  /** Total cooldown duration in seconds */
+  /** Total cooldown duration in seconds (0 = no cooldown) */
   duration: number;
+  /** Sound to play on the client (empty = none) */
+  useSound?: string;
 }
 
 /** Client → Server: request item definitions by id */

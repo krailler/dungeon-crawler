@@ -560,6 +560,10 @@ export class StateSync {
                 this.deps.soundManager.setDeathLoop("dead");
               } else {
                 this.deps.soundManager.setDeathLoop("none");
+                // Play revive/respawn sound when coming back alive
+                if (prevLifeState !== LifeState.ALIVE) {
+                  this.deps.soundManager.playSfx("revive");
+                }
               }
               prevLifeState = curLife;
             }

@@ -79,6 +79,7 @@ export const items = worldSchema.table("items", {
   cooldown: real("cooldown").notNull().default(0),
   effectType: text("effect_type").notNull().default(""),
   effectParams: jsonb("effect_params").notNull().default({}),
+  useSound: text("use_sound").notNull().default(""),
 });
 
 export const creatures = worldSchema.table("creatures", {

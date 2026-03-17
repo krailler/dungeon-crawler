@@ -9,4 +9,6 @@ export type ItemDef = {
   readonly cooldown: number;
   readonly effectType: string;
   readonly effectParams: Record<string, unknown>;
+  /** Sound to play on the client when used successfully (empty = no sound). */
+  readonly useSound: string;
 };

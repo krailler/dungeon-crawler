@@ -359,9 +359,14 @@ export class ClientGame {
       // Connect item def store to room for lazy loading
       itemDefStore.connect(room);
 
-      // Item cooldown from server
+      // Item use confirmation from server (cooldown + sound)
       room.onMessage(MessageType.ITEM_COOLDOWN, (data: ItemCooldownMessage) => {
-        hudStore.setItemCooldown(data.itemId, data.duration);
+        if (data.duration > 0) {
+          hudStore.setItemCooldown(data.itemId, data.duration);
+        }
+        if (data.useSound) {
+          this.soundManager.playSfx(data.useSound);
+        }
       });
 
       // Action feedback (skill/item use failures)

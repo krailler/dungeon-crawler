@@ -62,6 +62,7 @@ async function seed() {
       cooldown: 10,
       effectType: "heal",
       effectParams: { amount: 50 },
+      useSound: "potion_drink",
     })
     .onConflictDoNothing();
   console.log("World items seeded.");

@@ -101,6 +101,10 @@ export class SoundManager {
     this.registerSfx("chat_send", "/audio/sfx/chat_send.ogg", SFX_VOLUME);
     this.registerSfx("level_up", "/audio/sfx/level_up.ogg", SFX_VOLUME);
     this.registerSfx("downed_hit", "/audio/sfx/downed_hit.ogg", SFX_VOLUME);
+    this.registerSfx("revive", "/audio/sfx/revive.ogg", SFX_VOLUME);
+
+    // Item use sounds — keyed by ItemDef.useSound
+    this.registerSfx("potion_drink", "/audio/sfx/potion_drink.ogg", SFX_VOLUME);
 
     // Ambient cave loop (starts paused — call playAmbient() to start)
     await new Promise<void>((resolve) => {

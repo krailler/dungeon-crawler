@@ -407,14 +407,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Consume one
       player.removeItem(data.itemId, 1);
 
-      // Set cooldown
+      // Set cooldown + confirm use (always sent so client can play sound)
       if (def.cooldown > 0) {
         player.itemCooldowns.set(data.itemId, def.cooldown);
-        client.send(MessageType.ITEM_COOLDOWN, {
-          itemId: data.itemId,
-          duration: def.cooldown,
-        });
       }
+      client.send(MessageType.ITEM_COOLDOWN, {
+        itemId: data.itemId,
+        duration: def.cooldown,
+        useSound: def.useSound || undefined,
+      });
     });
 
     // Item swap: move / swap inventory slots

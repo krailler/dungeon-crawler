@@ -135,50 +135,69 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): React
 
 // ── Command help overlay ────────────────────────────────────────────────────
 
+/** Filter commands for autocomplete (shared between overlay and ChatPanel) */
+function filterCommands(commands: CommandInfo[], prefix: string, isAdmin: boolean): CommandInfo[] {
+  const lower = prefix.toLowerCase();
+  return commands
+    .filter((c) => {
+      if (c.adminOnly && !isAdmin) return false;
+      return c.name.toLowerCase().startsWith(lower);
+    })
+    .slice(0, 8);
+}
+
 const CommandHelpOverlay = ({
-  prefix,
   commands,
-  isAdmin,
+  selectedIndex,
   onSelect,
 }: {
-  prefix: string;
   commands: CommandInfo[];
-  isAdmin: boolean;
+  selectedIndex: number;
   onSelect: (name: string) => void;
 }): ReactNode => {
-  const filtered = useMemo(() => {
-    const lower = prefix.toLowerCase();
-    return commands
-      .filter((c) => {
-        if (c.adminOnly && !isAdmin) return false;
-        return c.name.toLowerCase().startsWith(lower);
-      })
-      .slice(0, 8);
-  }, [prefix, commands, isAdmin]);
+  if (commands.length === 0) return null;
 
-  if (filtered.length === 0) return null;
+  const selected = commands[selectedIndex] ?? commands[0];
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-slate-600/40 bg-slate-900/95 backdrop-blur-sm p-2 shadow-xl">
-      {filtered.map((cmd) => (
-        <div
-          key={cmd.name}
-          className="flex items-center gap-2 px-2 py-1 text-[12px] cursor-pointer rounded hover:bg-slate-800/60 transition-colors"
-          onMouseDown={(e) => {
-            e.preventDefault(); // Prevent blur
-            onSelect(cmd.name);
-          }}
-        >
-          <span className="font-mono text-sky-400">{cmd.usage}</span>
-          <span className="text-slate-500">&mdash;</span>
-          <span className="text-slate-400">{cmd.description}</span>
-          {cmd.adminOnly && (
-            <span className="ml-auto rounded bg-amber-900/50 px-1 py-0.5 text-[10px] text-amber-400 font-medium">
+    <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-slate-600/40 bg-slate-900/95 backdrop-blur-sm shadow-xl">
+      {/* Detail panel for the selected command */}
+      <div className="border-b border-slate-700/40 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[13px] text-sky-400">{selected.usage}</span>
+          {selected.adminOnly && (
+            <span className="rounded bg-amber-900/50 px-1 py-0.5 text-[10px] text-amber-400 font-medium">
               ADMIN
             </span>
           )}
         </div>
-      ))}
+        <div className="mt-0.5 text-[11px] text-slate-400">{selected.description}</div>
+      </div>
+      {/* Compact command list */}
+      <div className="p-1">
+        {commands.map((cmd, i) => (
+          <div
+            key={cmd.name}
+            className={[
+              "flex items-center gap-2 px-2 py-1 text-[12px] cursor-pointer rounded transition-colors",
+              i === selectedIndex
+                ? "bg-slate-700/50 text-slate-100"
+                : "text-slate-400 hover:bg-slate-800/60",
+            ].join(" ")}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onSelect(cmd.name);
+            }}
+          >
+            <span className="font-mono text-sky-400">/{cmd.name}</span>
+            {cmd.adminOnly && (
+              <span className="rounded bg-amber-900/50 px-1 py-0.5 text-[10px] text-amber-400 font-medium">
+                ADMIN
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -262,11 +281,26 @@ export const ChatPanel = (): ReactNode => {
   // Player names from HUD store
   const playerNames = useMemo(() => hudSnapshot.members.map((m) => m.name), [hudSnapshot.members]);
 
+  // Autocomplete: selected index for arrow-key navigation
+  const [selectedCmdIndex, setSelectedCmdIndex] = useState(0);
+
   // Determine autocomplete mode
   const acMode = useMemo(
     () => getAutocompleteMode(inputValue, snapshot.commands, isAdmin),
     [inputValue, snapshot.commands, isAdmin],
   );
+
+  // Filtered commands for the overlay (stable between render & key handler)
+  const filteredCommands = useMemo(
+    () =>
+      acMode?.kind === "commands" ? filterCommands(snapshot.commands, acMode.prefix, isAdmin) : [],
+    [acMode, snapshot.commands, isAdmin],
+  );
+
+  // Reset selection when the filtered list changes
+  useEffect(() => {
+    setSelectedCmdIndex(0);
+  }, [filteredCommands.length, acMode?.kind === "commands" ? acMode.prefix : ""]);
 
   // Refresh "now" every second for fade calculation
   useEffect(() => {
@@ -341,17 +375,34 @@ export const ChatPanel = (): ReactNode => {
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       e.stopPropagation(); // Prevent game keybinds (C, M, Escape, etc.)
 
+      // When command autocomplete is visible, arrow keys navigate the list
+      const cmdAcActive = acMode?.kind === "commands" && filteredCommands.length > 0;
+
       if (e.key === "Enter") {
+        if (cmdAcActive) {
+          // Select the highlighted command
+          e.preventDefault();
+          const cmd = filteredCommands[selectedCmdIndex];
+          if (cmd) {
+            setInputValue(`/${cmd.name} `);
+            setSelectedCmdIndex(0);
+          }
+          return;
+        }
         handleSend();
       } else if (e.key === "Escape") {
         setInputValue("");
         chatStore.setInputOpen(false);
       } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (cmdAcActive) {
+          setSelectedCmdIndex((prev) => (prev > 0 ? prev - 1 : filteredCommands.length - 1));
+          return;
+        }
+        // Chat history navigation
         const history = historyRef.current;
         if (history.length === 0) return;
-        e.preventDefault();
         if (historyIndexRef.current === -1) {
-          // Save current draft before navigating
           draftRef.current = inputValue;
           historyIndexRef.current = history.length - 1;
         } else if (historyIndexRef.current > 0) {
@@ -359,6 +410,11 @@ export const ChatPanel = (): ReactNode => {
         }
         setInputValue(history[historyIndexRef.current]);
       } else if (e.key === "ArrowDown") {
+        if (cmdAcActive) {
+          e.preventDefault();
+          setSelectedCmdIndex((prev) => (prev < filteredCommands.length - 1 ? prev + 1 : 0));
+          return;
+        }
         if (historyIndexRef.current === -1) return;
         e.preventDefault();
         const history = historyRef.current;
@@ -366,7 +422,6 @@ export const ChatPanel = (): ReactNode => {
           historyIndexRef.current++;
           setInputValue(history[historyIndexRef.current]);
         } else {
-          // Past the end — restore draft
           historyIndexRef.current = -1;
           setInputValue(draftRef.current);
         }
@@ -376,13 +431,11 @@ export const ChatPanel = (): ReactNode => {
         if (!acMode) return;
 
         if (acMode.kind === "commands") {
-          // Tab autocomplete command name
-          const match = snapshot.commands.find((c) => {
-            if (c.adminOnly && !isAdmin) return false;
-            return c.name.toLowerCase().startsWith(acMode.prefix.toLowerCase());
-          });
-          if (match) {
-            setInputValue(`/${match.name} `);
+          // Tab selects the highlighted command
+          const cmd = filteredCommands[selectedCmdIndex];
+          if (cmd) {
+            setInputValue(`/${cmd.name} `);
+            setSelectedCmdIndex(0);
           }
         } else if (acMode.kind === "players") {
           // Tab autocomplete player name — cycle through matches
@@ -390,7 +443,6 @@ export const ChatPanel = (): ReactNode => {
           const matches = playerNames.filter((n) => n.toLowerCase().startsWith(lower));
           if (matches.length === 0) return;
 
-          // Find current match and cycle to next
           const currentArg = inputValue.slice(inputValue.indexOf(" ") + 1).trim();
           const currentIdx = matches.findIndex((n) => n.toLowerCase() === currentArg.toLowerCase());
           const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % matches.length;
@@ -398,7 +450,16 @@ export const ChatPanel = (): ReactNode => {
         }
       }
     },
-    [handleSend, inputValue, snapshot.commands, isAdmin, acMode, playerNames],
+    [
+      handleSend,
+      inputValue,
+      snapshot.commands,
+      isAdmin,
+      acMode,
+      playerNames,
+      filteredCommands,
+      selectedCmdIndex,
+    ],
   );
 
   return (
@@ -426,11 +487,10 @@ export const ChatPanel = (): ReactNode => {
       {/* Input area */}
       {snapshot.inputOpen && (
         <div className="relative">
-          {acMode?.kind === "commands" && (
+          {acMode?.kind === "commands" && filteredCommands.length > 0 && (
             <CommandHelpOverlay
-              prefix={acMode.prefix}
-              commands={snapshot.commands}
-              isAdmin={isAdmin}
+              commands={filteredCommands}
+              selectedIndex={selectedCmdIndex}
               onSelect={selectCommand}
             />
           )}
