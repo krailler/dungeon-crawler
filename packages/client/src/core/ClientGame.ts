@@ -82,6 +82,7 @@ export class ClientGame {
 
   private pingInterval: number = 0;
   private onResize: () => void;
+  private onFocusChange: () => void;
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
   private settingsUnsub: (() => void) | null = null;
@@ -158,6 +159,24 @@ export class ClientGame {
       this.engine.resize();
     };
     window.addEventListener("resize", this.onResize);
+
+    // Throttle to ~30 FPS when window loses focus to save resources
+    const BG_FRAME_TIME = 1000 / 30;
+    const setThrottled = (throttled: boolean): void => {
+      if (throttled) {
+        this.engine.customAnimationFrameRequester = {
+          requestAnimationFrame: (cb: FrameRequestCallback) =>
+            window.setTimeout(cb, BG_FRAME_TIME) as unknown as number,
+          cancelAnimationFrame: (id: number) => window.clearTimeout(id),
+        };
+      } else {
+        this.engine.customAnimationFrameRequester = undefined as never;
+      }
+    };
+    this.onFocusChange = () => setThrottled(document.hidden || !document.hasFocus());
+    document.addEventListener("visibilitychange", this.onFocusChange);
+    window.addEventListener("blur", this.onFocusChange);
+    window.addEventListener("focus", this.onFocusChange);
 
     // Load assets then connect to server
     this.init();
@@ -443,6 +462,9 @@ export class ClientGame {
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("resize", this.onResize);
+    document.removeEventListener("visibilitychange", this.onFocusChange);
+    window.removeEventListener("blur", this.onFocusChange);
+    window.removeEventListener("focus", this.onFocusChange);
     this.settingsUnsub?.();
     this.settingsUnsub = null;
     if (this.onPointerDown) {
