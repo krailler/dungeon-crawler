@@ -36,6 +36,13 @@
       "when": 1774700000000,
       "tag": "0004_class_i18n",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774800000000,
+      "tag": "0005_talent_effect_enums",
+      "breakpoints": true
     }
   ]
 }

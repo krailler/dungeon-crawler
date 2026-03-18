@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TalentDefClient } from "@dungeon/shared";
@@ -8,8 +16,27 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { talentStore } from "../stores/talentStore";
 import { talentDefStore } from "../stores/talentDefStore";
 import { hudStore } from "../stores/hudStore";
+import { skillDefStore } from "../stores/skillDefStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { playUiSfx } from "../../audio/uiSfx";
+import { ShieldIcon } from "../icons/ShieldIcon";
+import { SwordIcon } from "../icons/SwordIcon";
+import { AgilityIcon } from "../icons/AgilityIcon";
+
+/** Map talent icon names to SVG components */
+const TALENT_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
+  shield: ShieldIcon,
+  sword: SwordIcon,
+  agility: AgilityIcon,
+};
+
+/** Map internal stat names to i18n keys */
+const STAT_I18N: Record<string, string> = {
+  maxHealth: "character.health",
+  attackDamage: "character.attackDamage",
+  defense: "character.defense",
+  moveSpeed: "talents.statMoveSpeed",
+};
 
 /** Props for the panel */
 interface TalentPanelProps {
@@ -43,20 +70,25 @@ const TalentNode = ({
     let desc = "";
     if (e.statModifier) {
       const sign = e.statModifier.value > 0 ? "+" : "";
+      const statLabel = t(STAT_I18N[e.statModifier.stat] ?? e.statModifier.stat);
       if (e.statModifier.type === "percent") {
-        desc = `${sign}${Math.round(e.statModifier.value * 100)}% ${e.statModifier.stat}`;
+        desc = `${sign}${Math.round(e.statModifier.value * 100)}% ${statLabel}`;
       } else {
-        desc = `${sign}${e.statModifier.value} ${e.statModifier.stat}`;
+        desc = `${sign}${e.statModifier.value} ${statLabel}`;
       }
     } else if (e.skillModifier) {
+      const skillDef = skillDefStore.get(e.skillModifier.skillId);
+      const skillName = skillDef ? t(skillDef.name) : e.skillModifier.skillId;
       const parts: string[] = [];
       if (e.skillModifier.cooldownMul)
-        parts.push(`${Math.round(e.skillModifier.cooldownMul * 100)}% CD`);
+        parts.push(`${Math.round(e.skillModifier.cooldownMul * 100)}% ${t("talents.modCooldown")}`);
       if (e.skillModifier.damageMul)
-        parts.push(`${Math.round(e.skillModifier.damageMul * 100)}% DMG`);
-      desc = `${e.skillModifier.skillId}: ${parts.join(", ")}`;
+        parts.push(`${Math.round(e.skillModifier.damageMul * 100)}% ${t("talents.modDamage")}`);
+      desc = `${skillName}: ${parts.join(", ")}`;
     } else if (e.skillId) {
-      desc = `Unlock: ${e.skillId}`;
+      const skillDef = skillDefStore.get(e.skillId);
+      const skillName = skillDef ? t(skillDef.name) : e.skillId;
+      desc = `${t("talents.unlockSkill")}: ${skillName}`;
     }
     const active = e.rank <= currentRank;
     return (
@@ -67,7 +99,7 @@ const TalentNode = ({
   });
 
   return (
-    <div className="group relative">
+    <div className="group relative" data-talent-id={def.id}>
       <button
         className={`pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-lg border-2 ${borderColor} transition-colors ${
           canAllocate && !isMaxed
@@ -81,7 +113,11 @@ const TalentNode = ({
           }
         }}
       >
-        <span className="text-lg">{def.icon}</span>
+        {TALENT_ICON_MAP[def.icon] ? (
+          TALENT_ICON_MAP[def.icon]({ className: "h-6 w-6" })
+        ) : (
+          <span className="text-lg">{def.icon}</span>
+        )}
         <span className="absolute -bottom-1 -right-1 rounded-full bg-zinc-900 px-1 text-[9px] font-bold text-zinc-300">
           {currentRank}/{def.maxRank}
         </span>
@@ -97,6 +133,97 @@ const TalentNode = ({
         )}
         <div className="mt-1 space-y-0.5">{rankLines}</div>
       </div>
+    </div>
+  );
+};
+
+/** Tree grid with SVG connector lines measured from actual DOM positions */
+const TalentTree = ({
+  talents,
+  rows,
+  maxCols,
+  allocations,
+  canAllocate,
+  onAllocate,
+}: {
+  talents: TalentDefClient[];
+  rows: [number, TalentDefClient[]][];
+  maxCols: number;
+  allocations: Map<string, number>;
+  canAllocate: (def: TalentDefClient) => boolean;
+  onAllocate: (talentId: string) => void;
+}): ReactNode => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [lines, setLines] = useState<
+    { x1: number; y1: number; x2: number; y2: number; fulfilled: boolean }[]
+  >([]);
+
+  // Measure node positions after render
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+
+    const newLines: typeof lines = [];
+    for (const t of talents) {
+      if (!t.requiredTalentId) continue;
+      const childEl = container.querySelector(`[data-talent-id="${t.id}"]`);
+      const parentEl = container.querySelector(`[data-talent-id="${t.requiredTalentId}"]`);
+      if (!childEl || !parentEl) continue;
+
+      const childRect = childEl.getBoundingClientRect();
+      const parentRect = parentEl.getBoundingClientRect();
+
+      const parentRank = allocations.get(t.requiredTalentId) ?? 0;
+      newLines.push({
+        x1: parentRect.left + parentRect.width / 2 - rect.left,
+        y1: parentRect.top + parentRect.height / 2 - rect.top,
+        x2: childRect.left + childRect.width / 2 - rect.left,
+        y2: childRect.top + childRect.height / 2 - rect.top,
+        fulfilled: parentRank >= t.requiredTalentRank,
+      });
+    }
+    setLines(newLines);
+  }, [talents, allocations]);
+
+  return (
+    <div ref={containerRef} className="relative flex flex-col items-center gap-4">
+      {/* SVG connector lines */}
+      {lines.length > 0 && (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+          {lines.map((l, i) => (
+            <line
+              key={i}
+              x1={l.x1}
+              y1={l.y1}
+              x2={l.x2}
+              y2={l.y2}
+              stroke={l.fulfilled ? "#34d399" : "#52525b"}
+              strokeWidth={2}
+              strokeDasharray={l.fulfilled ? undefined : "4 4"}
+            />
+          ))}
+        </svg>
+      )}
+
+      {rows.map(([rowIdx, rowTalents]) => (
+        <div key={rowIdx} className="flex gap-3">
+          {Array.from({ length: maxCols }, (_, colIdx) => {
+            const def = rowTalents.find((t) => t.col === colIdx);
+            if (!def) return <div key={colIdx} className="h-12 w-12" />;
+            const currentRank = allocations.get(def.id) ?? 0;
+            return (
+              <TalentNode
+                key={def.id}
+                def={def}
+                currentRank={currentRank}
+                canAllocate={canAllocate(def)}
+                onClick={() => onAllocate(def.id)}
+              />
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
@@ -194,27 +321,15 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
         </div>
       )}
 
-      {/* Tree grid */}
-      <div className="flex flex-col items-center gap-4">
-        {rows.map(([rowIdx, rowTalents]) => (
-          <div key={rowIdx} className="flex gap-3" style={{ minWidth: maxCols * 56 }}>
-            {Array.from({ length: maxCols }, (_, colIdx) => {
-              const def = rowTalents.find((t) => t.col === colIdx);
-              if (!def) return <div key={colIdx} className="h-12 w-12" />;
-              const currentRank = talentSnap.allocations.get(def.id) ?? 0;
-              return (
-                <TalentNode
-                  key={def.id}
-                  def={def}
-                  currentRank={currentRank}
-                  canAllocate={canAllocateTalent(def)}
-                  onClick={() => handleAllocate(def.id)}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      {/* Tree grid with connector lines */}
+      <TalentTree
+        talents={talents}
+        rows={rows}
+        maxCols={maxCols}
+        allocations={talentSnap.allocations}
+        canAllocate={canAllocateTalent}
+        onAllocate={handleAllocate}
+      />
 
       {/* Reset button */}
       {talentSnap.allocations.size > 0 && (

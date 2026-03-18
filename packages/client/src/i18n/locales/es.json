@@ -243,6 +243,10 @@
     "resetConfirm": "Reiniciar",
     "resetCancel": "Cancelar",
     "resetNotEnoughGold": "No tienes suficiente oro ({{cost}} necesario)",
+    "statMoveSpeed": "Velocidad",
+    "modCooldown": "Enfriamiento",
+    "modDamage": "Daño",
+    "unlockSkill": "Desbloquear",
     "warriorToughness": {
       "name": "Tenacidad",
       "desc": "Aumenta la vida máxima."

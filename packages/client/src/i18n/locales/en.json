@@ -243,6 +243,10 @@
     "resetConfirm": "Reset",
     "resetCancel": "Cancel",
     "resetNotEnoughGold": "Not enough gold ({{cost}} needed)",
+    "statMoveSpeed": "Move Speed",
+    "modCooldown": "Cooldown",
+    "modDamage": "Damage",
+    "unlockSkill": "Unlock",
     "warriorToughness": {
       "name": "Toughness",
       "desc": "Increases maximum health."

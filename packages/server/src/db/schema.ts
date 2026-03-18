@@ -10,7 +10,14 @@ import {
   index,
   uuid,
 } from "drizzle-orm/pg-core";
-import { Role, StackBehavior, ItemEffectType, CreatureEffectTrigger } from "@dungeon/shared";
+import {
+  Role,
+  StackBehavior,
+  ItemEffectType,
+  CreatureEffectTrigger,
+  TalentEffectType,
+  StatModType,
+} from "@dungeon/shared";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +33,8 @@ export const creatureEffectTriggerEnum = worldSchema.enum(
   "creature_effect_trigger",
   CreatureEffectTrigger,
 );
+export const talentEffectTypeEnum = worldSchema.enum("talent_effect_type", TalentEffectType);
+export const statModTypeEnum = worldSchema.enum("stat_mod_type", StatModType);
 
 // ── Characters schema (player data — backups) ───────────────────────────────
 
@@ -231,9 +240,9 @@ export const talentEffects = worldSchema.table("talent_effects", {
     .notNull()
     .references(() => talents.id, { onDelete: "cascade" }),
   rank: integer("rank").notNull().default(1),
-  effectType: text("effect_type").notNull(),
+  effectType: talentEffectTypeEnum("effect_type").notNull(),
   statName: text("stat_name"),
-  statModType: text("stat_mod_type"),
+  statModType: statModTypeEnum("stat_mod_type"),
   statModValue: real("stat_mod_value"),
   skillId: text("skill_id"),
   cooldownMul: real("cooldown_mul"),
