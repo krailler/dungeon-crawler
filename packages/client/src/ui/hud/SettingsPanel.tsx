@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { settingsStore, BindableAction, displayKeyName } from "../stores/settingsStore";
 import type { BindableActionValue, VolumeSettings } from "../stores/settingsStore";
 import { MenuButton } from "../components/MenuButton";
@@ -8,7 +9,7 @@ import { playUiSfx } from "../../audio/uiSfx";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = "audio" | "keybindings";
+type Tab = "audio" | "keybindings" | "language";
 
 type SettingsPanelProps = {
   onBack: () => void;
@@ -180,6 +181,44 @@ const KeybindingsTab = (): ReactNode => {
   );
 };
 
+// ── Language tab ────────────────────────────────────────────────────────────
+
+const LANGUAGES = [
+  { code: "en", i18nKey: "settings.langEn" },
+  { code: "es", i18nKey: "settings.langEs" },
+] as const;
+
+const LanguageTab = (): ReactNode => {
+  const { t } = useTranslation();
+  const [current, setCurrent] = useState(i18n.language?.slice(0, 2) ?? "en");
+
+  const changeLanguage = useCallback((code: string) => {
+    i18n.changeLanguage(code);
+    setCurrent(code);
+    playUiSfx("ui_click");
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-1">
+      {LANGUAGES.map(({ code, i18nKey }) => (
+        <button
+          key={code}
+          onClick={() => changeLanguage(code)}
+          className={[
+            "flex items-center justify-between rounded px-3 py-2 text-xs transition-colors",
+            current === code
+              ? "bg-amber-500/20 text-amber-300"
+              : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100",
+          ].join(" ")}
+        >
+          <span>{t(i18nKey)}</span>
+          {current === code && <span className="text-amber-400">✓</span>}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 // ── Settings Panel ──────────────────────────────────────────────────────────
 
 export const SettingsPanel = ({ onBack }: SettingsPanelProps): ReactNode => {
@@ -217,29 +256,37 @@ export const SettingsPanel = ({ onBack }: SettingsPanelProps): ReactNode => {
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-lg bg-slate-800/60 p-1">
-        {(["audio", "keybindings"] as const).map((t_) => (
-          <button
-            key={t_}
-            onClick={() => {
-              playUiSfx("ui_click");
-              setTab(t_);
-            }}
-            className={[
-              "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              tab === t_
-                ? "bg-slate-700/80 text-amber-300 shadow-sm"
-                : "text-slate-400 hover:text-slate-200",
-            ].join(" ")}
-          >
-            {t_ === "audio" ? t("settings.tabAudio") : t("settings.tabKeybindings")}
-          </button>
-        ))}
+        {(["audio", "keybindings", "language"] as const).map((t_) => {
+          const labels: Record<Tab, string> = {
+            audio: t("settings.tabAudio"),
+            keybindings: t("settings.tabKeybindings"),
+            language: t("settings.tabLanguage"),
+          };
+          return (
+            <button
+              key={t_}
+              onClick={() => {
+                playUiSfx("ui_click");
+                setTab(t_);
+              }}
+              className={[
+                "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                tab === t_
+                  ? "bg-slate-700/80 text-amber-300 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              {labels[t_]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab content */}
       <div className="max-h-[50vh] overflow-y-auto pr-1">
         {tab === "audio" && <AudioTab />}
         {tab === "keybindings" && <KeybindingsTab />}
+        {tab === "language" && <LanguageTab />}
       </div>
     </>
   );

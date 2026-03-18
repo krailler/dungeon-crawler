@@ -1,0 +1,309 @@
+{
+  "login": {
+    "title": "Dungeon Crawler",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "submit": "Entrar a la mazmorra",
+    "loading": "Iniciando sesión...",
+    "devMode": "Modo Dev",
+    "devAdmin": "Entrar como Admin",
+    "devPlayer": "Entrar como Jugador",
+    "connectionError": "No se pudo conectar al servidor.",
+    "invalidCredentials": "Correo o contraseña incorrectos.",
+    "emailMalformed": "Introduce un correo electrónico válido.",
+    "passwordTooShort": "La contraseña es demasiado corta.",
+    "unknownError": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "loading": {
+    "title": "Dungeon Crawler",
+    "models": "Cargando modelos y audio...",
+    "server": "Conectando al servidor...",
+    "dungeon_assets": "Cargando mazmorra...",
+    "dungeon_render": "Construyendo mazmorra...",
+    "complete": "¡Listo!",
+    "error": "Error de conexión. Recarga la página."
+  },
+  "party": {
+    "title": "Grupo",
+    "subtitle": "Expedición",
+    "roleLeader": "Líder",
+    "roleMember": "Miembro",
+    "waiting": "Esperando aventureros...",
+    "promoteLeader": "Ascender a Líder",
+    "kick": "Expulsar del Grupo",
+    "dead": "Muerto",
+    "downed": "Caído",
+    "offline": "Desconectado",
+    "dungeonLevel": "Nv.{{level}}"
+  },
+  "connection": {
+    "connecting": "Conectando...",
+    "reconnecting": "Reconectando...",
+    "reconnected": "¡Reconectado!",
+    "failed": "Error de conexión",
+    "lost": "Conexión perdida",
+    "info": "Sala {{roomId}} · {{sessionId}}"
+  },
+  "player": {
+    "you": "Tú",
+    "other": "Jugador {{id}}"
+  },
+  "kick": {
+    "duplicate": "Has sido desconectado porque tu cuenta inició sesión desde otra sesión.",
+    "kicked": "Has sido expulsado de la mazmorra por un administrador.",
+    "dungeonStarted": "La expedición ya ha comenzado. Espera a la siguiente.",
+    "versionMismatch": "Tu cliente está desactualizado. Recarga la página para obtener la última versión.",
+    "dungeonCompleted": "¡Mazmorra completada!"
+  },
+  "pause": {
+    "title": "Pausa",
+    "resume": "Continuar",
+    "resetTutorials": "Reiniciar Tutoriales",
+    "resetTutorialsTitle": "¿Reiniciar Tutoriales?",
+    "resetTutorialsMessage": "Todos los consejos del tutorial se mostrarán de nuevo. Esto no se puede deshacer.",
+    "resetTutorialsConfirm": "Reiniciar",
+    "resetTutorialsCancel": "Cancelar",
+    "settings": "Ajustes",
+    "logout": "Cerrar Sesión"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "back": "Volver",
+    "tabAudio": "Audio",
+    "tabKeybindings": "Controles",
+    "tabLanguage": "Idioma",
+    "masterVolume": "Volumen General",
+    "sfxVolume": "Efectos de Sonido",
+    "ambientVolume": "Música / Ambiente",
+    "uiVolume": "Sonidos de Interfaz",
+    "resetVolume": "Restablecer por Defecto",
+    "resetKeybindings": "Restablecer por Defecto",
+    "pressKey": "...",
+    "sprint": "Esprintar",
+    "chat": "Abrir Chat",
+    "interact": "Interactuar",
+    "skill1": "Habilidad 1",
+    "skill2": "Habilidad 2",
+    "skill3": "Habilidad 3",
+    "skill4": "Habilidad 4",
+    "skill5": "Habilidad 5",
+    "consumable1": "Consumible",
+    "characterPanel": "Personaje",
+    "inventoryPanel": "Inventario",
+    "talentsPanel": "Talentos",
+    "minimapPanel": "Minimapa",
+    "fullscreen": "Pantalla Completa",
+    "tabTarget": "Cambiar Objetivo",
+    "revive": "Revivir",
+    "language": "Idioma",
+    "langEn": "English",
+    "langEs": "Español"
+  },
+  "character": {
+    "title": "Personaje",
+    "level": "Nv.{{level}}",
+    "strength": "Fuerza",
+    "strengthTip": "Aumenta el daño de ataque",
+    "vitality": "Vitalidad",
+    "vitalityTip": "Aumenta la vida máxima y la defensa",
+    "agility": "Agilidad",
+    "agilityTip": "Aumenta la velocidad de movimiento y ataque",
+    "attackDamage": "Ataque",
+    "attackDamageTip": "Daño por golpe (basado en Fuerza)",
+    "defense": "Defensa",
+    "defenseTip": "Daño reducido por golpe (basado en Vitalidad)",
+    "health": "Vida",
+    "baseStats": "Atributos",
+    "derivedStats": "Combate",
+    "gold": "Oro",
+    "xp": "Experiencia",
+    "statPoints": "{{count}} pt"
+  },
+  "devBanner": "En desarrollo — todo puede cambiar",
+  "hud": {
+    "ping": "{{value}} ms",
+    "pingEmpty": "-- ms",
+    "fps": "{{value}} FPS",
+    "fpsEmpty": "-- FPS",
+    "map": "Mapa"
+  },
+  "chat": {
+    "placeholder": "Escribe un mensaje o /comando...",
+    "hintOpen": "Pulsa <kbd>Enter</kbd> para chatear",
+    "selectPlayer": "seleccionar jugador",
+    "joined": "{{name}} se unió a la mazmorra.",
+    "left": "{{name}} abandonó la mazmorra.",
+    "disconnected": "{{name}} se desconectó.",
+    "disconnectedWithTime": "{{name}} se desconectó. {{seconds}}s para reconectar.",
+    "reconnected": "{{name}} se reconectó.",
+    "reconnectWarning": "{{name}} tiene {{seconds}}s para reconectar.",
+    "reconnectExpired": "{{name}} no pudo reconectar y ha sido eliminado.",
+    "slain": "¡{{name}} ha sido derrotado!",
+    "downed": "¡{{name}} ha caído!",
+    "died": "¡{{name}} ha muerto!",
+    "revived": "¡{{name}} ha sido revivido por {{reviver}}!",
+    "respawned": "{{name}} ha reaparecido.",
+    "adminRevived": "¡{{name}} ha sido revivido por intervención divina!",
+    "dungeonReshape": "La mazmorra se transforma...",
+    "rateLimited": "Estás enviando mensajes demasiado rápido.",
+    "messageTooLong": "Mensaje demasiado largo (máx. {{max}} caracteres).",
+    "unknownCommand": "Comando desconocido: /{{name}}",
+    "adminRequired": "Este comando requiere permisos de administrador.",
+    "killedByAdmin": "¡{{name}} ha sido eliminado por intervención divina!",
+    "kicked": "{{name}} ha sido expulsado.",
+    "leaderChanged": "{{name}} es ahora el líder del grupo.",
+    "gateLeaderOnly": "Solo el líder del grupo puede abrir la puerta.",
+    "gateOpened": "La puerta se abre... ¡La mazmorra os espera!",
+    "goldGained": "+{{amount}} oro de {{enemy}}!",
+    "itemPickup": "+{{amount}} $t({{item}})",
+    "otherItemPickup": "{{player}} recogió {{amount}} $t({{item}})",
+    "levelUp": "¡{{name}} alcanzó el nivel {{level}}!",
+    "levelUpStatPoint": "+1 punto de atributo. Tienes {{total}} por asignar.",
+    "levelUpTalentPoint": "+1 punto de talento. Tienes {{total}} por asignar."
+  },
+  "gate": {
+    "interactHint": "Abrir la puerta",
+    "promptTitle": "¿Listos para empezar?",
+    "promptMessage": "Abrir la puerta iniciará la expedición para todos los jugadores.",
+    "promptAccept": "Entrar a la Mazmorra",
+    "promptCancel": "Todavía No"
+  },
+  "exit": {
+    "promptTitle": "¿Completar Mazmorra?",
+    "promptMessage": "Esto finalizará la expedición y cerrará la mazmorra para todos los jugadores.",
+    "promptAccept": "Completar",
+    "promptCancel": "Todavía No"
+  },
+  "announce": {
+    "gateCountdownStart": "{{name}} está abriendo la puerta en {{seconds}} segundos...",
+    "gateOpened": "La puerta se abre... ¡La mazmorra os espera!",
+    "dungeonCompleted": "¡Mazmorra completada! Cerrando en {{seconds}}...",
+    "dungeonCompletedFinal": "¡Mazmorra completada! ¡Buen trabajo!",
+    "exitCombatActive": "¡No se puede salir mientras haya enemigos en combate!"
+  },
+  "creatures": {
+    "zombie": "Zombi"
+  },
+  "skills": {
+    "basicAttack": "Ataque Básico",
+    "basicAttackDesc": "Ataca automáticamente al enemigo más cercano",
+    "heavyStrike": "Golpe Pesado",
+    "heavyStrikeDesc": "Un golpe poderoso que inflige {{multiplier}}× de daño",
+    "passive": "Pasiva",
+    "disabled": "Desactivada",
+    "locked": "Bloqueada",
+    "clickToToggle": "Clic o tecla para activar/desactivar",
+    "clickToUse": "Clic o tecla para usar",
+    "cooldown": "Enfriamiento: {{seconds}}s",
+    "damage": "Daño: {{multiplier}}×"
+  },
+  "tutorial": {
+    "startDungeon": "¡Eres el líder del grupo! Haz clic derecho en la puerta o pulsa F cerca para iniciar la mazmorra.",
+    "allocateStats": "¡Tienes puntos de atributo! Pulsa C para abrir el panel de personaje y asignarlos.",
+    "allocateTalents": "¡Has desbloqueado talentos! Pulsa el botón de estrella para abrir el árbol de talentos y gastar tus puntos.",
+    "sprint": "¡Mantén Shift mientras te mueves para esprintar más rápido — pero vigila tu energía!",
+    "youDowned": "¡Has caído! Un compañero puede revivirte antes de que te desangres. Puedes seguir usando el chat.",
+    "teammateDowned": "¡Un compañero ha caído! Acércate y pulsa R (o haz clic en Revivir) para salvarlo.",
+    "firstDebuff": "¡Te han aplicado un debuff! Mira los iconos bajo tu personaje para ver su efecto y tiempo restante."
+  },
+  "reconnect": {
+    "title": "Conexión Perdida",
+    "message": "Tu sesión sigue activa en el servidor. Puedes intentar reconectar.",
+    "button": "Reconectar",
+    "backToLogin": "Volver al Inicio",
+    "asCharacter": "como {{name}}",
+    "failed": "Error al reconectar. Tu sesión puede haber expirado."
+  },
+  "items": {
+    "healthPotion": "Poción de Vida",
+    "healthPotionDesc": "Restaura {{amount}} de vida"
+  },
+  "inventory": {
+    "title": "Inventario",
+    "clickToUse": "Clic para usar",
+    "rightClickToUse": "Clic derecho para usar"
+  },
+  "talents": {
+    "title": "Talentos",
+    "pointsAvailable": "puntos de talento disponibles",
+    "rank": "Rango",
+    "lockedTooltip": "Se desbloquea en el nivel {{level}}",
+    "requiresLevel": "Requiere nivel",
+    "warriorToughness": {
+      "name": "Tenacidad",
+      "desc": "Aumenta la vida máxima."
+    },
+    "warriorMight": {
+      "name": "Poderío",
+      "desc": "Aumenta el daño de ataque."
+    },
+    "warriorSwiftness": {
+      "name": "Rapidez",
+      "desc": "Aumenta la velocidad de movimiento."
+    },
+    "warriorThickSkin": {
+      "name": "Piel Gruesa",
+      "desc": "Aumenta la defensa."
+    },
+    "warriorCleave": {
+      "name": "Tajo",
+      "desc": "Mejora Golpe Pesado: enfriamiento más rápido y más daño."
+    },
+    "warriorRush": {
+      "name": "Embestida",
+      "desc": "Aumenta mucho la velocidad de movimiento."
+    },
+    "warriorLastStand": {
+      "name": "Última Resistencia",
+      "desc": "Aumenta enormemente la vida máxima."
+    }
+  },
+  "loot": {
+    "title": "Botín",
+    "take": "Coger",
+    "empty": "Vacío"
+  },
+  "death": {
+    "downed": "¡Has caído!",
+    "downedSub": "Espera a que un compañero te reviva...",
+    "bleedOut": "Desangrándote en:",
+    "dead": "Has muerto",
+    "respawning": "Reapareciendo en:",
+    "reviving": "Siendo revivido...",
+    "revive": "Revivir",
+    "outOfRange": "Demasiado lejos"
+  },
+  "feedback": {
+    "dead": "Estás muerto",
+    "noTarget": "No hay enemigo en rango",
+    "onCooldown": "Aún no está listo",
+    "noItem": "No tienes ese objeto",
+    "alreadyFull": "Ya tienes la vida llena",
+    "inventoryFull": "Inventario lleno"
+  },
+  "effects": {
+    "weakness": "Debilidad",
+    "weakness_desc": "Daño de ataque reducido en {{value}}%"
+  },
+  "cmd": {
+    "playerNotFound": "Jugador no encontrado: {{name}}",
+    "usageKill": "Uso: /kill <nombre_jugador>",
+    "usageTp": "Uso: /tp <nombre_jugador>",
+    "usageKick": "Uso: /kick <nombre_jugador>",
+    "healed": "{{name}} curado a vida máxima.",
+    "teleported": "Teletransportado a {{name}}.",
+    "usageSetlevel": "Uso: /setlevel <nombre_jugador> <nivel>",
+    "invalidLevel": "El nivel debe estar entre 1 y {{max}}.",
+    "setLevel": "{{name}} establecido al nivel {{level}}.",
+    "usageResettutorials": "Uso: /resettutorials <nombre_jugador>",
+    "resetTutorials": "{{count}} tutorial(es) reiniciados para {{name}}.",
+    "usageGive": "Uso: /give <nombre_jugador> <id_objeto> [cantidad]",
+    "itemNotFound": "Objeto desconocido: {{id}}",
+    "invalidQuantity": "La cantidad debe ser un número positivo.",
+    "inventoryFull": "El inventario de {{name}} está lleno.",
+    "gaveItem": "{{amount}}× {{item}} entregado a {{name}}.",
+    "notAlive": "{{name}} no está vivo. Usa /revive primero.",
+    "usageRevive": "Uso: /revive <nombre_jugador>",
+    "alreadyAlive": "{{name}} ya está vivo."
+  }
+}
