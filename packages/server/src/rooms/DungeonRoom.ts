@@ -58,7 +58,7 @@ import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
-import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
+import { getItemDef, getItemDefsForClient, getItemRegistryVersion } from "../items/ItemRegistry";
 import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
 import { getEffectDefsForClient, getEffectRegistryVersion } from "../effects/EffectRegistry";
 import { executeEffect } from "../items/EffectHandlers";
@@ -574,7 +574,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const ids = data.itemIds.slice(0, 50);
         client.send(MessageType.ITEM_DEFS_RESPONSE, {
           version: getItemRegistryVersion(),
-          items: getItemDefs(ids),
+          items: getItemDefsForClient(ids),
         });
       },
     );

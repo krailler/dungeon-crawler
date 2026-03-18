@@ -1,4 +1,5 @@
-import type { ItemDef } from "@dungeon/shared";
+import type { ItemDef, ItemDefClient } from "@dungeon/shared";
+import { toItemDefClient } from "@dungeon/shared";
 import { items } from "../db/schema.js";
 import { createRegistry } from "../db/createRegistry.js";
 
@@ -27,3 +28,8 @@ export const getItemDef = registry.get;
 export const getItemDefs = registry.getMany;
 export const getAllItemDefs = registry.getAll;
 export const getItemRegistryVersion = registry.getVersion;
+
+/** Return only presentation fields for client consumption */
+export function getItemDefsForClient(ids: string[]): ItemDefClient[] {
+  return registry.getMany(ids).map(toItemDefClient);
+}

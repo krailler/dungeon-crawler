@@ -1,6 +1,6 @@
 import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
-import type { ItemDef } from "./Items.js";
+import type { ItemDefClient } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
 import type { EffectDef } from "./Effects.js";
 
@@ -275,7 +275,7 @@ export interface ItemDefsRequestMessage {
 export interface ItemDefsResponseMessage {
   /** Cache version — changes when item definitions are modified */
   version: number;
-  items: ItemDef[];
+  items: ItemDefClient[];
 }
 
 // ── Loot ────────────────────────────────────────────────────────────────────

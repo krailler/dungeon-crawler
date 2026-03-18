@@ -90,8 +90,8 @@ export type { GateTypeValue } from "./GateTypes.js";
 export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
 
-export { ItemEffectType } from "./Items.js";
-export type { ItemEffectTypeValue, ItemDef } from "./Items.js";
+export { ItemEffectType, toItemDefClient } from "./Items.js";
+export type { ItemEffectTypeValue, ItemDef, ItemDefClient } from "./Items.js";
 
 export {
   CreatureEffectTrigger,
