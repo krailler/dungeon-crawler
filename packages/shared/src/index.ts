@@ -40,6 +40,8 @@ export type {
   ReviveStartMessage,
   EffectDefsRequestMessage,
   EffectDefsResponseMessage,
+  ClassDefsRequestMessage,
+  ClassDefsResponseMessage,
 } from "./protocol.js";
 
 export {
@@ -89,6 +91,9 @@ export type { GateTypeValue } from "./GateTypes.js";
 
 export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
+
+export { toClassDefClient } from "./Classes.js";
+export type { ClassDef, ClassDefClient } from "./Classes.js";
 
 export { ItemEffectType, toItemDefClient } from "./Items.js";
 export type { ItemEffectTypeValue, ItemDef, ItemDefClient } from "./Items.js";

@@ -3,6 +3,7 @@ import type { TutorialStepValue } from "./Tutorial.js";
 import type { ItemDefClient } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
 import type { EffectDef } from "./Effects.js";
+import type { ClassDefClient } from "./Classes.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -41,6 +42,8 @@ export const MessageType = {
   EFFECT_DEFS_REQUEST: "effect:defs:req",
   EFFECT_DEFS_RESPONSE: "effect:defs:res",
   EXIT_INTERACT: "exit:interact",
+  CLASS_DEFS_REQUEST: "class:defs:req",
+  CLASS_DEFS_RESPONSE: "class:defs:res",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -329,6 +332,20 @@ export interface EffectDefsResponseMessage {
   /** Cache version — changes when effect definitions are modified */
   version: number;
   effects: EffectDef[];
+}
+
+// ── Classes ─────────────────────────────────────────────────────────────────
+
+/** Client → Server: request class definitions by id */
+export interface ClassDefsRequestMessage {
+  classIds: string[];
+}
+
+/** Server → Client: class definitions response */
+export interface ClassDefsResponseMessage {
+  /** Cache version — changes when class definitions are modified */
+  version: number;
+  classes: ClassDefClient[];
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

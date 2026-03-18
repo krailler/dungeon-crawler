@@ -1,8 +1,8 @@
-import { auth, Hash, JWT } from "colyseus";
+import { auth, JWT } from "colyseus";
 import { eq } from "drizzle-orm";
-import { DEFAULT_SKILL_IDS } from "@dungeon/shared";
 import { getDb } from "../db/database";
-import { accounts, characters, characterSkills } from "../db/schema";
+import { accounts } from "../db/schema";
+import { createAccount } from "./createAccount";
 
 // JWT secret — use env var in production, dev fallback for local development
 JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-prod";
@@ -19,32 +19,12 @@ auth.settings.onRegisterWithEmailAndPassword = async (email: string, password: s
   if (process.env.NODE_ENV === "production") {
     throw new Error("Registration is disabled");
   }
-  if (process.env.NODE_ENV === "production" && password.length < 4) {
-    throw new Error("Password must be at least 4 characters");
-  }
-
-  const db = getDb();
-  const hashedPassword = await Hash.make(password);
 
   // Derive character name from email: "test@domain.com" → "Test"
   const raw = email.split("@")[0];
   const charName = raw.charAt(0).toUpperCase() + raw.slice(1);
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ email, password: hashedPassword, role: "user" })
-    .returning();
-
-  const [character] = await db
-    .insert(characters)
-    .values({ accountId: account.id, name: charName })
-    .returning({ id: characters.id });
-
-  // Assign default skills to the new character
-  await db
-    .insert(characterSkills)
-    .values(DEFAULT_SKILL_IDS.map((skillId) => ({ characterId: character.id, skillId })));
-
+  const account = await createAccount({ email, password, characterName: charName });
   console.log(`[Auth] Auto-created account "${email}" with character "${charName}"`);
   return account;
 };

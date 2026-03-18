@@ -5,8 +5,9 @@ import {
   MAX_LEVEL,
   INVENTORY_MAX_SLOTS,
   LifeState,
+  PLAYER_SCALING,
 } from "@dungeon/shared";
-import type { AllocatableStatValue, RoleValue } from "@dungeon/shared";
+import type { AllocatableStatValue, RoleValue, StatScaling } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
 import { InventorySlotState } from "./InventorySlotState";
 import { ActiveEffectState } from "./ActiveEffectState";
@@ -25,6 +26,7 @@ export class PlayerState extends Schema {
   @type("boolean") isLeader: boolean = false;
   @type("int16") level: number = 1;
   @type("boolean") isSprinting: boolean = false;
+  @type("string") classId: string = "warrior";
   @type({ map: ActiveEffectState }) effects = new MapSchema<ActiveEffectState>();
 
   // ── Death / revive fields (visible to all clients) ────────────────────────
@@ -39,6 +41,8 @@ export class PlayerState extends Schema {
 
   // ── Server-only (not synced at all) ────────────────────────────────────────
   characterId: string = "";
+  /** Stat scaling from the player's class (loaded from ClassRegistry on join) */
+  statScaling: StatScaling = PLAYER_SCALING;
   path: { x: number; z: number }[] = [];
   /** Number of real deaths this session (for escalating respawn timer) */
   deathCount: number = 0;
@@ -150,11 +154,14 @@ export class PlayerState extends Schema {
 
   /** Recompute all derived stats from current base stats and apply them. */
   applyDerivedStats(): void {
-    const derived = computeDerivedStats({
-      strength: this.strength,
-      vitality: this.vitality,
-      agility: this.agility,
-    });
+    const derived = computeDerivedStats(
+      {
+        strength: this.strength,
+        vitality: this.vitality,
+        agility: this.agility,
+      },
+      this.statScaling,
+    );
     this.maxHealth = derived.maxHealth;
     this.attackDamage = derived.attackDamage;
     this.defense = derived.defense;

@@ -6,6 +6,7 @@ import { loadItemRegistry } from "./items/ItemRegistry";
 import { loadCreatureTypeRegistry } from "./creatures/CreatureTypeRegistry";
 import { loadSkillRegistry } from "./skills/SkillRegistry";
 import { loadEffectRegistry } from "./effects/EffectRegistry";
+import { loadClassRegistry } from "./classes/ClassRegistry";
 import { logger } from "./logger";
 import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
@@ -24,6 +25,7 @@ const server = new Server({
     await loadCreatureTypeRegistry();
     await loadSkillRegistry();
     await loadEffectRegistry();
+    await loadClassRegistry();
   },
   express: (app) => {
     app.use("/auth", auth.routes());

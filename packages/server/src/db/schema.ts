@@ -53,6 +53,7 @@ export const characters = charactersSchema.table(
     gold: integer("gold").notNull().default(0),
     xp: integer("xp").notNull().default(0),
     statPoints: integer("stat_points").notNull().default(0),
+    classId: text("class_id").notNull().default("warrior"),
     tutorialsCompleted: text("tutorials_completed").notNull().default("[]"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -162,6 +163,33 @@ export const effects = worldSchema.table("effects", {
   statModifiers: jsonb("stat_modifiers").notNull().default({}),
   tickEffect: jsonb("tick_effect"),
   scaling: jsonb("scaling"),
+});
+
+export const classes = worldSchema.table("classes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  icon: text("icon").notNull().default(""),
+  hpBase: real("hp_base").notNull().default(50),
+  hpPerVit: real("hp_per_vit").notNull().default(5),
+  attackBase: real("attack_base").notNull().default(5),
+  attackPerStr: real("attack_per_str").notNull().default(0.5),
+  defenseBase: real("defense_base").notNull().default(0),
+  defensePerVit: real("defense_per_vit").notNull().default(0.3),
+  speedBase: real("speed_base").notNull().default(4),
+  speedPerAgi: real("speed_per_agi").notNull().default(0.1),
+  cooldownBase: real("cooldown_base").notNull().default(1.2),
+  cooldownPerAgi: real("cooldown_per_agi").notNull().default(0.02),
+  attackRange: real("attack_range").notNull().default(2.5),
+});
+
+export const classSkills = worldSchema.table("class_skills", {
+  classId: text("class_id")
+    .notNull()
+    .references(() => classes.id, { onDelete: "cascade" }),
+  skillId: text("skill_id")
+    .notNull()
+    .references(() => skills.id, { onDelete: "cascade" }),
 });
 
 export const creatureEffects = worldSchema.table("creature_effects", {

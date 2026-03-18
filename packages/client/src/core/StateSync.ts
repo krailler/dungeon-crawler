@@ -56,6 +56,7 @@ import { hudStore } from "../ui/stores/hudStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { skillDefStore } from "../ui/stores/skillDefStore";
 import { effectDefStore } from "../ui/stores/effectDefStore";
+import { classDefStore } from "../ui/stores/classDefStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
@@ -128,6 +129,7 @@ export class StateSync {
     // Connect def stores — lazy-loads definitions from server
     skillDefStore.connect(room);
     effectDefStore.connect(room);
+    classDefStore.connect(room);
 
     // Listen for skill cooldown messages from server
     room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {
@@ -457,6 +459,11 @@ export class StateSync {
               defense: secret.defense,
             }
           : undefined;
+        // Prefetch class definition for UI
+        if (player.classId) {
+          classDefStore.ensureLoaded([player.classId as string]);
+        }
+
         hudStore.setMember({
           id: sessionId,
           name,
@@ -466,6 +473,7 @@ export class StateSync {
           online: player.online,
           isLeader: player.isLeader,
           level: player.level,
+          classId: (player.classId as string) || undefined,
           lifeState: player.lifeState ?? LifeState.ALIVE,
           // Private fields — only for local player
           ...(secret && {
@@ -921,6 +929,7 @@ export class StateSync {
     deathStore.reset();
     skillDefStore.reset();
     effectDefStore.reset();
+    classDefStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();

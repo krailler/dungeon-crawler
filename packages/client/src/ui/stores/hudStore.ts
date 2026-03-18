@@ -36,6 +36,7 @@ export type PartyMember = {
   online: boolean;
   isLeader: boolean;
   level: number;
+  classId?: string;
   lifeState?: string;
   bleedTimer?: number;
   respawnTimer?: number;

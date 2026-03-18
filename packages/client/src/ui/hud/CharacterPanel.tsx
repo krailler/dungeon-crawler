@@ -5,6 +5,7 @@ import { AllocatableStat, TutorialStep } from "@dungeon/shared";
 import type { AllocatableStatValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
+import { classDefStore } from "../stores/classDefStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { CoinIcon } from "../icons/CoinIcon";
 import { HudPanel } from "../components/HudPanel";
@@ -49,6 +50,7 @@ const StatRow = ({
 export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
+  const classDefs = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
   const local = snapshot.members.find((m) => m.isLocal);
 
   if (!local?.stats) return null;
@@ -56,6 +58,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
   const stats: CharacterStats = local.stats;
   const statPoints = local.statPoints ?? 0;
   const healthPct = Math.round((local.health / Math.max(1, local.maxHealth)) * 100);
+  const classDef = local.classId ? classDefs.get(local.classId) : undefined;
 
   const handleAllocate = (stat: AllocatableStatValue): void => {
     playUiSfx("ui_click");
@@ -71,6 +74,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
           <h3 className="text-sm font-bold text-slate-100">{local.name}</h3>
           <span className="text-[11px] text-sky-400">
             {t("character.level", { level: local.level })}
+            {classDef && ` — ${classDef.name}`}
           </span>
         </div>
       }

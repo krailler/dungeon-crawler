@@ -15,9 +15,9 @@ import {
   MessageType,
   TutorialStep,
   GateType,
-  DEFAULT_SKILL_IDS,
 } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
+import { getClassDef } from "../classes/ClassRegistry";
 import {
   registerSession,
   unregisterSession,
@@ -80,6 +80,7 @@ export class PlayerSessionManager {
       gold,
       xp,
       statPoints,
+      classId,
       tutorialsCompleted: tutorialsRaw,
     } = client.auth as {
       accountId: string;
@@ -93,6 +94,7 @@ export class PlayerSessionManager {
       gold: number;
       xp: number;
       statPoints: number;
+      classId: string;
       tutorialsCompleted: string;
     };
 
@@ -152,6 +154,13 @@ export class PlayerSessionManager {
     player.xpToNext = xpToNextLevel(level);
     player.statPoints = statPoints;
     player.characterId = characterId;
+    player.classId = classId;
+
+    // Load class scaling from registry (fallback to default if class not found)
+    const classDef = getClassDef(classId);
+    if (classDef) {
+      player.statScaling = classDef.scaling;
+    }
 
     // Parse tutorial completion from DB
     try {
@@ -625,20 +634,11 @@ export class PlayerSessionManager {
       .from(characterSkills)
       .where(eq(characterSkills.characterId, characterId));
 
+    for (const row of rows) {
+      player.skills.push(row.skillId);
+    }
     if (rows.length > 0) {
-      for (const row of rows) {
-        player.skills.push(row.skillId);
-      }
       this.log.debug({ characterId, skills: rows.length }, "Skills loaded");
-    } else {
-      // Legacy character — assign default skills and persist them
-      for (const skillId of DEFAULT_SKILL_IDS) {
-        player.skills.push(skillId);
-      }
-      await db
-        .insert(characterSkills)
-        .values(DEFAULT_SKILL_IDS.map((skillId) => ({ characterId, skillId })));
-      this.log.debug({ characterId }, "Default skills assigned to legacy character");
     }
   }
 

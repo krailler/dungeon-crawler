@@ -146,12 +146,15 @@ export class EffectSystem {
    * Recompute player derived stats, applying all active effect modifiers.
    */
   recomputeStats(player: PlayerState): void {
-    // Start from clean base stats
-    const derived = computeDerivedStats({
-      strength: player.strength,
-      vitality: player.vitality,
-      agility: player.agility,
-    });
+    // Start from clean base stats (using per-class scaling)
+    const derived = computeDerivedStats(
+      {
+        strength: player.strength,
+        vitality: player.vitality,
+        agility: player.agility,
+      },
+      player.statScaling,
+    );
 
     // Aggregate all modifiers from active effects
     const flatMods: Record<string, number> = {};

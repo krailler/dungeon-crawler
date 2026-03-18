@@ -36,6 +36,7 @@ import { StarIcon } from "../icons/StarIcon";
 import { BackpackIcon } from "../icons/BackpackIcon";
 import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
+import { classDefStore } from "../stores/classDefStore";
 
 import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
@@ -62,6 +63,8 @@ const PartyRow = ({
   onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
 }): ReactNode => {
   const { t } = useTranslation();
+  const classDefs = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
+  const classDef = member.classId ? classDefs.get(member.classId) : undefined;
   const safeMax = Math.max(1, member.maxHealth);
   const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
   const isDowned = member.lifeState === LifeState.DOWNED;
@@ -140,7 +143,9 @@ const PartyRow = ({
               )}
             </div>
             <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-              {member.isLeader ? t("party.roleLeader") : t("party.roleMember")}
+              {[classDef?.name, member.isLeader ? t("party.roleLeader") : undefined]
+                .filter(Boolean)
+                .join(" — ") || t("party.roleMember")}
             </span>
           </div>
           <div className="relative">

@@ -10,6 +10,7 @@ import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
 import { EffectIcon } from "../components/EffectIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
+import { classDefStore } from "../stores/classDefStore";
 import { LifeState } from "@dungeon/shared";
 
 export const TargetFrame = (): ReactNode => {
@@ -19,6 +20,7 @@ export const TargetFrame = (): ReactNode => {
   const hudSnap = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const creatureSnap = useSyncExternalStore(creatureStore.subscribe, creatureStore.getSnapshot);
   const defSnap = useSyncExternalStore(effectDefStore.subscribe, effectDefStore.getSnapshot);
+  const classSnap = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
 
   // Resolve target entity data from the appropriate store.
   const targetCreature =
@@ -107,6 +109,11 @@ export const TargetFrame = (): ReactNode => {
               <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
                 {t("character.level", { level: entity.level })}
               </span>
+              {targetMember?.classId && classSnap.get(targetMember.classId) && (
+                <span className="text-[10px] text-slate-400">
+                  {classSnap.get(targetMember.classId)!.name}
+                </span>
+              )}
               {entity.isDead && (
                 <span className="rounded bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
                   {t("party.dead")}

@@ -61,6 +61,7 @@ import { PlayerSessionManager } from "./PlayerSessionManager";
 import { getItemDef, getItemDefsForClient, getItemRegistryVersion } from "../items/ItemRegistry";
 import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
 import { getEffectDefsForClient, getEffectRegistryVersion } from "../effects/EffectRegistry";
+import { getClassDefsForClient, getClassRegistryVersion } from "../classes/ClassRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
@@ -102,6 +103,7 @@ import type {
   ItemSwapMessage,
   ItemDefsRequestMessage,
   EffectDefsRequestMessage,
+  ClassDefsRequestMessage,
   LootTakeMessage,
   SetTargetMessage,
   ReviveStartMessage,
@@ -605,6 +607,19 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
     );
 
+    // Class definitions: client requests defs lazily by id
+    this.onMessage(
+      MessageType.CLASS_DEFS_REQUEST,
+      (client: Client, data: ClassDefsRequestMessage) => {
+        if (!Array.isArray(data.classIds) || data.classIds.length === 0) return;
+        const ids = data.classIds.slice(0, 50);
+        client.send(MessageType.CLASS_DEFS_RESPONSE, {
+          version: getClassRegistryVersion(),
+          classes: getClassDefsForClient(ids),
+        });
+      },
+    );
+
     // Loot: take an item from a loot bag on the ground
     this.onMessage(MessageType.LOOT_TAKE, (client: Client, data: LootTakeMessage) => {
       const player = this.state.players.get(client.sessionId);
@@ -889,6 +904,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     gold: number;
     xp: number;
     statPoints: number;
+    classId: string;
     tutorialsCompleted: string;
   }> {
     // Check client protocol version
@@ -926,6 +942,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         gold: characters.gold,
         xp: characters.xp,
         statPoints: characters.statPoints,
+        classId: characters.classId,
         tutorialsCompleted: characters.tutorialsCompleted,
       })
       .from(characters)
@@ -956,6 +973,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       gold: character.gold,
       xp: character.xp,
       statPoints: character.statPoints,
+      classId: character.classId,
       tutorialsCompleted: character.tutorialsCompleted,
     };
   }
