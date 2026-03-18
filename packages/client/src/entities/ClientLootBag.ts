@@ -1,7 +1,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
@@ -25,7 +25,7 @@ export class ClientLootBag {
   private anchor: TransformNode;
   private modelMeshes: AbstractMesh[] = [];
   private hitbox: AbstractMesh;
-  private light: PointLight;
+  private glowDisc: AbstractMesh;
   private renderObserver: Observer<Scene>;
   private startTime: number;
   readonly id: string;
@@ -52,6 +52,8 @@ export class ClientLootBag {
           mat.alpha = 1;
           mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
           mat.backFaceCulling = true;
+          mat.metallic = 0;
+          mat.roughness = 0.8;
           mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
         }
         m.isPickable = false;
@@ -72,11 +74,38 @@ export class ClientLootBag {
     const meta: InteractableMetadata = { interactType: "loot", interactId: id };
     this.hitbox.metadata = meta;
 
-    // Subtle glow light
-    this.light = new PointLight(`loot_light_${id}`, new Vector3(x, 0.5, z), scene);
-    this.light.intensity = 0.3;
-    this.light.range = 3;
-    this.light.diffuse = new Color3(1, 0.85, 0.2);
+    // Golden glow blob on the ground (fake light, zero GPU light cost)
+    const glowDisc = MeshBuilder.CreateGround(
+      `loot_glow_${id}`,
+      { width: 2.5, height: 2.5 },
+      scene,
+    );
+    glowDisc.position.set(x, 0.02, z); // just above floor to avoid z-fighting
+    glowDisc.isPickable = false;
+
+    // Procedural radial gradient texture
+    const glowSize = 128;
+    const glowTex = new DynamicTexture(`loot_glow_tex_${id}`, glowSize, scene, false);
+    const ctx = glowTex.getContext();
+    const cx = glowSize / 2;
+    const gradient = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+    gradient.addColorStop(0, "rgba(255, 200, 50, 0.6)");
+    gradient.addColorStop(0.5, "rgba(255, 170, 30, 0.2)");
+    gradient.addColorStop(1, "rgba(255, 150, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, glowSize, glowSize);
+    glowTex.update();
+
+    const glowMat = new StandardMaterial(`loot_glow_mat_${id}`, scene);
+    glowMat.diffuseTexture = glowTex;
+    glowMat.diffuseTexture.hasAlpha = true;
+    glowMat.useAlphaFromDiffuseTexture = true;
+    glowMat.emissiveTexture = glowTex;
+    glowMat.disableLighting = true;
+    glowMat.alpha = 0.3;
+    glowMat.backFaceCulling = false;
+    glowDisc.material = glowMat;
+    this.glowDisc = glowDisc;
 
     // Bobbing + rotation animation
     this.renderObserver = scene.onBeforeRenderObservable.add(() => {
@@ -92,8 +121,10 @@ export class ClientLootBag {
 
   dispose(): void {
     this.anchor.getScene().onBeforeRenderObservable.remove(this.renderObserver);
-    this.anchor.dispose(false, true);
+    // Dispose meshes but NOT materials (shared across all chest instances)
+    this.anchor.dispose(false, false);
     this.hitbox.dispose();
-    this.light.dispose();
+    this.glowDisc.material?.dispose();
+    this.glowDisc.dispose();
   }
 }

@@ -103,9 +103,9 @@ export class ClientGame {
     this.setupLighting();
     this.fogOfWar = new FogOfWarSystem(this.scene, this.isoCamera.camera);
 
-    this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.loaderRegistry = new CharacterLoaderRegistry(this.scene);
     this.propRegistry = new PropRegistry(this.scene);
+    this.dungeonRenderer = new DungeonRenderer(this.scene, this.propRegistry);
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
 

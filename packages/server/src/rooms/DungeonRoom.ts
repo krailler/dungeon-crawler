@@ -931,11 +931,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const wallVariants = generateWallVariants(this.tileMap, seed, roomOwnership, roomSets);
     this.state.wallVariantData = JSON.stringify(wallVariants);
 
-    // Setup pathfinding — block all closed gate tiles
+    // Setup pathfinding — block closed gates and exit portal tile
     this.pathfinder = new Pathfinder(this.tileMap);
     this.state.gates.forEach((gate: GateState) => {
       if (!gate.open) this.pathfinder.blockTile(gate.tileX, gate.tileY);
     });
+    // Block exit tile so players can't walk over the portal
+    const exitTileX = Math.round(this.exitPos.x / TILE_SIZE);
+    const exitTileZ = Math.round(this.exitPos.z / TILE_SIZE);
+    this.pathfinder.blockTile(exitTileX, exitTileZ);
 
     // Setup AI + combat systems
     this.aiSystem = new AISystem(this.pathfinder);
@@ -988,6 +992,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.isMoving = false;
       player.path = [];
       player.currentPathIndex = 0;
+      player.itemCooldowns.clear();
+      this.effectSystem.clearEffects(player);
       if (spawnPos) {
         player.x = spawnPos.x;
         player.z = spawnPos.z;

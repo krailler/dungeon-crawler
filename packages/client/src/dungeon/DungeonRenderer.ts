@@ -7,6 +7,9 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { TransformNode as TransformNodeClass } from "@babylonjs/core/Meshes/transformNode";
+import type { PropRegistry } from "../entities/PropRegistry";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color4 as BColor4 } from "@babylonjs/core/Maths/math.color";
@@ -16,9 +19,6 @@ import {
   TILE_SIZE,
   WALL_HEIGHT,
   WALL_DEPTH,
-  WALL_TORCH_INTENSITY,
-  WALL_TORCH_RANGE,
-  WALL_TORCH_CHANCE,
   SPAWN_LIGHT_INTENSITY,
   SPAWN_LIGHT_RANGE,
   unpackSetId,
@@ -41,8 +41,6 @@ export class DungeonRenderer {
   private wallDecoMap: Map<Mesh, TransformNode[]> = new Map();
 
   /** Wall torch lights and particles */
-  private torchLights: PointLight[] = [];
-  private torchParticles: ParticleSystem[] = [];
   /** Shared particle texture for all torches (created once, reused) */
   private fireTexture: Texture | null = null;
 
@@ -56,11 +54,13 @@ export class DungeonRenderer {
   private exitPortal: { mesh: Mesh; light: PointLight } | null = null;
 
   private scene: Scene;
+  private propRegistry: PropRegistry;
   private floorAssetLoader: FloorAssetLoader;
   private wallAssetLoader: WallAssetLoader;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, propRegistry: PropRegistry) {
     this.scene = scene;
+    this.propRegistry = propRegistry;
 
     this.floorAssetLoader = new FloorAssetLoader(scene);
     this.wallAssetLoader = new WallAssetLoader(scene);
@@ -253,16 +253,6 @@ export class DungeonRenderer {
     this.floorRoots = [];
     this.floorMeshes = [];
 
-    // Dispose torch lights & particles
-    for (const ps of this.torchParticles) {
-      ps.dispose();
-    }
-    this.torchParticles = [];
-    for (const light of this.torchLights) {
-      light.dispose();
-    }
-    this.torchLights = [];
-
     // Dispose wall meshes
     for (const mesh of this.wallMeshes) {
       mesh.dispose();
@@ -451,11 +441,7 @@ export class DungeonRenderer {
 
     this.wallDecoMap.set(wall, decos);
 
-    // Deterministic torch placement on front face only
-    const hash = ((tileX * 73856093) ^ (tileY * 19349663) ^ (face * 83492791)) >>> 0;
-    if ((hash % 1000) / 1000 < WALL_TORCH_CHANCE) {
-      this.createWallTorch(frontX, frontZ, dir);
-    }
+    // Wall torches disabled — TODO: revisit with proximity-based light system
   }
 
   /** Create a portcullis-style gate mesh at the given tile */
@@ -553,9 +539,9 @@ export class DungeonRenderer {
     this.spawnLight = light;
   }
 
-  /** Glowing portal ring on the EXIT tile — clickable to complete the dungeon. */
+  /** Exit portal on the EXIT tile — clickable to complete the dungeon. */
   private createExitPortal(worldX: number, worldZ: number, tileX: number, tileY: number): void {
-    const portalY = WALL_HEIGHT * 0.45;
+    const PORTAL_SCALE = 0.25;
 
     // Invisible hitbox for click detection
     const hitbox = MeshBuilder.CreateBox(
@@ -563,7 +549,7 @@ export class DungeonRenderer {
       { width: TILE_SIZE * 0.8, height: WALL_HEIGHT * 0.8, depth: TILE_SIZE * 0.8 },
       this.scene,
     );
-    hitbox.position.set(worldX, portalY, worldZ);
+    hitbox.position.set(worldX, WALL_HEIGHT * 0.4, worldZ);
     hitbox.isPickable = true;
     hitbox.visibility = 0;
     hitbox.metadata = {
@@ -573,85 +559,60 @@ export class DungeonRenderer {
       interactZ: tileY * TILE_SIZE,
     };
 
-    // Vertical torus ring
-    const ring = MeshBuilder.CreateTorus(
-      "exitRing",
-      { diameter: TILE_SIZE * 0.7, thickness: 0.12, tessellation: 32 },
-      this.scene,
-    );
-    const mat = new StandardMaterial("exitPortalMat", this.scene);
-    mat.diffuseColor = new Color3(0.2, 0.1, 0.6);
-    mat.emissiveColor = new Color3(0.3, 0.15, 0.8);
-    mat.specularColor = new Color3(0.5, 0.3, 1.0);
-    mat.alpha = 0.85;
-    ring.material = mat;
-    ring.parent = hitbox;
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0;
+    // Instantiate portal GLB model
+    const container = this.propRegistry.get("portal");
+    if (container) {
+      const result = container.instantiateModelsToScene((sourceName) => `exitPortal_${sourceName}`);
+      const root = result.rootNodes[0] as TransformNodeClass;
+      root.parent = hitbox;
+      root.position.y = -WALL_HEIGHT * 0.4;
+      root.scaling.setAll(PORTAL_SCALE);
+      // Rotate to face the isometric camera
+      hitbox.rotation.y = -Math.PI / 4;
 
-    // Point light for glow
-    const light = new PointLight(
-      "exitPortalLight",
-      new Vector3(worldX, portalY, worldZ),
-      this.scene,
-    );
-    light.intensity = 1.2;
-    light.range = TILE_SIZE * 3;
-    light.diffuse = new Color3(0.4, 0.2, 1.0);
-    light.specular = new Color3(0.2, 0.1, 0.5);
+      for (const m of root.getChildMeshes(false)) {
+        const mat = m.material;
+        if (mat instanceof PBRMaterial) {
+          mat.alpha = 1;
+          mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+          mat.backFaceCulling = true;
+          mat.metallic = 0;
+          mat.roughness = 0.8;
+          // Use unlit mode so albedo texture shows at full brightness
+          // (Meshy bakes lighting into the texture — external lights won't help)
+          mat.unlit = true;
+        }
+        m.isPickable = false;
+      }
+    }
+
+    // Cyan point light inside the arch opening
+    const light = new PointLight("exitPortalLight", new Vector3(worldX, 1.0, worldZ), this.scene);
+    light.intensity = 2.0;
+    light.range = TILE_SIZE * 5;
+    light.diffuse = new Color3(0.1, 0.7, 1.0);
+    light.specular = new Color3(0.05, 0.3, 0.5);
+
+    // Magical particle effect rising from the portal
+    const ps = new ParticleSystem("exitPortalParticles", 60, this.scene);
+    ps.particleTexture = new Texture("/textures/flare.png", this.scene);
+    ps.emitter = new Vector3(worldX, 0.3, worldZ);
+    ps.minEmitBox = new Vector3(-0.8, 0, -0.8);
+    ps.maxEmitBox = new Vector3(0.8, 0, 0.8);
+    ps.direction1 = new Vector3(-0.2, 1, -0.2);
+    ps.direction2 = new Vector3(0.2, 2.0, 0.2);
+    ps.minLifeTime = 1.0;
+    ps.maxLifeTime = 2.0;
+    ps.minSize = 0.15;
+    ps.maxSize = 0.4;
+    ps.emitRate = 40;
+    ps.color1 = new BColor4(0.1, 0.8, 1.0, 0.9);
+    ps.color2 = new BColor4(0.3, 0.6, 1.0, 0.7);
+    ps.colorDead = new BColor4(0.1, 0.3, 0.8, 0);
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.gravity = new Vector3(0, 0.3, 0);
+    ps.start();
 
     this.exitPortal = { mesh: hitbox, light };
-  }
-
-  private createWallTorch(x: number, z: number, dir: { x: number; z: number }): void {
-    const torchY = WALL_HEIGHT * 0.6;
-    // Offset slightly inward from wall face
-    const offsetDist = 0.3;
-    const px = x - dir.x * offsetDist;
-    const pz = z - dir.z * offsetDist;
-
-    const name = `wallTorch_${this.torchLights.length}`;
-
-    // PointLight
-    const light = new PointLight(name, new Vector3(px, torchY, pz), this.scene);
-    light.intensity = WALL_TORCH_INTENSITY;
-    light.range = WALL_TORCH_RANGE;
-    light.diffuse = new Color3(1.0, 0.7, 0.3);
-    light.specular = new Color3(0.4, 0.2, 0.1);
-    this.torchLights.push(light);
-
-    // Fire particle system
-    const ps = new ParticleSystem(`${name}_fire`, 30, this.scene);
-    ps.createPointEmitter(new Vector3(-0.05, 0, -0.05), new Vector3(0.05, 0.3, 0.05));
-    ps.emitter = new Vector3(px, torchY, pz);
-
-    // Share a single particle texture across all torches
-    if (!this.fireTexture) {
-      this.fireTexture = new Texture(
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAKNJREFUWEft1DEKwDAMA1D5/0enQ4eQIZClxKR0syT+NjapzN1i5v4tAD8HZG4ROU7MfBb4x8gRwMzswF0AhxVPAPpMAO4GACIAMA3knIDtACIA0ACsAmDrAEIA0ADMAqDLAGIA0ABMAaDrAOIA0ABMA6DrABIA0ABsA6DLAFIAnwB+f4qPfwB3d/3+q/nqrxDy/0KyD2j/HNj+M2S7A/0OAN8JbtwgkzFIRwAAAABJRU5ErkJggg==",
-        this.scene,
-      );
-    }
-    ps.particleTexture = this.fireTexture;
-
-    ps.minSize = 0.1;
-    ps.maxSize = 0.25;
-    ps.minLifeTime = 0.2;
-    ps.maxLifeTime = 0.5;
-    ps.emitRate = 20;
-    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
-
-    ps.color1 = new BColor4(1.0, 0.6, 0.1, 1.0);
-    ps.color2 = new BColor4(1.0, 0.3, 0.0, 0.8);
-    ps.colorDead = new BColor4(0.3, 0.1, 0.0, 0.0);
-
-    ps.minEmitPower = 0.3;
-    ps.maxEmitPower = 0.6;
-    ps.updateSpeed = 0.02;
-
-    ps.gravity = new Vector3(0, 1.5, 0);
-
-    ps.start();
-    this.torchParticles.push(ps);
   }
 }

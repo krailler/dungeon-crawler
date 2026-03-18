@@ -9,6 +9,7 @@ import type { Scene } from "@babylonjs/core/scene";
 
 const PROP_PATHS: Record<string, string> = {
   chest: "/models/props/chest.glb",
+  portal: "/models/props/portal.glb",
 };
 
 export class PropRegistry {

@@ -141,6 +141,35 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   });
 
   registry.register({
+    name: "tpxy",
+    usage: "/tpxy <x> <z>",
+    description: "Teleport to world coordinates",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const parts = ctx.args.trim().split(/\s+/);
+      if (parts.length < 2) {
+        ctx.replyError("Usage: /tpxy <x> <z>", "cmd.usageTpxy");
+        return;
+      }
+      const x = parseFloat(parts[0]);
+      const z = parseFloat(parts[1]);
+      if (isNaN(x) || isNaN(z)) {
+        ctx.replyError("Invalid coordinates.", "cmd.invalidCoords");
+        return;
+      }
+      ctx.player.x = x;
+      ctx.player.z = z;
+      ctx.player.path = [];
+      ctx.player.currentPathIndex = 0;
+      ctx.player.isMoving = false;
+      ctx.reply(`Teleported to (${x.toFixed(1)}, ${z.toFixed(1)}).`, "cmd.teleportedXY", {
+        x: x.toFixed(1),
+        z: z.toFixed(1),
+      });
+    },
+  });
+
+  registry.register({
     name: "leader",
     usage: "/leader [player]",
     description: "Transfer party leadership (or current target)",
