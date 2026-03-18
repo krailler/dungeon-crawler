@@ -13,6 +13,9 @@ const HOLD_SEND_INTERVAL = 150;
 /** Min interval (ms) between floor raycasts while holding (≈20 Hz) */
 const RAYCAST_INTERVAL = 50;
 
+/** Distance to stop before an interactable (tiles). Must be < INTERACT_RANGE (2.0) */
+const INTERACTABLE_STOP_DISTANCE = 1.2;
+
 /**
  * Metadata placed on any mesh that the player can click to interact with.
  * Future interactables (chests, NPCs, …) reuse the same shape.
@@ -279,10 +282,10 @@ export class InputManager {
     );
     if (!pick?.hit || !pick.pickedMesh) return false;
 
-    // Walk to the mesh position (not the canonical tile position) because
-    // the mesh is offset toward the room and is always reachable.
+    // Walk toward the interactable but stop at a comfortable margin
     const meshPos = pick.pickedMesh.getAbsolutePosition();
-    this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
+    const target = this.computeStopPosition(meshPos.x, meshPos.z, INTERACTABLE_STOP_DISTANCE);
+    this.room.send(MessageType.MOVE, target);
     this.lastSendTime = performance.now();
     return true;
   }
@@ -333,9 +336,9 @@ export class InputManager {
         x: ix,
         z: iz,
       };
-      // Walk to the mesh position (not the tile position) because the mesh
-      // is offset toward the room and is always reachable by pathfinding.
-      this.room.send(MessageType.MOVE, { x: meshPos.x, z: meshPos.z });
+      // Walk toward the canonical interact position but stop at a comfortable margin
+      const target = this.computeStopPosition(ix, iz, INTERACTABLE_STOP_DISTANCE);
+      this.room.send(MessageType.MOVE, target);
       this.lastSendTime = performance.now();
     }
     return true;
@@ -420,6 +423,24 @@ export class InputManager {
     }
 
     this.setCursor("");
+  }
+
+  /** Compute a position that stops `stopDist` before the target, from the player's current position. */
+  private computeStopPosition(
+    targetX: number,
+    targetZ: number,
+    stopDist: number,
+  ): { x: number; z: number } {
+    const playerPos = this.interactable?.getPlayerPosition();
+    if (!playerPos) return { x: targetX, z: targetZ };
+
+    const dx = targetX - playerPos.x;
+    const dz = targetZ - playerPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist <= stopDist) return { x: playerPos.x, z: playerPos.z };
+
+    const ratio = (dist - stopDist) / dist;
+    return { x: playerPos.x + dx * ratio, z: playerPos.z + dz * ratio };
   }
 
   private setCursor(cursor: string): void {

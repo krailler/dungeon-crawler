@@ -14,6 +14,7 @@ import { Client, Room } from "@colyseus/sdk";
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { CharacterLoaderRegistry } from "../entities/CharacterLoaderRegistry";
+import { PropRegistry } from "../entities/PropRegistry";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
 import { preloadUiSounds, initUiSfxVolume, playUiSfx, disposeUiSounds } from "../audio/uiSfx";
@@ -74,6 +75,7 @@ export class ClientGame {
   private room: Room | null = null;
 
   private loaderRegistry: CharacterLoaderRegistry;
+  private propRegistry: PropRegistry;
   private soundManager: SoundManager;
 
   // Extracted modules
@@ -103,6 +105,7 @@ export class ClientGame {
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
     this.loaderRegistry = new CharacterLoaderRegistry(this.scene);
+    this.propRegistry = new PropRegistry(this.scene);
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
 
@@ -117,6 +120,7 @@ export class ClientGame {
       isoCamera: this.isoCamera,
       dungeonRenderer: this.dungeonRenderer,
       loaderRegistry: this.loaderRegistry,
+      propRegistry: this.propRegistry,
       soundManager: this.soundManager,
       fogOfWar: this.fogOfWar,
       guiTexture: this.guiTexture,
@@ -191,6 +195,7 @@ export class ClientGame {
       // Pre-load character models + audio while connecting
       await Promise.all([
         this.loaderRegistry.preload(["warrior", "zombie"]),
+        this.propRegistry.preloadAll(),
         this.soundManager.load(),
       ]);
 
@@ -499,6 +504,7 @@ export class ClientGame {
     minimapStore.reset();
     this.soundManager.dispose();
     disposeUiSounds();
+    this.propRegistry.dispose();
     this.loaderRegistry.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();

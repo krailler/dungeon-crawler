@@ -38,6 +38,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { PropRegistry } from "../entities/PropRegistry";
 import type { Room } from "@colyseus/sdk";
 import { getStateCallbacks } from "@colyseus/sdk";
 import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
@@ -92,6 +93,7 @@ export interface StateSyncDeps {
   readonly soundManager: SoundManager;
   readonly fogOfWar: FogOfWarSystem;
   readonly guiTexture: AdvancedDynamicTexture;
+  readonly propRegistry: PropRegistry;
   addShadowCaster(mesh: AbstractMesh): void;
   onDungeonReady(): void;
 }
@@ -806,7 +808,13 @@ export class StateSync {
 
     track(
       state$.lootBags.onAdd((bag: any, bagId: string) => {
-        const drop = new ClientLootBag(this.deps.scene, bagId, bag.x, bag.z);
+        const drop = new ClientLootBag(
+          this.deps.scene,
+          bagId,
+          bag.x,
+          bag.z,
+          this.deps.propRegistry.get("chest"),
+        );
         this.lootBags.set(bagId, drop);
         // Pre-fetch item defs for loot panel
         const itemIds: string[] = [];
