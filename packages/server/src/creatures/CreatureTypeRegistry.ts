@@ -5,9 +5,9 @@ import type {
   CreatureEffectTriggerValue,
   EffectScaling,
 } from "@dungeon/shared";
-import { creatures, creatureLoot, creatureEffects } from "../db/schema";
-import { getDb } from "../db/database";
-import { logger } from "../logger";
+import { creatures, creatureLoot, creatureEffects } from "../db/schema.js";
+import { createRegistry, simpleHash } from "../db/createRegistry.js";
+import { getDb } from "../db/database.js";
 
 export type CreatureEffectEntry = {
   trigger: CreatureEffectTriggerValue;
@@ -20,17 +20,16 @@ export type CreatureEffectEntry = {
   scalingOverride: EffectScaling | null;
 };
 
-const typeMap = new Map<string, CreatureTypeDefinition>();
-const lootMap = new Map<string, CreatureLootEntry[]>();
-const effectsMap = new Map<string, CreatureEffectEntry[]>();
+type CreatureRow = typeof creatures.$inferSelect;
 
-export async function loadCreatureTypeRegistry(): Promise<void> {
-  const db = getDb();
+/** Pre-loaded related data — populated before registry.load() */
+let lootByCreature = new Map<string, CreatureLootEntry[]>();
+let effectsByCreature = new Map<string, CreatureEffectEntry[]>();
 
-  // Load creature types
-  const typeRows = await db.select().from(creatures);
-  typeMap.clear();
-  for (const row of typeRows) {
+const registry = createRegistry<CreatureRow, CreatureTypeDefinition>({
+  table: creatures,
+  name: "CreatureTypeRegistry",
+  mapRow: (row) => {
     const overrides: Partial<DerivedStats> = {};
     if (row.overrideMaxHealth !== null) overrides.maxHealth = row.overrideMaxHealth;
     if (row.overrideMoveSpeed !== null) overrides.moveSpeed = row.overrideMoveSpeed;
@@ -38,7 +37,7 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
     if (row.overrideAttackDamage !== null) overrides.attackDamage = row.overrideAttackDamage;
     if (row.overrideDefense !== null) overrides.defense = row.overrideDefense;
 
-    typeMap.set(row.id, {
+    return {
       id: row.id,
       name: row.name,
       baseStats: {
@@ -53,28 +52,33 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
       skin: row.skin,
       minLevel: row.minLevel,
       maxLevel: row.maxLevel,
-    });
-  }
+    };
+  },
+  hashDef: (def) => simpleHash(JSON.stringify(def)),
+});
 
-  // Load creature loot
+export async function loadCreatureTypeRegistry(): Promise<void> {
+  const db = getDb();
+
+  // Pre-load creature loot
   const lootRows = await db.select().from(creatureLoot);
-  lootMap.clear();
+  lootByCreature = new Map<string, CreatureLootEntry[]>();
   for (const row of lootRows) {
-    const entries = lootMap.get(row.creatureId) ?? [];
+    const entries = lootByCreature.get(row.creatureId) ?? [];
     entries.push({
       itemId: row.itemId,
       dropChance: row.dropChance,
       minQuantity: row.minQuantity,
       maxQuantity: row.maxQuantity,
     });
-    lootMap.set(row.creatureId, entries);
+    lootByCreature.set(row.creatureId, entries);
   }
 
-  // Load creature effects
+  // Pre-load creature effects
   const effectRows = await db.select().from(creatureEffects);
-  effectsMap.clear();
+  effectsByCreature = new Map<string, CreatureEffectEntry[]>();
   for (const row of effectRows) {
-    const entries = effectsMap.get(row.creatureId) ?? [];
+    const entries = effectsByCreature.get(row.creatureId) ?? [];
     entries.push({
       trigger: row.trigger,
       effectId: row.effectId,
@@ -85,21 +89,19 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
       maxChance: row.maxChance,
       scalingOverride: (row.scalingOverride as EffectScaling) ?? null,
     });
-    effectsMap.set(row.creatureId, entries);
+    effectsByCreature.set(row.creatureId, entries);
   }
 
-  logger.info(
-    `CreatureTypeRegistry loaded ${typeMap.size} creature type(s), ${lootRows.length} loot entry(ies), ${effectRows.length} effect(s)`,
-  );
+  await registry.load();
 }
 
-export function getCreatureTypeDef(id: string): CreatureTypeDefinition | undefined {
-  return typeMap.get(id);
-}
+export const getCreatureTypeDef = registry.get;
+export const getAllCreatureTypeDefs = registry.getAll;
+export const getCreatureTypeRegistryVersion = registry.getVersion;
 
 export function getCreatureTypesForLevel(level: number): CreatureTypeDefinition[] {
   const result: CreatureTypeDefinition[] = [];
-  for (const def of typeMap.values()) {
+  for (const def of registry.getAll()) {
     if (level >= def.minLevel && (def.maxLevel === 0 || level <= def.maxLevel)) {
       result.push(def);
     }
@@ -108,9 +110,9 @@ export function getCreatureTypesForLevel(level: number): CreatureTypeDefinition[
 }
 
 export function getCreatureLoot(creatureTypeId: string): CreatureLootEntry[] {
-  return lootMap.get(creatureTypeId) ?? [];
+  return lootByCreature.get(creatureTypeId) ?? [];
 }
 
 export function getCreatureEffects(creatureTypeId: string): CreatureEffectEntry[] {
-  return effectsMap.get(creatureTypeId) ?? [];
+  return effectsByCreature.get(creatureTypeId) ?? [];
 }
