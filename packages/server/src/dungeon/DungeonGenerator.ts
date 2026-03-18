@@ -11,7 +11,7 @@
  *                      or vertical-first per corridor.
  *
  *   3. Mark special    SPAWN = center of first room
- *      tiles           EXIT  = center of last room
+ *      tiles           EXIT  = center of room farthest from spawn
  *
  *   4. Find gates      Scan the 4 edges of the spawn room for corridor exits.
  *                      Each opening gets a gate position (used by GateSystem).
@@ -81,11 +81,27 @@ export class DungeonGenerator {
       map.set(cx, cy, TileType.SPAWN);
     }
 
-    // Mark exit in last room center
+    // Mark exit in the room farthest from spawn
     if (this.rooms.length > 1) {
-      const last = this.rooms[this.rooms.length - 1];
-      const cx = last.x + Math.floor(last.w / 2);
-      const cy = last.y + Math.floor(last.h / 2);
+      const spawnRoom = this.rooms[0];
+      const sx = spawnRoom.x + Math.floor(spawnRoom.w / 2);
+      const sy = spawnRoom.y + Math.floor(spawnRoom.h / 2);
+
+      let farthest = this.rooms[1];
+      let maxDist = 0;
+      for (let i = 1; i < this.rooms.length; i++) {
+        const r = this.rooms[i];
+        const dx = r.x + Math.floor(r.w / 2) - sx;
+        const dy = r.y + Math.floor(r.h / 2) - sy;
+        const dist = dx * dx + dy * dy;
+        if (dist > maxDist) {
+          maxDist = dist;
+          farthest = r;
+        }
+      }
+
+      const cx = farthest.x + Math.floor(farthest.w / 2);
+      const cy = farthest.y + Math.floor(farthest.h / 2);
       map.set(cx, cy, TileType.EXIT);
     }
 
