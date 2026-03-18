@@ -302,7 +302,7 @@ export class CombatSystem {
       combat.attackCooldown -= dt;
       if (combat.attackCooldown > 0) continue;
 
-      if (!player || player.lifeState !== LifeState.ALIVE) continue;
+      if (!player || player.lifeState !== LifeState.ALIVE || !player.online) continue;
 
       // Skip auto-attack if player has it disabled
       if (!player.autoAttackEnabled) continue;
