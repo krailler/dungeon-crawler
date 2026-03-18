@@ -13,7 +13,7 @@ import { Client, Room } from "@colyseus/sdk";
 
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
-import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
+import { CharacterLoaderRegistry } from "../entities/CharacterLoaderRegistry";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import { SoundManager } from "../audio/SoundManager";
 import { preloadUiSounds, initUiSfxVolume, playUiSfx, disposeUiSounds } from "../audio/uiSfx";
@@ -73,8 +73,7 @@ export class ClientGame {
   private client: Client;
   private room: Room | null = null;
 
-  private playerLoader: CharacterAssetLoader;
-  private creatureLoader: CharacterAssetLoader;
+  private loaderRegistry: CharacterLoaderRegistry;
   private soundManager: SoundManager;
 
   // Extracted modules
@@ -103,8 +102,7 @@ export class ClientGame {
     this.fogOfWar = new FogOfWarSystem(this.scene, this.isoCamera.camera);
 
     this.dungeonRenderer = new DungeonRenderer(this.scene);
-    this.playerLoader = new CharacterAssetLoader(this.scene, "/models/characters/player");
-    this.creatureLoader = new CharacterAssetLoader(this.scene, "/models/characters/zombie");
+    this.loaderRegistry = new CharacterLoaderRegistry(this.scene);
     this.soundManager = new SoundManager(this.scene);
     preloadUiSounds();
 
@@ -118,8 +116,7 @@ export class ClientGame {
       scene: this.scene,
       isoCamera: this.isoCamera,
       dungeonRenderer: this.dungeonRenderer,
-      playerLoader: this.playerLoader,
-      creatureLoader: this.creatureLoader,
+      loaderRegistry: this.loaderRegistry,
       soundManager: this.soundManager,
       fogOfWar: this.fogOfWar,
       guiTexture: this.guiTexture,
@@ -193,8 +190,7 @@ export class ClientGame {
     try {
       // Pre-load character models + audio while connecting
       await Promise.all([
-        this.playerLoader.load(),
-        this.creatureLoader.load(),
+        this.loaderRegistry.preload(["warrior", "zombie"]),
         this.soundManager.load(),
       ]);
 
@@ -503,8 +499,7 @@ export class ClientGame {
     minimapStore.reset();
     this.soundManager.dispose();
     disposeUiSounds();
-    this.playerLoader.dispose();
-    this.creatureLoader.dispose();
+    this.loaderRegistry.dispose();
     this.fogOfWar.dispose();
     this.dungeonRenderer.dispose();
     this.guiTexture.dispose();

@@ -420,11 +420,12 @@ export class GameLoop {
       }
     }
 
+    // Keep corpse visible for a few seconds so players see the death animation
     this.bridge.clock.setTimeout(() => {
       this.bridge.state.creatures.delete(event.creatureId);
       this.bridge.aiSystem.unregister(event.creatureId);
       this.bridge.onCreatureRemoved?.(event.creatureId);
-    }, 1000);
+    }, 5000);
   }
 
   /** Drain / regenerate stamina for all players each tick. */

@@ -30,9 +30,6 @@ const LERP_FACTOR = 6;
 /** Rotation smoothing factor — lower = smoother turn */
 const ROT_LERP_FACTOR = 10;
 
-/** Distance threshold to consider the player "moving" */
-const MOVE_THRESHOLD = 0.05;
-
 /** Interval between footstep sounds while running (seconds) */
 const FOOTSTEP_INTERVAL = 0.32;
 
@@ -42,6 +39,9 @@ const WALK_ANIM_SPEED = 0.4;
 const SPRINT_ANIM_SPEED = 1.0;
 /** Footstep interval when sprinting (faster steps) */
 const SPRINT_FOOTSTEP_INTERVAL = 0.22;
+
+/** Distance threshold to consider the player "moving" */
+const MOVE_THRESHOLD = 0.05;
 
 /** How long the chat bubble stays fully visible (seconds) */
 const BUBBLE_DURATION = 5;
@@ -71,6 +71,7 @@ export class ClientPlayer {
   private scene: Scene;
   private animController: AnimationController;
   private soundManager: SoundManager | null = null;
+  private lastAnimState: string = "";
   private footstepTimer: number = 0;
 
   // 3D anchor nodes for GUI elements (world-space, resolution-independent)
@@ -178,7 +179,7 @@ export class ClientPlayer {
   }
 
   /** Attach the loaded GLB character instance. */
-  attachModel(instance: CharacterInstance): void {
+  attachModel(instance: CharacterInstance, scale: number = 0.5): void {
     this.modelRoot = instance.root;
     this.modelMeshes = instance.meshes;
     this.animController.setAnimations(instance.animations);
@@ -186,15 +187,18 @@ export class ClientPlayer {
     // Parent to our invisible anchor and scale to fit dungeon proportions
     this.modelRoot.parent = this.mesh;
     this.modelRoot.position.setAll(0);
-    this.modelRoot.scaling.setAll(0.5);
+    this.modelRoot.scaling.setAll(scale);
 
-    // Fix GLB material: exported with alpha=0 (transparent) — force opaque
+    // Fix GLB material: force opaque + tame emissive for dungeon lighting
     for (const m of this.modelMeshes) {
       const mat = m.material;
       if (mat instanceof PBRMaterial) {
         mat.alpha = 1;
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.backFaceCulling = true;
+        // Meshy exports bake lighting into emissive — scale it down so the
+        // glow layer doesn't blow it out, but keep enough for visibility
+        mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
       }
       m.isPickable = false;
     }
@@ -238,10 +242,11 @@ export class ClientPlayer {
     this.targetRotY = rotY;
     this.sprinting = isSprinting;
 
-    // Trigger one-shot animation if server says so
-    if (animState && !this.animController.isOneShotPlaying) {
+    // Trigger one-shot animation if server says so (interrupts current one-shot)
+    if (animState && animState !== this.lastAnimState) {
       this.animController.playOneShot(animState as AnimName);
     }
+    this.lastAnimState = animState;
   }
 
   /** Snap position immediately (used on first spawn) */
@@ -292,14 +297,23 @@ export class ClientPlayer {
     if (delta < -Math.PI) delta += 2 * Math.PI;
     this.mesh.rotation.y += delta * (1 - Math.exp(-ROT_LERP_FACTOR * dt));
 
-    // Switch animation based on movement (only if not playing one-shot)
-    if (!this.animController.isOneShotPlaying) {
+    // Switch animation based on interpolation distance (skip if dead or playing one-shot)
+    if (!this.isDead && !this.animController.isOneShotPlaying) {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist > MOVE_THRESHOLD) {
-        this.animController.playLoop("run");
-        // Adjust animation speed: walk = slower, sprint = full speed
-        const animSpeed = this.sprinting ? SPRINT_ANIM_SPEED : WALK_ANIM_SPEED;
-        this.animController.setSpeedRatio(animSpeed);
+        const hasWalk = this.animController.hasAnim("walk");
+        if (!this.sprinting && hasWalk) {
+          // Dedicated walk animation — play at normal speed
+          this.animController.playLoop("walk");
+          this.animController.setSpeedRatio(1.0);
+        } else {
+          this.animController.playLoop("run");
+          // Models with a separate walk anim: run always at 1.0
+          // Models without: slow down run for walking, full speed for sprint
+          this.animController.setSpeedRatio(
+            hasWalk ? 1.0 : this.sprinting ? SPRINT_ANIM_SPEED : WALK_ANIM_SPEED,
+          );
+        }
 
         // Footstep sounds at regular intervals
         if (this.soundManager) {
@@ -449,6 +463,7 @@ export class ClientPlayer {
   }
 
   private lifeAlpha: number = 1.0;
+  private isDead: boolean = false;
   /** Cloned materials per-mesh so we can change transparency without affecting other players */
   private ownMaterials: Map<AbstractMesh, PBRMaterial> = new Map();
 
@@ -456,6 +471,17 @@ export class ClientPlayer {
   setLifeState(lifeState: string): void {
     const isAlive = lifeState === "alive";
     this.lifeAlpha = isAlive ? 1.0 : lifeState === "downed" ? 0.5 : 0.2;
+
+    // Play death animation once and freeze on last frame
+    if (!isAlive && !this.isDead && this.animController.hasAnim("death")) {
+      this.animController.playOneShotAndFreeze("death");
+    }
+    // On revive: reset dead state and restart idle
+    if (isAlive && this.isDead) {
+      this.animController.resetFreeze();
+      this.animController.startIdle();
+    }
+    this.isDead = !isAlive;
 
     for (const m of this.modelMeshes) {
       const mat = m.material;

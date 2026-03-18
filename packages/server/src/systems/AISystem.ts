@@ -80,6 +80,8 @@ const ROAM_MAX_ATTEMPTS = 3;
 const ROAM_STUCK_TIMEOUT = 1.5;
 /** Minimum distance² a creature must travel per stuck-check window to not be stuck */
 const ROAM_STUCK_DIST_SQ = 0.1 * 0.1;
+/** Out-of-combat health regen: percentage of maxHealth per second */
+const OOC_REGEN_RATE = 0.2;
 
 function randomRoamWait(): number {
   return ROAM_MIN_WAIT + Math.random() * (ROAM_MAX_WAIT - ROAM_MIN_WAIT);
@@ -119,6 +121,8 @@ interface CreatureAI {
   /** Stuck detection: last known position */
   roamLastX: number;
   roamLastZ: number;
+  /** Fractional health accumulator for OOC regen (health is int16) */
+  regenAccum: number;
 }
 
 export class AISystem {
@@ -151,6 +155,7 @@ export class AISystem {
       roamStuckTimer: 0,
       roamLastX: creature.x,
       roamLastZ: creature.z,
+      regenAccum: 0,
     };
     this.entries.push(entry);
     this.entryById.set(creatureId, entry);
@@ -252,6 +257,21 @@ export class AISystem {
       entry.creature.isAggro = target !== null;
 
       if (!target) {
+        // Regen health out of combat (accumulate fractional HP, apply as integer)
+        if (entry.creature.health < entry.creature.maxHealth) {
+          entry.regenAccum += entry.creature.maxHealth * OOC_REGEN_RATE * dt;
+          if (entry.regenAccum >= 1) {
+            const heal = Math.floor(entry.regenAccum);
+            entry.regenAccum -= heal;
+            entry.creature.health = Math.min(
+              entry.creature.maxHealth,
+              entry.creature.health + heal,
+            );
+          }
+        } else {
+          entry.regenAccum = 0;
+        }
+
         // No threat — idle or roam
         if (entry.state === AIState.ROAM) {
           this.moveCreature(entry.creature, dt);

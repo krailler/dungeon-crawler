@@ -20,9 +20,6 @@ import { SelectionRing } from "./SelectionRing";
 const LERP_FACTOR = 12;
 const HIT_FLASH_DURATION = 0.12;
 
-/** Distance threshold to consider the creature "moving" */
-const MOVE_THRESHOLD = 0.05;
-
 /** Interval between footstep sounds for creatures (seconds) */
 const CREATURE_FOOTSTEP_INTERVAL = 0.35;
 
@@ -37,10 +34,12 @@ export class ClientCreature {
   public modelMeshes: AbstractMesh[] = [];
   public isDead: boolean = false;
   public isAggro: boolean = false;
+  public serverMoving: boolean = false;
 
   private animController: AnimationController;
   private soundManager: SoundManager | null = null;
   private footstepTimer: number = 0;
+  private lastAnimState: string = "";
   private selectionRing: SelectionRing;
 
   // Target state from server
@@ -147,14 +146,14 @@ export class ClientCreature {
   }
 
   /** Attach the loaded GLB character instance. */
-  attachModel(instance: CharacterInstance): void {
+  attachModel(instance: CharacterInstance, scale: number = 0.5): void {
     this.modelRoot = instance.root;
     this.modelMeshes = instance.meshes;
     this.animController.setAnimations(instance.animations);
 
     // Parent to our invisible anchor and scale
     this.modelRoot.parent = this.mesh;
-    this.modelRoot.scaling.setAll(0.5);
+    this.modelRoot.scaling.setAll(scale);
 
     // Fix GLB material: exported with alpha=0 — force opaque
     for (const m of this.modelMeshes) {
@@ -163,6 +162,8 @@ export class ClientCreature {
         mat.alpha = 1;
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.backFaceCulling = true;
+        // Meshy exports bake lighting into emissive — scale it down
+        mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
       }
       // Store original materials for hit flash restore
       this.baseMaterials.set(m, m.material);
@@ -203,11 +204,13 @@ export class ClientCreature {
     isDead: boolean,
     animState: string = "",
     isAggro: boolean = false,
+    isMoving: boolean = false,
   ): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
     this.isAggro = isAggro;
+    this.serverMoving = isMoving;
 
     if (health < this.previousHealth && !isDead) {
       this.triggerHitFlash();
@@ -216,19 +219,25 @@ export class ClientCreature {
 
     this.updateHealthBar(health, maxHealth);
 
-    // Trigger one-shot animation if server says so
-    if (animState && !this.animController.isOneShotPlaying && !isDead) {
+    // Trigger one-shot animation if server says so (interrupts current one-shot)
+    if (animState && animState !== this.lastAnimState && !isDead) {
       this.animController.playOneShot(animState as AnimName);
     }
+    this.lastAnimState = animState;
 
     if (isDead) {
-      if (this.isDead) return; // Already processed death — avoid double dispose
+      if (this.isDead) return; // Already processed death
       this.isDead = true;
       this.healthBarContainer.dispose();
       this.barAnchor.dispose();
-      this.animController.dispose();
-      this.modelRoot?.dispose(false, false);
-      this.mesh.dispose();
+      this.selectionRing.setSelected(false);
+      // Disable hitbox so corpse can't be selected/hovered
+      for (const child of this.mesh.getChildMeshes(false)) {
+        child.isPickable = false;
+        child.metadata = null;
+      }
+      // Play death animation and freeze on last frame
+      this.animController.playOneShotAndFreeze("death");
     }
   }
 
@@ -252,10 +261,10 @@ export class ClientCreature {
 
   /** Interpolate toward server state each frame */
   update(dt: number): void {
-    if (this.isDead) return;
-
-    // Update animation system (crossfade + sound timing)
+    // Always update animation (needed for death anim to play through)
     this.animController.update(dt);
+
+    if (this.isDead) return;
 
     const t = 1 - Math.exp(-LERP_FACTOR * dt);
     const dx = this.targetX - this.mesh.position.x;
@@ -270,10 +279,9 @@ export class ClientCreature {
     if (delta < -Math.PI) delta += 2 * Math.PI;
     this.mesh.rotation.y += delta * (1 - Math.exp(-LERP_FACTOR * dt));
 
-    // Switch animation based on movement (only if not playing one-shot)
+    // Switch animation based on server movement state (only if not playing one-shot)
     if (!this.animController.isOneShotPlaying) {
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist > MOVE_THRESHOLD) {
+      if (this.serverMoving) {
         this.animController.playLoop("run");
 
         // Spatial footstep sounds
@@ -396,11 +404,9 @@ export class ClientCreature {
     this.damageTexts.length = 0;
     this.healthBarContainer.dispose();
     this.barAnchor.dispose();
-    if (!this.isDead) {
-      this.animController.dispose();
-      this.modelRoot?.dispose(false, false);
-      this.mesh.dispose();
-    }
+    this.animController.dispose();
+    this.modelRoot?.dispose(false, false);
+    this.mesh.dispose();
     this.hitMaterial.dispose();
   }
 }

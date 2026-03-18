@@ -246,14 +246,13 @@ export class InputManager {
 
   private trySendMove(): void {
     if (this.isPointerOverUi()) return;
-    // Reuse cursor position if already updated this frame
-    if (this.cursorWorldPoint) {
-      this.room.send(MessageType.MOVE, {
-        x: this.cursorWorldPoint.x,
-        z: this.cursorWorldPoint.z,
-      });
-      this.lastSendTime = performance.now();
-    }
+    if (!this.cursorWorldPoint) return;
+
+    this.room.send(MessageType.MOVE, {
+      x: this.cursorWorldPoint.x,
+      z: this.cursorWorldPoint.z,
+    });
+    this.lastSendTime = performance.now();
   }
 
   /**

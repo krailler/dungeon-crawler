@@ -47,7 +47,7 @@ import { DungeonRenderer } from "../dungeon/DungeonRenderer";
 import { ClientPlayer } from "../entities/ClientPlayer";
 import { ClientCreature } from "../entities/ClientCreature";
 import { ClientLootBag } from "../entities/ClientLootBag";
-import { CharacterAssetLoader } from "../entities/CharacterAssetLoader";
+import { CharacterLoaderRegistry } from "../entities/CharacterLoaderRegistry";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
@@ -88,8 +88,7 @@ export interface StateSyncDeps {
   readonly scene: Scene;
   readonly isoCamera: IsometricCamera;
   readonly dungeonRenderer: DungeonRenderer;
-  readonly playerLoader: CharacterAssetLoader;
-  readonly creatureLoader: CharacterAssetLoader;
+  readonly loaderRegistry: CharacterLoaderRegistry;
   readonly soundManager: SoundManager;
   readonly fogOfWar: FogOfWarSystem;
   readonly guiTexture: AdvancedDynamicTexture;
@@ -439,9 +438,11 @@ export class StateSync {
           }
         }
 
-        // Attach GLB character model
-        const charInstance = this.deps.playerLoader.instantiate(`char_${sessionId}`);
-        clientPlayer.attachModel(charInstance);
+        // Attach GLB character model (use classId to pick the right model)
+        const classId = (player.classId as string) || "player";
+        const charInstance = this.deps.loaderRegistry.get(classId).instantiate(`char_${sessionId}`);
+        const modelScale = this.deps.loaderRegistry.getConfig(classId).scale;
+        clientPlayer.attachModel(charInstance, modelScale);
 
         // Add model meshes as shadow casters for local player's torch
         for (const m of clientPlayer.modelMeshes) {
@@ -709,10 +710,13 @@ export class StateSync {
           creature.isDead,
           creature.animState,
           creature.isAggro,
+          creature.isMoving,
         );
-        // Attach creature GLB model
-        const creatureInstance = this.deps.creatureLoader.instantiate(`creature_${id}`);
-        clientCreature.attachModel(creatureInstance);
+        // Attach creature GLB model (use creatureType to pick the right model)
+        const cType = (creature.creatureType as string) || "zombie";
+        const creatureInstance = this.deps.loaderRegistry.get(cType).instantiate(`creature_${id}`);
+        const creatureScale = this.deps.loaderRegistry.getConfig(cType).scale;
+        clientCreature.attachModel(creatureInstance, creatureScale);
 
         this.creatures.set(id, clientCreature);
         for (const m of clientCreature.modelMeshes) {
@@ -740,6 +744,7 @@ export class StateSync {
             creature.isDead,
             creature.animState,
             creature.isAggro,
+            creature.isMoving,
           );
           // Update creature store
           creatureStore.update(id, {

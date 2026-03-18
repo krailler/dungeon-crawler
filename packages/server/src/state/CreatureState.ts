@@ -15,11 +15,12 @@ export class CreatureState extends Schema {
   @type("string") nameKey: string = "creatures.zombie";
   @type("int16") level: number = 1;
 
+  @type("boolean") isMoving: boolean = false;
+
   // Server-only (not synced)
   path: { x: number; z: number }[] = [];
   currentPathIndex: number = 0;
   speed: number = 0;
-  isMoving: boolean = false;
   attackDamage: number = 0;
   defense: number = 0;
   attackCooldown: number = 1.5;

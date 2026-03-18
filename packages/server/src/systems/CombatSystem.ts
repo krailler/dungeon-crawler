@@ -29,6 +29,7 @@
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
 import { ATTACK_ANIM_DURATION, DAMAGE_DELAY, computeDamage, LifeState } from "@dungeon/shared";
+
 import { getSkillDef } from "../skills/SkillRegistry";
 import { collectTalentSkillMods } from "../talents/TalentRegistry";
 
@@ -299,6 +300,9 @@ export class CombatSystem {
 
       combat.attackCooldown -= dt;
       if (combat.attackCooldown > 0) continue;
+
+      // Don't auto-attack while another animation is still playing (e.g. heavy_strike)
+      if (combat.animTimer > 0) continue;
 
       if (!player || player.lifeState !== LifeState.ALIVE || !player.online) continue;
 

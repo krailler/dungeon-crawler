@@ -20,6 +20,7 @@ export class AnimationController {
   private previousAnim: AnimName | null = null;
   private crossfadeTimer: number = 0;
   private isPlayingOneShot: boolean = false;
+  private activeOneShot: AnimationGroup | null = null;
   private pendingSoundName: string | null = null;
   private pendingSoundTimer: number = 0;
   private soundManager: SoundManager | null;
@@ -62,26 +63,66 @@ export class AnimationController {
     this.crossfadeTimer = CROSSFADE_DURATION;
   }
 
-  /** Play a one-shot animation (e.g. attack) — interrupts looping.
+  /** Play a one-shot animation (e.g. attack) — interrupts looping and any current one-shot.
    *  If no animation exists for `name`, falls back to "punch" but keeps `name` for the sound. */
   playOneShot(name: AnimName): void {
-    if (this.isPlayingOneShot) return;
+    // Stop any currently playing one-shot (clear observable FIRST to prevent callbacks)
+    if (this.activeOneShot) {
+      this.activeOneShot.onAnimationGroupEndObservable.clear();
+      this.activeOneShot.stop();
+      this.activeOneShot = null;
+    }
 
+    // Stop current looping animation
     if (this.currentAnim) {
       const current = this.animations.get(this.currentAnim);
       current?.stop();
     }
 
+    // Reset state before starting new animation
+    this.isPlayingOneShot = false;
+
     const anim = this.animations.get(name) ?? this.animations.get("punch");
     if (anim) {
       this.isPlayingOneShot = true;
+      this.activeOneShot = anim;
       anim.start(false);
       this.pendingSoundName = name;
       this.pendingSoundTimer = ATTACK_SOUND_DELAY;
       anim.onAnimationGroupEndObservable.addOnce(() => {
         this.isPlayingOneShot = false;
+        this.activeOneShot = null;
         this.currentAnim = null;
       });
+    }
+  }
+
+  /** Play a one-shot animation that freezes on the last frame (e.g. death). */
+  playOneShotAndFreeze(name: AnimName): void {
+    if (this.currentAnim) {
+      const current = this.animations.get(this.currentAnim);
+      current?.stop();
+    }
+
+    const anim = this.animations.get(name);
+    if (anim) {
+      this.isPlayingOneShot = true;
+      anim.start(false);
+      anim.onAnimationGroupEndObservable.addOnce(() => {
+        // Pause on last frame instead of resetting
+        anim.goToFrame(anim.to);
+        anim.pause();
+      });
+    }
+  }
+
+  /** Reset a frozen one-shot (e.g. death) so normal animations can resume. */
+  resetFreeze(): void {
+    this.isPlayingOneShot = false;
+    this.currentAnim = null;
+    // Stop all animations so playLoop can start fresh
+    for (const [, anim] of this.animations) {
+      anim.stop();
     }
   }
 
@@ -125,6 +166,11 @@ export class AnimationController {
         this.pendingSoundName = null;
       }
     }
+  }
+
+  /** Check whether a specific animation is available. */
+  hasAnim(name: AnimName): boolean {
+    return this.animations.has(name);
   }
 
   /** Set the playback speed of the current looping animation (1.0 = default). */
