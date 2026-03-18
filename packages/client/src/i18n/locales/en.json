@@ -181,6 +181,12 @@
     "dungeonCompletedFinal": "Dungeon completed! Well done!",
     "exitCombatActive": "Cannot exit while enemies are in combat!"
   },
+  "classes": {
+    "warrior": {
+      "name": "Warrior",
+      "desc": "A sturdy melee fighter who excels in close combat."
+    }
+  },
   "creatures": {
     "zombie": "Zombie"
   },

@@ -144,7 +144,10 @@ const PartyRow = ({
               )}
             </div>
             <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-              {[classDef?.name, member.isLeader ? t("party.roleLeader") : undefined]
+              {[
+                classDef ? t(classDef.name) : undefined,
+                member.isLeader ? t("party.roleLeader") : undefined,
+              ]
                 .filter(Boolean)
                 .join(" — ") || t("party.roleMember")}
             </span>

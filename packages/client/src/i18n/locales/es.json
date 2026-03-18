@@ -181,6 +181,12 @@
     "dungeonCompletedFinal": "¡Mazmorra completada! ¡Buen trabajo!",
     "exitCombatActive": "¡No se puede salir mientras haya enemigos en combate!"
   },
+  "classes": {
+    "warrior": {
+      "name": "Guerrero",
+      "desc": "Un luchador cuerpo a cuerpo resistente que destaca en el combate cercano."
+    }
+  },
   "creatures": {
     "zombie": "Zombi"
   },

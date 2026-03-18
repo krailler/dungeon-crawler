@@ -74,7 +74,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
           <h3 className="text-sm font-bold text-slate-100">{local.name}</h3>
           <span className="text-[11px] text-sky-400">
             {t("character.level", { level: local.level })}
-            {classDef && ` — ${classDef.name}`}
+            {classDef && ` — ${t(classDef.name)}`}
           </span>
         </div>
       }

@@ -111,7 +111,7 @@ export const TargetFrame = (): ReactNode => {
               </span>
               {targetMember?.classId && classSnap.get(targetMember.classId) && (
                 <span className="text-[10px] text-slate-400">
-                  {classSnap.get(targetMember.classId)!.name}
+                  {t(classSnap.get(targetMember.classId)!.name)}
                 </span>
               )}
               {entity.isDead && (
