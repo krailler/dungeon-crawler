@@ -166,10 +166,23 @@ export class ClientCreature {
       }
       // Store original materials for hit flash restore
       this.baseMaterials.set(m, m.material);
-      // Make clickable for target selection
-      m.isPickable = true;
-      m.metadata = { ...(m.metadata ?? {}), pickType: "creature", pickId: this.id };
+      m.isPickable = false;
     }
+
+    // Invisible hitbox cylinder for easier click targeting
+    const hitbox = MeshBuilder.CreateCylinder(
+      `creatureHitbox_${this.id}`,
+      {
+        diameter: 1.2,
+        height: 2.0,
+      },
+      this.mesh.getScene(),
+    );
+    hitbox.parent = this.mesh;
+    hitbox.position.y = 1.0;
+    hitbox.visibility = 0;
+    hitbox.isPickable = true;
+    hitbox.metadata = { pickType: "creature", pickId: this.id };
 
     // Start idle animation
     this.animController.startIdle();

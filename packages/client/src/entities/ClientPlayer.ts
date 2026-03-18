@@ -196,10 +196,23 @@ export class ClientPlayer {
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.backFaceCulling = true;
       }
-      // Make clickable for target selection (all players including self)
-      m.isPickable = true;
-      m.metadata = { ...(m.metadata ?? {}), pickType: "player", pickId: this.sessionId };
+      m.isPickable = false;
     }
+
+    // Invisible hitbox cylinder for easier click targeting
+    const hitbox = MeshBuilder.CreateCylinder(
+      `playerHitbox_${this.sessionId}`,
+      {
+        diameter: 1.2,
+        height: 2.0,
+      },
+      this.scene,
+    );
+    hitbox.parent = this.mesh;
+    hitbox.position.y = 1.0;
+    hitbox.visibility = 0;
+    hitbox.isPickable = true;
+    hitbox.metadata = { pickType: "player", pickId: this.sessionId };
 
     // Add model meshes as shadow casters
     if (this.shadowGenerator) {
