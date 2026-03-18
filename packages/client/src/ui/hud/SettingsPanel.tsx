@@ -2,14 +2,23 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n/i18n";
-import { settingsStore, BindableAction, displayKeyName } from "../stores/settingsStore";
-import type { BindableActionValue, VolumeSettings } from "../stores/settingsStore";
+import {
+  settingsStore,
+  BindableAction,
+  displayKeyName,
+  ShadowQuality,
+} from "../stores/settingsStore";
+import type {
+  BindableActionValue,
+  VolumeSettings,
+  ShadowQualityValue,
+} from "../stores/settingsStore";
 import { MenuButton } from "../components/MenuButton";
 import { playUiSfx } from "../../audio/uiSfx";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = "audio" | "keybindings" | "language";
+type Tab = "audio" | "keybindings" | "language" | "graphics";
 
 type SettingsPanelProps = {
   onBack: () => void;
@@ -219,6 +228,153 @@ const LanguageTab = (): ReactNode => {
   );
 };
 
+// ── Toggle row ─────────────────────────────────────────────────────────────
+
+const ToggleRow = ({
+  label,
+  checked,
+  onChange,
+  note,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  note?: string;
+}): ReactNode => (
+  <div className="flex items-center justify-between py-1">
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-slate-300">{label}</span>
+      {note && <span className="text-[10px] text-slate-500">{note}</span>}
+    </div>
+    <button
+      onClick={() => {
+        playUiSfx("ui_click");
+        onChange(!checked);
+      }}
+      className={[
+        "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+        checked ? "bg-amber-500" : "bg-slate-600",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform",
+          checked ? "translate-x-[18px]" : "translate-x-[3px]",
+        ].join(" ")}
+      />
+    </button>
+  </div>
+);
+
+// ── Graphics tab ───────────────────────────────────────────────────────────
+
+const SHADOW_OPTIONS: { value: ShadowQualityValue; i18nKey: string }[] = [
+  { value: ShadowQuality.LOW, i18nKey: "settings.shadowLow" },
+  { value: ShadowQuality.MEDIUM, i18nKey: "settings.shadowMedium" },
+  { value: ShadowQuality.HIGH, i18nKey: "settings.shadowHigh" },
+];
+
+const GraphicsTab = (): ReactNode => {
+  const { t } = useTranslation();
+  const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
+  const gfx = settings.graphics;
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <ToggleRow
+        label={t("settings.shadows")}
+        checked={gfx.shadows}
+        onChange={(v) => settingsStore.setGraphics("shadows", v)}
+      />
+
+      {/* Shadow quality selector */}
+      <div className={gfx.shadows ? "" : "pointer-events-none opacity-40"}>
+        <span className="mb-1 block text-[11px] text-slate-400">{t("settings.shadowQuality")}</span>
+        <div className="flex gap-1">
+          {SHADOW_OPTIONS.map(({ value, i18nKey }) => (
+            <button
+              key={value}
+              onClick={() => {
+                playUiSfx("ui_click");
+                settingsStore.setGraphics("shadowQuality", value);
+              }}
+              className={[
+                "flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                gfx.shadowQuality === value
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200",
+              ].join(" ")}
+            >
+              {t(i18nKey)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <ToggleRow
+        label={t("settings.particles")}
+        checked={gfx.particles}
+        onChange={(v) => settingsStore.setGraphics("particles", v)}
+      />
+
+      <ToggleRow
+        label={t("settings.glowEffects")}
+        checked={gfx.glow}
+        onChange={(v) => settingsStore.setGraphics("glow", v)}
+      />
+
+      <ToggleRow
+        label={t("settings.antiAliasing")}
+        checked={gfx.antiAliasing}
+        onChange={(v) => settingsStore.setGraphics("antiAliasing", v)}
+        note={t("settings.antiAliasingNote")}
+      />
+
+      <ToggleRow
+        label={t("settings.fxaa")}
+        checked={gfx.fxaa}
+        onChange={(v) => settingsStore.setGraphics("fxaa", v)}
+        note={t("settings.fxaaNote")}
+      />
+
+      {/* Resolution scale slider */}
+      <div className="flex items-center gap-3">
+        <span className="w-28 shrink-0 text-xs text-slate-300">
+          {t("settings.resolutionScale")}
+        </span>
+        <input
+          type="range"
+          min="50"
+          max="100"
+          step="5"
+          value={Math.round(gfx.resolutionScale * 100)}
+          onChange={(e) =>
+            settingsStore.setGraphics("resolutionScale", Number(e.target.value) / 100)
+          }
+          className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-slate-700 accent-amber-500 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500"
+        />
+        <span className="w-9 text-right text-[11px] font-mono text-slate-400">
+          {Math.round(gfx.resolutionScale * 100)}%
+        </span>
+      </div>
+
+      <div className="mt-3 border-t border-slate-600/30 pt-2.5">
+        <ToggleRow
+          label={t("settings.showPerformance")}
+          checked={gfx.showPerformance}
+          onChange={(v) => settingsStore.setGraphics("showPerformance", v)}
+        />
+      </div>
+
+      <div className="mt-2 border-t border-slate-600/30 pt-2">
+        <MenuButton onClick={() => settingsStore.resetGraphics()} className="w-full">
+          {t("settings.resetGraphics")}
+        </MenuButton>
+      </div>
+    </div>
+  );
+};
+
 // ── Settings Panel ──────────────────────────────────────────────────────────
 
 export const SettingsPanel = ({ onBack }: SettingsPanelProps): ReactNode => {
@@ -256,9 +412,10 @@ export const SettingsPanel = ({ onBack }: SettingsPanelProps): ReactNode => {
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-lg bg-slate-800/60 p-1">
-        {(["audio", "keybindings", "language"] as const).map((t_) => {
+        {(["audio", "graphics", "keybindings", "language"] as const).map((t_) => {
           const labels: Record<Tab, string> = {
             audio: t("settings.tabAudio"),
+            graphics: t("settings.tabGraphics"),
             keybindings: t("settings.tabKeybindings"),
             language: t("settings.tabLanguage"),
           };
@@ -285,6 +442,7 @@ export const SettingsPanel = ({ onBack }: SettingsPanelProps): ReactNode => {
       {/* Tab content */}
       <div className="max-h-[50vh] overflow-y-auto pr-1">
         {tab === "audio" && <AudioTab />}
+        {tab === "graphics" && <GraphicsTab />}
         {tab === "keybindings" && <KeybindingsTab />}
         {tab === "language" && <LanguageTab />}
       </div>

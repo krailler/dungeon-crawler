@@ -399,6 +399,33 @@ export class ClientPlayer {
     this.facingTarget = null;
   }
 
+  /** Toggle shadows and/or change shadow map resolution at runtime. */
+  setShadowConfig(enabled: boolean, mapSize: number): void {
+    if (!this.isLocal || !this.torchLight) return;
+
+    if (!enabled) {
+      this.shadowGenerator?.dispose();
+      this.shadowGenerator = null;
+      return;
+    }
+
+    // Recreate if needed (first enable or map size changed)
+    const needsRecreate = !this.shadowGenerator || this.shadowGenerator.mapSize !== mapSize;
+    if (!needsRecreate) return;
+
+    // Preserve current shadow casters
+    const casters = this.shadowGenerator?.getShadowMap()?.renderList?.slice() ?? this.modelMeshes;
+    this.shadowGenerator?.dispose();
+
+    this.shadowGenerator = new ShadowGenerator(mapSize, this.torchLight);
+    this.shadowGenerator.usePercentageCloserFiltering = true;
+    this.shadowGenerator.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+
+    for (const mesh of casters) {
+      this.shadowGenerator.addShadowCaster(mesh);
+    }
+  }
+
   /** Play a golden aura particle effect around the character (level-up). */
   playLevelUpEffect(): void {
     const ps = new ParticleSystem(`levelUp_${this.mesh.name}`, 200, this.scene);

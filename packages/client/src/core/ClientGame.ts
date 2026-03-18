@@ -25,6 +25,7 @@ import { debugStore } from "../ui/stores/debugStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
+import { FxaaPostProcess } from "@babylonjs/core/PostProcesses/fxaaPostProcess";
 import {
   CloseCode,
   MessageType,
@@ -59,6 +60,7 @@ import { tutorialStore } from "../ui/stores/tutorialStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
 import { settingsStore } from "../ui/stores/settingsStore";
+import type { GraphicsSettings } from "../ui/stores/settingsStore";
 import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
 import { t } from "../i18n/i18n";
 
@@ -88,16 +90,25 @@ export class ClientGame {
   private ambientReady: boolean = false;
   private onPointerDown: (() => void) | null = null;
   private settingsUnsub: (() => void) | null = null;
+  private glowLayer: GlowLayer | null = null;
+  private fxaaPostProcess: FxaaPostProcess | null = null;
+  private lastGraphics: GraphicsSettings;
   private renderObserver: Observer<Scene> | null = null;
 
   constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
-    this.engine = new Engine(canvas, true, {
+    const gfx = settingsStore.getSnapshot().graphics;
+    this.engine = new Engine(canvas, gfx.antiAliasing, {
       preserveDrawingBuffer: true,
       stencil: true,
       audioEngine: true,
     });
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.02, 0.02, 0.05, 1);
+    this.lastGraphics = gfx;
+
+    // Apply initial graphics settings
+    this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
+    this.scene.particlesEnabled = gfx.particles;
 
     this.isoCamera = new IsometricCamera(this.scene, canvas);
     this.setupLighting();
@@ -202,9 +213,14 @@ export class ClientGame {
       // Apply volume settings from settingsStore and subscribe to changes
       this.soundManager.applyVolumes(settingsStore.getSnapshot().volume);
       initUiSfxVolume(() => settingsStore.getSnapshot().volume);
+      // Apply all initial graphics settings (glow, shadows, etc.)
+      this.applyGraphicsAll(settingsStore.getSnapshot().graphics);
+
       this.settingsUnsub = settingsStore.subscribe(() => {
-        this.soundManager.applyVolumes(settingsStore.getSnapshot().volume);
-        initUiSfxVolume(() => settingsStore.getSnapshot().volume);
+        const snap = settingsStore.getSnapshot();
+        this.soundManager.applyVolumes(snap.volume);
+        initUiSfxVolume(() => snap.volume);
+        this.applyGraphicsChanges(snap.graphics);
       });
 
       // Suppress Babylon.js default "click to unmute" button — we unlock
@@ -445,8 +461,46 @@ export class ClientGame {
     ambient.diffuse = new Color3(0.4, 0.4, 0.55);
     ambient.groundColor = new Color3(0.1, 0.1, 0.15);
 
-    const glow = new GlowLayer("glow", this.scene);
-    glow.intensity = 0.4;
+    this.glowLayer = new GlowLayer("glow", this.scene);
+    this.glowLayer.intensity = 0.4;
+
+    // FXAA post-process for smoother edges (works on top of hardware AA)
+    this.fxaaPostProcess = new FxaaPostProcess("fxaa", 1.0, this.isoCamera.camera);
+  }
+
+  /** Force-apply all graphics settings (used on startup). */
+  private applyGraphicsAll(gfx: GraphicsSettings): void {
+    if (this.glowLayer) this.glowLayer.isEnabled = gfx.glow;
+    this.scene.particlesEnabled = gfx.particles;
+    this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
+    if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
+    const local = this.stateSync.players.get(this.stateSync.localSessionId);
+    local?.setShadowConfig(gfx.shadows, gfx.shadowQuality);
+    this.lastGraphics = gfx;
+  }
+
+  /** Apply only the graphics settings that changed since last check. */
+  private applyGraphicsChanges(gfx: GraphicsSettings): void {
+    const prev = this.lastGraphics;
+    if (gfx === prev) return;
+
+    if (gfx.glow !== prev.glow) {
+      if (this.glowLayer) this.glowLayer.isEnabled = gfx.glow;
+    }
+    if (gfx.particles !== prev.particles) {
+      this.scene.particlesEnabled = gfx.particles;
+    }
+    if (gfx.resolutionScale !== prev.resolutionScale) {
+      this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
+    }
+    if (gfx.fxaa !== prev.fxaa) {
+      if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
+    }
+    if (gfx.shadows !== prev.shadows || gfx.shadowQuality !== prev.shadowQuality) {
+      const local = this.stateSync.players.get(this.stateSync.localSessionId);
+      local?.setShadowConfig(gfx.shadows, gfx.shadowQuality);
+    }
+    this.lastGraphics = gfx;
   }
 
   private addShadowCaster(mesh: AbstractMesh): void {

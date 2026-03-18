@@ -32,9 +32,29 @@ export type VolumeSettings = {
 
 export type KeybindingSettings = Record<BindableActionValue, string>;
 
+export const ShadowQuality = {
+  LOW: 512,
+  MEDIUM: 1024,
+  HIGH: 2048,
+} as const;
+
+export type ShadowQualityValue = (typeof ShadowQuality)[keyof typeof ShadowQuality];
+
+export type GraphicsSettings = {
+  shadows: boolean;
+  shadowQuality: ShadowQualityValue;
+  particles: boolean;
+  glow: boolean;
+  antiAliasing: boolean;
+  fxaa: boolean;
+  resolutionScale: number; // 0.5 to 1.0
+  showPerformance: boolean;
+};
+
 export type SettingsSnapshot = {
   volume: VolumeSettings;
   keybindings: KeybindingSettings;
+  graphics: GraphicsSettings;
 };
 
 // ── Defaults ────────────────────────────────────────────────────────────────
@@ -65,6 +85,17 @@ const DEFAULT_KEYBINDINGS: KeybindingSettings = {
   revive: "r",
 };
 
+const DEFAULT_GRAPHICS: GraphicsSettings = {
+  shadows: true,
+  shadowQuality: ShadowQuality.MEDIUM,
+  particles: true,
+  glow: true,
+  antiAliasing: true,
+  fxaa: false,
+  resolutionScale: 1.0,
+  showPerformance: true,
+};
+
 // ── Persistence ─────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "dungeon_settings";
@@ -81,12 +112,17 @@ const loadState = (): SettingsSnapshot => {
       return {
         volume: { ...DEFAULT_VOLUME, ...(saved.volume ?? {}) },
         keybindings: { ...DEFAULT_KEYBINDINGS, ...(saved.keybindings ?? {}) },
+        graphics: { ...DEFAULT_GRAPHICS, ...((saved as any).graphics ?? {}) },
       };
     }
   } catch {
     // Corrupt or unavailable localStorage — use defaults
   }
-  return { volume: { ...DEFAULT_VOLUME }, keybindings: { ...DEFAULT_KEYBINDINGS } };
+  return {
+    volume: { ...DEFAULT_VOLUME },
+    keybindings: { ...DEFAULT_KEYBINDINGS },
+    graphics: { ...DEFAULT_GRAPHICS },
+  };
 };
 
 const saveState = (s: SettingsSnapshot): void => {
@@ -173,10 +209,25 @@ export const settingsStore = {
     emit();
   },
 
+  // Graphics
+  setGraphics<K extends keyof GraphicsSettings>(key: K, value: GraphicsSettings[K]): void {
+    if (state.graphics[key] === value) return;
+    state = { ...state, graphics: { ...state.graphics, [key]: value } };
+    saveState(state);
+    emit();
+  },
+
+  resetGraphics(): void {
+    state = { ...state, graphics: { ...DEFAULT_GRAPHICS } };
+    saveState(state);
+    emit();
+  },
+
   resetAll(): void {
     state = {
       volume: { ...DEFAULT_VOLUME },
       keybindings: { ...DEFAULT_KEYBINDINGS },
+      graphics: { ...DEFAULT_GRAPHICS },
     };
     try {
       localStorage.removeItem(STORAGE_KEY);

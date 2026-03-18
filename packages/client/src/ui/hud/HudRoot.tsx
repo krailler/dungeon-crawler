@@ -417,21 +417,25 @@ export const HudRoot = (): ReactNode => {
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}
           </HudPill>
         )}
-        <HudPill>
-          {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}
-        </HudPill>
-        <HudPill>
-          {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
-        </HudPill>
-        {snapshot.frameMs > 0 && (
-          <HudPill mono>
-            <span className="text-slate-400">{snapshot.frameMs} ms</span>
-          </HudPill>
-        )}
-        {snapshot.heapMB > 0 && (
-          <HudPill mono>
-            <span className="text-slate-400">{snapshot.heapMB} MB</span>
-          </HudPill>
+        {settings.graphics.showPerformance && (
+          <>
+            <HudPill>
+              {snapshot.ping > 0 ? t("hud.ping", { value: snapshot.ping }) : t("hud.pingEmpty")}
+            </HudPill>
+            <HudPill>
+              {snapshot.fps > 0 ? t("hud.fps", { value: snapshot.fps }) : t("hud.fpsEmpty")}
+            </HudPill>
+            {snapshot.frameMs > 0 && (
+              <HudPill mono>
+                <span className="text-slate-400">{snapshot.frameMs} ms</span>
+              </HudPill>
+            )}
+            {snapshot.heapMB > 0 && (
+              <HudPill mono>
+                <span className="text-slate-400">{snapshot.heapMB} MB</span>
+              </HudPill>
+            )}
+          </>
         )}
         {debugSnapshot.showTickRate && adminSnapshot.tickRate > 0 && (
           <HudPill>
