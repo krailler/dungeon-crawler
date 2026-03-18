@@ -308,7 +308,6 @@ export class StateSync {
                     if (!creatureState || creatureState.isDead) return;
                     targetStore.selectCreature(pickId);
                   } else if (pickType === "player") {
-                    if (pickId === this.localSessionId) return; // don't target self
                     const playerState = (room.state as any).players.get(pickId);
                     if (!playerState) return;
                     targetStore.selectPlayer(pickId);
@@ -344,10 +343,9 @@ export class StateSync {
                     return;
                   }
 
-                  // No alive creatures — cycle through other players
+                  // No alive creatures — cycle through all players (including self)
                   const players: { id: string; dist: number }[] = [];
                   for (const [id, player] of this.players) {
-                    if (id === room.sessionId) continue; // skip self
                     const oPos = player.getWorldPosition();
                     const dx = oPos.x - pPos.x;
                     const dz = oPos.z - pPos.z;

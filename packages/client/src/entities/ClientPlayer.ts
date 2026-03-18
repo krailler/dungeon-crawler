@@ -196,11 +196,9 @@ export class ClientPlayer {
         mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         mat.backFaceCulling = true;
       }
-      // Make clickable for target selection (skip local player)
-      if (!this.isLocal) {
-        m.isPickable = true;
-        m.metadata = { ...(m.metadata ?? {}), pickType: "player", pickId: this.sessionId };
-      }
+      // Make clickable for target selection (all players including self)
+      m.isPickable = true;
+      m.metadata = { ...(m.metadata ?? {}), pickType: "player", pickId: this.sessionId };
     }
 
     // Add model meshes as shadow casters
