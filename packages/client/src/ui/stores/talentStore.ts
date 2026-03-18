@@ -50,6 +50,11 @@ export const talentStore = {
     room.send(MessageType.TALENT_ALLOCATE, { talentId });
   },
 
+  resetTalents(): void {
+    if (!room) return;
+    room.send(MessageType.TALENT_RESET, {});
+  },
+
   getRank(talentId: string): number {
     return state.allocations.get(talentId) ?? 0;
   },

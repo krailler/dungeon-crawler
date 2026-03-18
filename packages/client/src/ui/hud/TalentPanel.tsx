@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TalentDefClient } from "@dungeon/shared";
+import { TutorialStep, TALENT_RESET_GOLD_PER_LEVEL } from "@dungeon/shared";
 import { HudPanel } from "../components/HudPanel";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { talentStore } from "../stores/talentStore";
 import { talentDefStore } from "../stores/talentDefStore";
 import { hudStore } from "../stores/hudStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { playUiSfx } from "../../audio/uiSfx";
-import { TutorialStep } from "@dungeon/shared";
 
 /** Props for the panel */
 interface TalentPanelProps {
@@ -166,6 +167,17 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
     tutorialStore.dismiss(TutorialStep.ALLOCATE_TALENTS);
   }, []);
 
+  // Reset talents with gold
+  const resetCost = playerLevel * TALENT_RESET_GOLD_PER_LEVEL;
+  const canReset = talentSnap.allocations.size > 0 && (localMember?.gold ?? 0) >= resetCost;
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleResetConfirm = useCallback(() => {
+    talentStore.resetTalents();
+    setShowResetConfirm(false);
+    playUiSfx("ui_click");
+  }, []);
+
   return (
     <HudPanel
       header={<span className="text-sm font-semibold text-slate-200">{t("talents.title")}</span>}
@@ -203,6 +215,45 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
           </div>
         ))}
       </div>
+
+      {/* Reset button */}
+      {talentSnap.allocations.size > 0 && (
+        <div className="group/reset relative mt-3 border-t border-zinc-700/50 pt-3">
+          <button
+            onClick={() => {
+              if (canReset) {
+                playUiSfx("ui_click");
+                setShowResetConfirm(true);
+              }
+            }}
+            className={`w-full rounded-lg px-3 py-1.5 text-xs transition-colors ${
+              canReset
+                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                : "cursor-not-allowed text-zinc-600"
+            }`}
+          >
+            {t("talents.reset", { cost: resetCost })}
+          </button>
+          {!canReset && (
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover/reset:block">
+              {t("talents.resetNotEnoughGold", { cost: resetCost })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reset confirmation dialog */}
+      {showResetConfirm && (
+        <ConfirmDialog
+          variant="inline"
+          title={t("talents.resetTitle")}
+          message={t("talents.resetMessage", { cost: resetCost })}
+          confirmLabel={t("talents.resetConfirm")}
+          cancelLabel={t("talents.resetCancel")}
+          onConfirm={handleResetConfirm}
+          onCancel={() => setShowResetConfirm(false)}
+        />
+      )}
     </HudPanel>
   );
 };

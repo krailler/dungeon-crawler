@@ -69,6 +69,7 @@ import {
   getTalentDef,
   getTalentDefsForClient,
   getTalentRegistryVersion,
+  getTalentsForClass,
 } from "../talents/TalentRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
@@ -95,6 +96,7 @@ import {
   INTERACT_RANGE,
   MAX_LEVEL,
   LifeState,
+  TALENT_RESET_GOLD_PER_LEVEL,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -705,6 +707,35 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         talentId,
         newRank: currentRank + 1,
       });
+    });
+
+    // Talent reset: spend gold to refund all talent points
+    this.onMessage(MessageType.TALENT_RESET, (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+      if (player.talentAllocations.size === 0) return;
+
+      const cost = player.level * TALENT_RESET_GOLD_PER_LEVEL;
+      if (player.gold < cost) return;
+
+      player.gold -= cost;
+      player.resetTalents();
+      this.effectSystem.recomputeStats(player);
+
+      // Send updated (empty) allocations to client
+      const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
+      client.send(MessageType.TALENT_STATE, {
+        allocations: [],
+        classTalentIds,
+      });
+
+      // Notify player via chat
+      this.chatSystem.sendSystemI18nTo(
+        client.sessionId,
+        "chat.talentsReset",
+        { cost, points: player.talentPoints },
+        `Talents reset for ${cost} gold. ${player.talentPoints} point(s) refunded.`,
+      );
     });
 
     // Loot: take an item from a loot bag on the ground

@@ -47,6 +47,7 @@ export const MessageType = {
   CLASS_DEFS_RESPONSE: "class:defs:res",
   TALENT_ALLOCATE: "talent:allocate",
   TALENT_ALLOCATED: "talent:allocated",
+  TALENT_RESET: "talent:reset",
   TALENT_DEFS_REQUEST: "talent:defs:req",
   TALENT_DEFS_RESPONSE: "talent:defs:res",
   TALENT_STATE: "talent:state",

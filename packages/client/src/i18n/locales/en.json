@@ -159,7 +159,9 @@
     "otherItemPickup": "{{player}} picked up {{amount}} $t({{item}})",
     "levelUp": "{{name}} reached level {{level}}!",
     "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign.",
-    "levelUpTalentPoint": "+1 talent point! You have {{total}} to assign."
+    "levelUpTalentPoint": "+1 talent point! You have {{total}} to assign.",
+    "goldReceived": "+{{amount}} gold",
+    "talentsReset": "Talents reset for {{cost}} gold. {{points}} point(s) refunded."
   },
   "gate": {
     "interactHint": "Open the gate",
@@ -235,6 +237,12 @@
     "rank": "Rank",
     "lockedTooltip": "Unlocks at level {{level}}",
     "requiresLevel": "Requires level",
+    "reset": "Reset Talents ({{cost}} gold)",
+    "resetTitle": "Reset Talents?",
+    "resetMessage": "All talent points will be refunded. This costs {{cost}} gold.",
+    "resetConfirm": "Reset",
+    "resetCancel": "Cancel",
+    "resetNotEnoughGold": "Not enough gold ({{cost}} needed)",
     "warriorToughness": {
       "name": "Toughness",
       "desc": "Increases maximum health."
@@ -310,6 +318,8 @@
     "gaveItem": "Gave {{amount}}× {{item}} to {{name}}.",
     "notAlive": "{{name}} is not alive. Use /revive first.",
     "usageRevive": "Usage: /revive <player_name>",
-    "alreadyAlive": "{{name}} is already alive."
+    "alreadyAlive": "{{name}} is already alive.",
+    "usageGold": "Usage: /gold [player_name] <amount>",
+    "gaveGold": "Gave {{amount}} gold to {{name}}."
   }
 }

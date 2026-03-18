@@ -397,6 +397,59 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       });
     },
   });
+
+  registry.register({
+    name: "gold",
+    usage: "/gold [player] <amount>",
+    description: "Give gold (target if no player specified)",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      if (!ctx.args[0]) {
+        ctx.replyError("Usage: /gold [player_name] <amount>", "cmd.usageGold");
+        return;
+      }
+
+      let target: { sessionId: string; player: PlayerState } | null;
+      let amountStr: string;
+
+      // Try first arg as player name; if not found, treat it as amount and use target
+      const byName = bridge.findPlayerByName(ctx.args[0]);
+      if (byName && ctx.args[1]) {
+        target = byName;
+        amountStr = ctx.args[1];
+      } else {
+        const targetSessionId = bridge.getPlayerTarget(ctx.sessionId);
+        if (targetSessionId) {
+          const p = bridge.getPlayer(targetSessionId);
+          target = p ? { sessionId: targetSessionId, player: p } : null;
+        } else {
+          target = null;
+        }
+        amountStr = ctx.args[0];
+      }
+
+      if (!target) {
+        ctx.replyError("Usage: /gold [player_name] <amount>", "cmd.usageGold");
+        return;
+      }
+
+      const amount = parseInt(amountStr, 10);
+      if (isNaN(amount) || amount <= 0) {
+        ctx.replyError("Amount must be a positive number.", "cmd.invalidQuantity");
+        return;
+      }
+
+      target.player.gold += amount;
+
+      // Notify the receiving player
+      chat.sendSystemI18nTo(target.sessionId, "chat.goldReceived", { amount }, `+${amount} gold`);
+
+      ctx.reply(`Gave ${amount} gold to ${target.player.characterName}.`, "cmd.gaveGold", {
+        amount,
+        name: target.player.characterName,
+      });
+    },
+  });
 }
 
 /** Find a Colyseus Client by sessionId from the room's clients list. */
