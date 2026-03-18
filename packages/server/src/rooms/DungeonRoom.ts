@@ -64,11 +64,13 @@ import { getEffectDefsForClient, getEffectRegistryVersion } from "../effects/Eff
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
+  ChatVariant,
   DUNGEON_WIDTH,
   DUNGEON_HEIGHT,
   DUNGEON_ROOMS,
   TILE_SIZE,
   type TileMap,
+  TileType,
   MessageType,
   generateFloorVariants,
   generateWallVariants,
@@ -130,6 +132,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private playerTargets: Map<string, string> = new Map();
   private tileMap!: TileMap;
   private log!: Logger;
+
+  /** Exit tile world position (center of last room) */
+  private exitPos: { x: number; z: number } = { x: 0, z: 0 };
+  /** Whether the exit countdown is already running */
+  private exitCountdownActive: boolean = false;
 
   // ── Area of Interest (AOI) ──────────────────────────────────────────────────
   /** All creatures (authoritative) — includes those outside sync range */
@@ -331,6 +338,72 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.onMessage(MessageType.GATE_INTERACT, (client: Client, data: { gateId: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (player) this.gateSystem.handleInteract(client, player, data);
+    });
+    // Exit: player interacts with the exit portal → dungeon completion countdown
+    this.onMessage(MessageType.EXIT_INTERACT, (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+      if (this.exitCountdownActive) return;
+
+      // Check proximity to exit tile
+      const dx = player.x - this.exitPos.x;
+      const dz = player.z - this.exitPos.z;
+      if (dx * dx + dz * dz > INTERACT_RANGE * INTERACT_RANGE) return;
+
+      // Block exit if any creature is in active combat
+      if (this.aiSystem.hasActiveCombat()) {
+        this.chatSystem.sendAnnouncementTo(
+          client,
+          "announce.exitCombatActive",
+          {},
+          "Cannot exit while enemies are in combat!",
+          ChatVariant.ERROR,
+        );
+        return;
+      }
+
+      this.exitCountdownActive = true;
+      const EXIT_COUNTDOWN = 10;
+
+      this.chatSystem.broadcastAnnouncement(
+        "announce.dungeonCompleted",
+        { seconds: EXIT_COUNTDOWN },
+        `Dungeon completed! Closing in ${EXIT_COUNTDOWN}...`,
+      );
+
+      for (let s = EXIT_COUNTDOWN - 1; s >= 1; s--) {
+        this.clock.setTimeout(
+          () => {
+            this.chatSystem.broadcastAnnouncement(
+              "announce.dungeonCompleted",
+              { seconds: s },
+              `Dungeon completed! Closing in ${s}...`,
+            );
+          },
+          (EXIT_COUNTDOWN - s) * 1000,
+        );
+      }
+
+      this.clock.setTimeout(() => {
+        this.chatSystem.broadcastAnnouncement(
+          "announce.dungeonCompletedFinal",
+          {},
+          "Dungeon completed! Well done!",
+        );
+        // Kick all players after a short delay for the final announcement to display
+        this.clock.setTimeout(() => {
+          for (const c of this.clients) {
+            c.leave(CloseCode.DUNGEON_COMPLETED);
+          }
+          // Room has autoDispose=false — disconnect explicitly after completion
+          this.disconnect();
+        }, 2000);
+      }, EXIT_COUNTDOWN * 1000);
+
+      this.log.info(
+        { player: client.sessionId },
+        "Exit portal activated — dungeon completion countdown started",
+      );
     });
     // Skill toggle: enable/disable a passive skill (e.g. auto-attack)
     this.onMessage(MessageType.SKILL_TOGGLE, (client: Client, data: { skillId: string }) => {
@@ -679,6 +752,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.dungeonLevel = dungeonLevel;
     const generator = new DungeonGenerator();
     this.tileMap = generator.generate(DUNGEON_WIDTH, DUNGEON_HEIGHT, DUNGEON_ROOMS, seed);
+
+    // Find EXIT tile position (center of last room)
+    this.exitCountdownActive = false;
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        if (this.tileMap.get(x, y) === TileType.EXIT) {
+          this.exitPos = { x: x * TILE_SIZE, z: y * TILE_SIZE };
+        }
+      }
+    }
 
     // Clear existing gates
     this.state.gates.clear();

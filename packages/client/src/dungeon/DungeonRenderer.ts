@@ -52,6 +52,9 @@ export class DungeonRenderer {
   /** Spawn room ambient light */
   private spawnLight: PointLight | null = null;
 
+  /** Exit portal mesh + light */
+  private exitPortal: { mesh: Mesh; light: PointLight } | null = null;
+
   private scene: Scene;
   private floorAssetLoader: FloorAssetLoader;
   private wallAssetLoader: WallAssetLoader;
@@ -103,6 +106,10 @@ export class DungeonRenderer {
           // Place ambient light at the spawn tile
           if (tile === TileType.SPAWN) {
             this.createSpawnLight(worldX, worldZ);
+          }
+          // Place exit portal at the exit tile
+          if (tile === TileType.EXIT) {
+            this.createExitPortal(worldX, worldZ, x, y);
           }
         } else if (tile === TileType.WALL && map.isAdjacentToFloor(x, y)) {
           const wallPacked = wallVariants[y * map.width + x];
@@ -174,10 +181,11 @@ export class DungeonRenderer {
     this.gates.delete(gateId);
   }
 
-  /** Returns all interactable meshes (gates, future chests, etc.) for click detection */
+  /** Returns all interactable meshes (gates, portal, etc.) for click detection */
   getInteractableMeshes(): AbstractMesh[] {
-    // Currently only gates — extend with chests, NPCs, etc. in the future
-    return [...this.gates.values()].map((e) => e.mesh);
+    const meshes: AbstractMesh[] = [...this.gates.values()].map((e) => e.mesh);
+    if (this.exitPortal) meshes.push(this.exitPortal.mesh);
+    return meshes;
   }
 
   getGateWorldPositions(): Map<string, Vector3> {
@@ -216,6 +224,13 @@ export class DungeonRenderer {
     if (this.spawnLight) {
       this.spawnLight.dispose();
       this.spawnLight = null;
+    }
+
+    // Dispose exit portal
+    if (this.exitPortal) {
+      this.exitPortal.mesh.dispose(false, true);
+      this.exitPortal.light.dispose();
+      this.exitPortal = null;
     }
 
     // Dispose gate mesh
@@ -536,6 +551,56 @@ export class DungeonRenderer {
     light.diffuse = new Color3(1.0, 0.85, 0.6);
     light.specular = new Color3(0.3, 0.25, 0.15);
     this.spawnLight = light;
+  }
+
+  /** Glowing portal ring on the EXIT tile — clickable to complete the dungeon. */
+  private createExitPortal(worldX: number, worldZ: number, tileX: number, tileY: number): void {
+    const portalY = WALL_HEIGHT * 0.45;
+
+    // Invisible hitbox for click detection
+    const hitbox = MeshBuilder.CreateBox(
+      "exitPortal",
+      { width: TILE_SIZE * 0.8, height: WALL_HEIGHT * 0.8, depth: TILE_SIZE * 0.8 },
+      this.scene,
+    );
+    hitbox.position.set(worldX, portalY, worldZ);
+    hitbox.isPickable = true;
+    hitbox.visibility = 0;
+    hitbox.metadata = {
+      interactType: "exit",
+      interactId: "exit",
+      interactX: tileX * TILE_SIZE,
+      interactZ: tileY * TILE_SIZE,
+    };
+
+    // Vertical torus ring
+    const ring = MeshBuilder.CreateTorus(
+      "exitRing",
+      { diameter: TILE_SIZE * 0.7, thickness: 0.12, tessellation: 32 },
+      this.scene,
+    );
+    const mat = new StandardMaterial("exitPortalMat", this.scene);
+    mat.diffuseColor = new Color3(0.2, 0.1, 0.6);
+    mat.emissiveColor = new Color3(0.3, 0.15, 0.8);
+    mat.specularColor = new Color3(0.5, 0.3, 1.0);
+    mat.alpha = 0.85;
+    ring.material = mat;
+    ring.parent = hitbox;
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0;
+
+    // Point light for glow
+    const light = new PointLight(
+      "exitPortalLight",
+      new Vector3(worldX, portalY, worldZ),
+      this.scene,
+    );
+    light.intensity = 1.2;
+    light.range = TILE_SIZE * 3;
+    light.diffuse = new Color3(0.4, 0.2, 1.0);
+    light.specular = new Color3(0.2, 0.1, 0.5);
+
+    this.exitPortal = { mesh: hitbox, light };
   }
 
   private createWallTorch(x: number, z: number, dir: { x: number; z: number }): void {

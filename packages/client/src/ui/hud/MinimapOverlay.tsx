@@ -18,6 +18,7 @@ const COLOR_GATE = "#fbbf24";
 const COLOR_LOCAL_PLAYER = "#38bdf8";
 const COLOR_OTHER_PLAYER = "#4ade80";
 const COLOR_CREATURE = "#f87171";
+const COLOR_EXIT = "#a855f7";
 const PLAYER_DOT_RADIUS = 4;
 const CREATURE_DOT_RADIUS = 3;
 
@@ -91,6 +92,24 @@ export const MinimapOverlay = (): ReactNode => {
       if (discovered.has(gateKey)) {
         ctx.fillStyle = COLOR_GATE;
         ctx.fillRect(gate.x * PX, gate.y * PX, PX, PX);
+      }
+    }
+
+    // Draw exit portal marker (if discovered)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const key = y * w + x;
+        if (!discovered.has(key)) continue;
+        if (tileMap.get(x, y) === TileType.EXIT) {
+          const cx = x * PX + PX / 2;
+          const cy = y * PX + PX / 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, PX * 1.2, 0, Math.PI * 2);
+          ctx.fillStyle = COLOR_EXIT;
+          ctx.globalAlpha = 0.7;
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        }
       }
     }
 

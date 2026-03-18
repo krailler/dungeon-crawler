@@ -855,6 +855,18 @@ export class StateSync {
         lootBagStore.open(id);
         break;
       }
+      case "exit": {
+        promptStore.show({
+          title: t("exit.promptTitle"),
+          message: t("exit.promptMessage"),
+          confirmLabel: t("exit.promptAccept"),
+          cancelLabel: t("exit.promptCancel"),
+          onConfirm: () => {
+            room.send(MessageType.EXIT_INTERACT, {});
+          },
+        });
+        break;
+      }
     }
   }
 

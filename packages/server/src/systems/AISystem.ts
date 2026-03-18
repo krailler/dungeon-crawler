@@ -173,6 +173,15 @@ export class AISystem {
     entry.threatTable.set(sessionId, current + amount);
   }
 
+  /** Check if any alive creature is actively in combat (has threat on any player). */
+  hasActiveCombat(): boolean {
+    for (const entry of this.entries) {
+      if (entry.creature.isDead) continue;
+      if (entry.threatTable.size > 0) return true;
+    }
+    return false;
+  }
+
   /** Remove a player from all threat tables (disconnect / death). */
   removePlayer(sessionId: string): void {
     for (const entry of this.entries) {

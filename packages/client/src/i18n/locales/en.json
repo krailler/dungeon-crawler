@@ -52,7 +52,8 @@
     "duplicate": "You were disconnected because your account logged in from another session.",
     "kicked": "You have been kicked from the dungeon by an administrator.",
     "dungeonStarted": "The dungeon expedition has already started. Wait for the next run.",
-    "versionMismatch": "Your client is outdated. Please refresh the page to get the latest version."
+    "versionMismatch": "Your client is outdated. Please refresh the page to get the latest version.",
+    "dungeonCompleted": "Dungeon completed!"
   },
   "pause": {
     "title": "Paused",
@@ -161,9 +162,18 @@
     "promptAccept": "Enter the Dungeon",
     "promptCancel": "Not Yet"
   },
+  "exit": {
+    "promptTitle": "Complete Dungeon?",
+    "promptMessage": "This will end the expedition and close the dungeon for all players.",
+    "promptAccept": "Complete",
+    "promptCancel": "Not Yet"
+  },
   "announce": {
     "gateCountdownStart": "{{name}} is opening the gate in {{seconds}} seconds...",
-    "gateOpened": "The gate opens... The dungeon awaits!"
+    "gateOpened": "The gate opens... The dungeon awaits!",
+    "dungeonCompleted": "Dungeon completed! Closing in {{seconds}}...",
+    "dungeonCompletedFinal": "Dungeon completed! Well done!",
+    "exitCombatActive": "Cannot exit while enemies are in combat!"
   },
   "creatures": {
     "zombie": "Zombie"

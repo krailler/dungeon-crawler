@@ -5,6 +5,8 @@ export type Announcement = {
   text: string;
   i18nKey?: string;
   i18nParams?: Record<string, string | number>;
+  /** Optional visual variant (e.g. "error" for red text) */
+  variant?: string;
   /** Timestamp when the announcement was added (for fade timing) */
   addedAt: number;
 };
@@ -44,6 +46,7 @@ export const announcementStore = {
     text: string;
     i18nKey?: string;
     i18nParams?: Record<string, string | number>;
+    variant?: string;
   }): void {
     // Clear previous fade timer
     if (fadeTimer !== null) {
@@ -55,6 +58,7 @@ export const announcementStore = {
       text: entry.text,
       i18nKey: entry.i18nKey,
       i18nParams: entry.i18nParams,
+      variant: entry.variant,
       addedAt: Date.now(),
     };
     rebuildSnapshot();

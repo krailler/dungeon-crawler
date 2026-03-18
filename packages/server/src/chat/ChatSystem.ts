@@ -153,6 +153,7 @@ export class ChatSystem {
     i18nKey: string,
     i18nParams: Record<string, string | number>,
     fallbackText: string,
+    variant?: ChatVariantValue,
   ): void {
     this.broadcast({
       id: this.nextId++,
@@ -161,7 +162,27 @@ export class ChatSystem {
       text: fallbackText,
       i18nKey,
       i18nParams,
+      variant,
     });
+  }
+
+  /** Send a center-screen announcement to a single client. */
+  sendAnnouncementTo(
+    client: Client,
+    i18nKey: string,
+    i18nParams: Record<string, string | number>,
+    fallbackText: string,
+    variant?: ChatVariantValue,
+  ): void {
+    client.send(MessageType.CHAT_ENTRY, {
+      id: this.nextId++,
+      category: ChatCategory.ANNOUNCEMENT,
+      timestamp: Date.now(),
+      text: fallbackText,
+      i18nKey,
+      i18nParams,
+      variant,
+    } satisfies ChatEntry);
   }
 
   /** Send a message to a single client. */

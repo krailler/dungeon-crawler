@@ -23,7 +23,7 @@ export const AnnouncementOverlay = (): ReactNode => {
     <div className="pointer-events-none absolute inset-x-0 top-[20%] flex justify-center">
       <p
         key={current.id}
-        className="animate-announcement-in text-center text-2xl font-bold tracking-wide text-amber-300 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]"
+        className={`animate-announcement-in text-center text-2xl font-bold tracking-wide drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${current.variant === "error" ? "text-red-400" : "text-amber-300"}`}
         style={
           {
             "--fade-duration": `${ANNOUNCEMENT_FADE_MS}ms`,

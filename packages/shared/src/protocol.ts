@@ -40,6 +40,7 @@ export const MessageType = {
   REVIVE_START: "revive:start",
   EFFECT_DEFS_REQUEST: "effect:defs:req",
   EFFECT_DEFS_RESPONSE: "effect:defs:res",
+  EXIT_INTERACT: "exit:interact",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -47,6 +48,7 @@ export const CloseCode = {
   KICKED_DUPLICATE: 4100,
   KICKED: 4101,
   VERSION_MISMATCH: 4102,
+  DUNGEON_COMPLETED: 4103,
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
