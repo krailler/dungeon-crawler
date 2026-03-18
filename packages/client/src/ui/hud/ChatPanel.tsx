@@ -513,7 +513,6 @@ export const ChatPanel = (): ReactNode => {
               setTimeout(() => {
                 if (!inputRef.current || document.activeElement !== inputRef.current) {
                   chatStore.setInputOpen(false);
-                  setInputValue("");
                 }
               }, 150);
             }}
