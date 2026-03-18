@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
 import { playUiSfx } from "../../audio/uiSfx";
+import { Tooltip } from "./Tooltip";
 
 type HudButtonProps = {
   onClick: () => void;
@@ -70,22 +71,21 @@ export const HudButton = ({
     return () => window.removeEventListener("keydown", handleKey);
   }, [shortcut, handleClick, disabled]);
 
-  return (
-    <div className="group relative">
-      <button
-        onClick={handleClick}
-        className={`${baseClass} ${disabled ? "cursor-not-allowed border-slate-600/30 bg-slate-900/40 text-slate-600 opacity-50" : variantClass(variant, isOpen)}`}
-      >
-        {icon}
-        <span className="uppercase tracking-wider">{label}</span>
-        {shortcut && !disabled && <kbd className={kbdClass(variant)}>{shortcut}</kbd>}
-        {suffix}
-      </button>
-      {tooltip && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover:block">
-          {tooltip}
-        </div>
-      )}
-    </div>
+  const button = (
+    <button
+      onClick={handleClick}
+      className={`${baseClass} ${disabled ? "cursor-not-allowed border-slate-600/30 bg-slate-900/40 text-slate-600 opacity-50" : variantClass(variant, isOpen)}`}
+    >
+      {icon}
+      <span className="uppercase tracking-wider">{label}</span>
+      {shortcut && !disabled && <kbd className={kbdClass(variant)}>{shortcut}</kbd>}
+      {suffix}
+    </button>
   );
+
+  if (tooltip) {
+    return <Tooltip content={tooltip}>{button}</Tooltip>;
+  }
+
+  return button;
 };

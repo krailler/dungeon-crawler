@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { TalentDefClient } from "@dungeon/shared";
 import { TutorialStep, TALENT_RESET_GOLD_PER_LEVEL } from "@dungeon/shared";
 import { HudPanel } from "../components/HudPanel";
+import { Tooltip } from "../components/Tooltip";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { talentStore } from "../stores/talentStore";
 import { talentDefStore } from "../stores/talentDefStore";
@@ -98,41 +99,45 @@ const TalentNode = ({
     );
   });
 
+  const tooltipContent = (
+    <>
+      <div className="font-bold text-amber-300">{t(def.name)}</div>
+      <div className="mt-0.5 text-zinc-400">{t(def.description)}</div>
+      {def.requiredLevel > 1 && (
+        <div className="mt-1 text-zinc-500">
+          {t("talents.requiresLevel")}: {def.requiredLevel}
+        </div>
+      )}
+      <div className="mt-1 space-y-0.5">{rankLines}</div>
+    </>
+  );
+
   return (
-    <div className="group relative" data-talent-id={def.id}>
-      <button
-        className={`pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-lg border-2 ${borderColor} transition-colors ${
-          canAllocate && !isMaxed
-            ? "cursor-pointer bg-zinc-800 hover:bg-zinc-700"
-            : "cursor-default bg-zinc-900"
-        } ${isLocked ? "opacity-40" : ""}`}
-        onClick={() => {
-          if (canAllocate && !isMaxed) {
-            onClick();
-            playUiSfx("ui_click");
-          }
-        }}
-      >
-        {TALENT_ICON_MAP[def.icon] ? (
-          TALENT_ICON_MAP[def.icon]({ className: "h-6 w-6" })
-        ) : (
-          <span className="text-lg">{def.icon}</span>
-        )}
-        <span className="absolute -bottom-1 -right-1 rounded-full bg-zinc-900 px-1 text-[9px] font-bold text-zinc-300">
-          {currentRank}/{def.maxRank}
-        </span>
-      </button>
-      {/* Tooltip */}
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-48 -translate-x-1/2 rounded-lg border border-zinc-600 bg-zinc-900/95 p-2 text-xs shadow-lg group-hover:block">
-        <div className="font-bold text-amber-300">{t(def.name)}</div>
-        <div className="mt-0.5 text-zinc-400">{t(def.description)}</div>
-        {def.requiredLevel > 1 && (
-          <div className="mt-1 text-zinc-500">
-            {t("talents.requiresLevel")}: {def.requiredLevel}
-          </div>
-        )}
-        <div className="mt-1 space-y-0.5">{rankLines}</div>
-      </div>
+    <div data-talent-id={def.id}>
+      <Tooltip content={tooltipContent} width="w-48" className="p-2 text-xs">
+        <button
+          className={`pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-lg border-2 ${borderColor} transition-colors ${
+            canAllocate && !isMaxed
+              ? "cursor-pointer bg-zinc-800 hover:bg-zinc-700"
+              : "cursor-default bg-zinc-900"
+          } ${isLocked ? "opacity-40" : ""}`}
+          onClick={() => {
+            if (canAllocate && !isMaxed) {
+              onClick();
+              playUiSfx("ui_click");
+            }
+          }}
+        >
+          {TALENT_ICON_MAP[def.icon] ? (
+            TALENT_ICON_MAP[def.icon]({ className: "h-6 w-6" })
+          ) : (
+            <span className="text-lg">{def.icon}</span>
+          )}
+          <span className="absolute -bottom-1 -right-1 rounded-full bg-zinc-900 px-1 text-[9px] font-bold text-zinc-300">
+            {currentRank}/{def.maxRank}
+          </span>
+        </button>
+      </Tooltip>
     </div>
   );
 };
@@ -333,27 +338,24 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
 
       {/* Reset button */}
       {talentSnap.allocations.size > 0 && (
-        <div className="group/reset relative mt-3 border-t border-zinc-700/50 pt-3">
-          <button
-            onClick={() => {
-              if (canReset) {
-                playUiSfx("ui_click");
-                setShowResetConfirm(true);
-              }
-            }}
-            className={`w-full rounded-lg px-3 py-1.5 text-xs transition-colors ${
-              canReset
-                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                : "cursor-not-allowed text-zinc-600"
-            }`}
-          >
-            {t("talents.reset", { cost: resetCost })}
-          </button>
-          {!canReset && (
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover/reset:block">
-              {t("talents.resetNotEnoughGold", { cost: resetCost })}
-            </div>
-          )}
+        <div className="mt-3 border-t border-zinc-700/50 pt-3">
+          <Tooltip content={!canReset ? t("talents.resetNotEnoughGold", { cost: resetCost }) : ""}>
+            <button
+              onClick={() => {
+                if (canReset) {
+                  playUiSfx("ui_click");
+                  setShowResetConfirm(true);
+                }
+              }}
+              className={`w-full rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                canReset
+                  ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  : "cursor-not-allowed text-zinc-600"
+              }`}
+            >
+              {t("talents.reset", { cost: resetCost })}
+            </button>
+          </Tooltip>
         </div>
       )}
 

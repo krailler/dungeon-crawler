@@ -11,6 +11,7 @@ import { isEntityDead } from "../components/lifeState";
 import { EffectIcon } from "../components/EffectIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { classDefStore } from "../stores/classDefStore";
+import { Badge } from "../components/Badge";
 import { LifeState } from "@dungeon/shared";
 
 export const TargetFrame = (): ReactNode => {
@@ -106,18 +107,16 @@ export const TargetFrame = (): ReactNode => {
               >
                 {entity.name}
               </span>
-              <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
-                {t("character.level", { level: entity.level })}
-              </span>
+              <Badge>{t("character.level", { level: entity.level })}</Badge>
               {targetMember?.classId && classSnap.get(targetMember.classId) && (
                 <span className="text-[10px] text-slate-400">
                   {t(classSnap.get(targetMember.classId)!.name)}
                 </span>
               )}
               {entity.isDead && (
-                <span className="rounded bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                <Badge variant="status" color="red">
                   {t("party.dead")}
-                </span>
+                </Badge>
               )}
             </div>
             <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">

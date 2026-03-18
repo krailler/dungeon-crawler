@@ -28,6 +28,7 @@ import { DeathOverlay } from "./DeathOverlay";
 import { TargetFrame } from "./TargetFrame";
 import { targetStore } from "../stores/targetStore";
 import { HudButton } from "../components/HudButton";
+import { Badge } from "../components/Badge";
 import { HudPill } from "../components/HudPill";
 import { playUiSfx } from "../../audio/uiSfx";
 import { CharacterIcon } from "../icons/CharacterIcon";
@@ -124,23 +125,21 @@ const PartyRow = ({
               >
                 {member.name}
               </span>
-              <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
-                {t("character.level", { level: member.level })}
-              </span>
+              <Badge>{t("character.level", { level: member.level })}</Badge>
               {isDowned && (
-                <span className="rounded bg-amber-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <Badge variant="status" color="amber">
                   {t("party.downed")}
-                </span>
+                </Badge>
               )}
               {isFullDead && (
-                <span className="rounded bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                <Badge variant="status" color="red">
                   {t("party.dead")}
-                </span>
+                </Badge>
               )}
               {!member.online && (
-                <span className="rounded bg-slate-700/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <Badge variant="status" color="slate">
                   {t("party.offline")}
-                </span>
+                </Badge>
               )}
             </div>
             <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
@@ -493,9 +492,9 @@ export const HudRoot = (): ReactNode => {
             }
           />
           {(localMember?.talentPoints ?? 0) > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow animate-pulse">
+            <Badge variant="notification" color="amber" pulse>
               {localMember?.talentPoints}
-            </span>
+            </Badge>
           )}
         </div>
         <HudButton
@@ -521,9 +520,9 @@ export const HudRoot = (): ReactNode => {
             shortcut={displayKeyName(settings.keybindings.character)}
           />
           {(localMember?.statPoints ?? 0) > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white shadow animate-pulse">
-              {localMember!.statPoints}
-            </span>
+            <Badge variant="notification" color="sky" pulse>
+              {localMember?.statPoints}
+            </Badge>
           )}
         </div>
       </div>

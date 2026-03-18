@@ -9,6 +9,8 @@ import { classDefStore } from "../stores/classDefStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { CoinIcon } from "../icons/CoinIcon";
 import { HudPanel } from "../components/HudPanel";
+import { Tooltip } from "../components/Tooltip";
+import { ProgressBar } from "../components/ProgressBar";
 import { playUiSfx } from "../../audio/uiSfx";
 
 const StatRow = ({
@@ -25,27 +27,34 @@ const StatRow = ({
   tooltip?: string;
   canAllocate?: boolean;
   onAllocate?: () => void;
-}) => (
-  <div className="group/stat relative flex items-center justify-between py-1">
-    <span className="text-xs text-slate-400">{label}</span>
-    <div className="flex items-center gap-1.5">
-      <span className={`font-mono text-sm font-semibold ${color}`}>{value}</span>
-      {canAllocate && (
-        <button
-          onClick={onAllocate}
-          className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/40 hover:text-sky-100"
-        >
-          +
-        </button>
-      )}
-    </div>
-    {tooltip && (
-      <div className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden rounded-lg bg-slate-950/95 px-2.5 py-1.5 text-[11px] leading-tight text-slate-300 shadow-lg shadow-black/40 group-hover/stat:block">
-        {tooltip}
+}) => {
+  const row = (
+    <div className="flex items-center justify-between py-1">
+      <span className="text-xs text-slate-400">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className={`font-mono text-sm font-semibold ${color}`}>{value}</span>
+        {canAllocate && (
+          <button
+            onClick={onAllocate}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/40 hover:text-sky-100"
+          >
+            +
+          </button>
+        )}
       </div>
-    )}
-  </div>
-);
+    </div>
+  );
+
+  if (tooltip) {
+    return (
+      <Tooltip content={tooltip} position="bottom" className="bg-slate-950/95 shadow-black/40">
+        {row}
+      </Tooltip>
+    );
+  }
+
+  return row;
+};
 
 export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode => {
   const { t } = useTranslation();
@@ -57,7 +66,6 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
 
   const stats: CharacterStats = local.stats;
   const statPoints = local.statPoints ?? 0;
-  const healthPct = Math.round((local.health / Math.max(1, local.maxHealth)) * 100);
   const classDef = local.classId ? classDefs.get(local.classId) : undefined;
 
   const handleAllocate = (stat: AllocatableStatValue): void => {
@@ -90,12 +98,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
             {Math.ceil(local.health)}/{local.maxHealth}
           </span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/80">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-400/90 to-emerald-500/80 transition-[width] duration-300"
-            style={{ width: `${healthPct}%` }}
-          />
-        </div>
+        <ProgressBar value={local.health} max={local.maxHealth} color="health" />
       </div>
 
       {/* XP bar */}
@@ -107,14 +110,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
               {(local.xp ?? 0).toLocaleString()}/{(local.xpToNext ?? 0).toLocaleString()}
             </span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/80">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-400/90 to-violet-500/80 transition-[width] duration-300"
-              style={{
-                width: `${Math.round(((local.xp ?? 0) / Math.max(1, local.xpToNext ?? 1)) * 100)}%`,
-              }}
-            />
-          </div>
+          <ProgressBar value={local.xp ?? 0} max={local.xpToNext ?? 1} color="xp" />
         </div>
       )}
 
