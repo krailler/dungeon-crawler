@@ -1,3 +1,5 @@
+import { MIN_ATTACK_COOLDOWN } from "./constants/player.js";
+
 // ── Allocatable stat identifiers ─────────────────────────────────────────────
 
 export const AllocatableStat = {
@@ -92,7 +94,10 @@ export function computeDerivedStats(
     attackDamage: Math.round(scaling.attackBase + base.strength * scaling.attackPerStr),
     defense: Math.round(scaling.defenseBase + base.vitality * scaling.defensePerVit),
     moveSpeed: scaling.speedBase + base.agility * scaling.speedPerAgi,
-    attackCooldown: Math.max(0.3, scaling.cooldownBase - base.agility * scaling.cooldownPerAgi),
+    attackCooldown: Math.max(
+      MIN_ATTACK_COOLDOWN,
+      scaling.cooldownBase - base.agility * scaling.cooldownPerAgi,
+    ),
     attackRange: scaling.attackRange,
   };
 }

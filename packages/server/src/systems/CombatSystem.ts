@@ -28,11 +28,9 @@
  */
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
-import { ATTACK_ANIM_DURATION, computeDamage, LifeState } from "@dungeon/shared";
+import { ATTACK_ANIM_DURATION, DAMAGE_DELAY, computeDamage, LifeState } from "@dungeon/shared";
 import { getSkillDef } from "../skills/SkillRegistry";
 import { collectTalentSkillMods } from "../talents/TalentRegistry";
-
-const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
 export interface CombatHitEvent {
   sessionId: string;

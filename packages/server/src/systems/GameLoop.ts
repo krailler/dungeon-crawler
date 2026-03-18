@@ -48,6 +48,7 @@ import {
   WALL_MARGIN,
   STAMINA_MAX,
   SPRINT_SPEED_MULTIPLIER,
+  PLAYER_WAYPOINT_THRESHOLD,
   STAMINA_DRAIN_PER_SEC,
   STAMINA_REGEN_PER_SEC,
   STAMINA_REGEN_DELAY,
@@ -489,7 +490,7 @@ export class GameLoop {
       const dz = target.z - entity.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
 
-      if (dist < 0.01) {
+      if (dist < PLAYER_WAYPOINT_THRESHOLD) {
         entity.currentPathIndex++;
         continue;
       }

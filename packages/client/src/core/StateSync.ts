@@ -448,8 +448,6 @@ export class StateSync {
           this.deps.addShadowCaster(m);
         }
 
-        const name = player.characterName || sessionId.slice(0, 4).toUpperCase();
-
         // Private data lives in player.secret (only visible to the owning client via @view)
         const secret = isLocal ? player.secret : undefined;
         const localStats = secret
@@ -468,7 +466,7 @@ export class StateSync {
 
         hudStore.setMember({
           id: sessionId,
-          name,
+          name: displayName,
           health: player.health,
           maxHealth: player.maxHealth,
           isLocal,

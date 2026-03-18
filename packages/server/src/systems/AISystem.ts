@@ -36,6 +36,8 @@ import type { Pathfinder, WorldPos } from "../navigation/Pathfinder";
 import {
   ATTACK_ANIM_DURATION,
   CREATURE_REPATH_INTERVAL,
+  CREATURE_WAYPOINT_THRESHOLD,
+  DAMAGE_DELAY,
   TILE_SIZE,
   computeDamage,
   LifeState,
@@ -50,8 +52,6 @@ const AIState = {
 } as const;
 
 type AIStateType = (typeof AIState)[keyof typeof AIState];
-
-const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
 // ── Aggro tuning ────────────────────────────────────────────────────────────
 
@@ -521,7 +521,7 @@ export class AISystem {
     const dz = target.z - creature.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
 
-    if (dist < 0.15) {
+    if (dist < CREATURE_WAYPOINT_THRESHOLD) {
       creature.currentPathIndex++;
       if (creature.currentPathIndex >= creature.path.length) {
         creature.isMoving = false;

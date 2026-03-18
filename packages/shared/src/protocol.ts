@@ -2,7 +2,7 @@ import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
 import type { ItemDefClient } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
-import type { EffectDef } from "./Effects.js";
+import type { EffectDefClient } from "./Effects.js";
 import type { ClassDefClient } from "./Classes.js";
 import type { TalentDefClient } from "./Talents.js";
 
@@ -338,7 +338,7 @@ export interface EffectDefsRequestMessage {
 export interface EffectDefsResponseMessage {
   /** Cache version — changes when effect definitions are modified */
   version: number;
-  effects: EffectDef[];
+  effects: EffectDefClient[];
 }
 
 // ── Classes ─────────────────────────────────────────────────────────────────

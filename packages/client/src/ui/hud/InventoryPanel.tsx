@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useSyncExternalStore } from "react";
+import { memo, useMemo, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import type { ReactNode, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { INVENTORY_MAX_SLOTS } from "@dungeon/shared";
@@ -42,105 +42,113 @@ type InventorySlotProps = {
   onContextMenu: (itemId: string) => void;
 };
 
-const InventorySlot = ({
-  index,
-  slot,
-  isDragSource,
-  isDragOver,
-  cooldown,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
-  onContextMenu,
-}: InventorySlotProps): ReactNode => {
-  const { t } = useTranslation();
-  const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
-  const def = slot ? itemDefs.get(slot.itemId) : undefined;
-  const IconComponent = def ? ITEM_ICON_MAP[def.icon] : undefined;
-  const isConsumable = def?.consumable;
+const InventorySlot = memo(
+  ({
+    index,
+    slot,
+    isDragSource,
+    isDragOver,
+    cooldown,
+    onDragStart,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    onDragEnd,
+    onContextMenu,
+  }: InventorySlotProps): ReactNode => {
+    const { t } = useTranslation();
+    const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
+    const def = slot ? itemDefs.get(slot.itemId) : undefined;
+    const IconComponent = def ? ITEM_ICON_MAP[def.icon] : undefined;
+    const isConsumable = def?.consumable;
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      if (!slot) {
-        e.preventDefault();
-        return;
-      }
-      // Hide default drag ghost
-      if (EMPTY_IMG) {
-        e.dataTransfer.setDragImage(EMPTY_IMG, 0, 0);
-      }
-      e.dataTransfer.effectAllowed = "move";
-      onDragStart(index);
-    },
-    [slot, index, onDragStart],
-  );
-
-  const handleDragOver = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      onDragOver(index);
-    },
-    [index, onDragOver],
-  );
-
-  const handleDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      onDrop(index);
-    },
-    [index, onDrop],
-  );
-
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (slot && isConsumable) {
-        onContextMenu(slot.itemId);
-      }
-    },
-    [slot, isConsumable, onContextMenu],
-  );
-
-  return (
-    <div
-      draggable={!!slot}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={handleDrop}
-      onDragEnd={onDragEnd}
-      onContextMenu={handleContextMenu}
-      className={[
-        "transition-transform",
-        isDragSource ? "opacity-40 scale-90" : "",
-        isDragOver ? "scale-110" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      style={{ transition: "transform 100ms ease, opacity 100ms ease" }}
-    >
-      <ActionSlot
-        variant="empty"
-        size="sm"
-        active={!!slot}
-        icon={
-          IconComponent ? <IconComponent /> : slot ? <span className="text-[14px]">?</span> : <></>
+    const handleDragStart = useCallback(
+      (e: DragEvent<HTMLDivElement>) => {
+        if (!slot) {
+          e.preventDefault();
+          return;
         }
-        quantity={slot?.quantity}
-        quantityMin={2}
-        quantityPosition="bottom-right"
-        cooldown={cooldown}
-        tooltipName={def?.name}
-        tooltipDesc={def?.description}
-        tooltipDescParams={def?.effectParams}
-        tooltipHint={isConsumable ? t("inventory.rightClickToUse") : undefined}
-      />
-    </div>
-  );
-};
+        // Hide default drag ghost
+        if (EMPTY_IMG) {
+          e.dataTransfer.setDragImage(EMPTY_IMG, 0, 0);
+        }
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart(index);
+      },
+      [slot, index, onDragStart],
+    );
+
+    const handleDragOver = useCallback(
+      (e: DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        onDragOver(index);
+      },
+      [index, onDragOver],
+    );
+
+    const handleDrop = useCallback(
+      (e: DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        onDrop(index);
+      },
+      [index, onDrop],
+    );
+
+    const handleContextMenu = useCallback(
+      (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (slot && isConsumable) {
+          onContextMenu(slot.itemId);
+        }
+      },
+      [slot, isConsumable, onContextMenu],
+    );
+
+    return (
+      <div
+        draggable={!!slot}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={onDragEnd}
+        onContextMenu={handleContextMenu}
+        className={[
+          "transition-transform",
+          isDragSource ? "opacity-40 scale-90" : "",
+          isDragOver ? "scale-110" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={{ transition: "transform 100ms ease, opacity 100ms ease" }}
+      >
+        <ActionSlot
+          variant="empty"
+          size="sm"
+          active={!!slot}
+          icon={
+            IconComponent ? (
+              <IconComponent />
+            ) : slot ? (
+              <span className="text-[14px]">?</span>
+            ) : (
+              <></>
+            )
+          }
+          quantity={slot?.quantity}
+          quantityMin={2}
+          quantityPosition="bottom-right"
+          cooldown={cooldown}
+          tooltipName={def?.name}
+          tooltipDesc={def?.description}
+          tooltipDescParams={def?.effectParams}
+          tooltipHint={isConsumable ? t("inventory.rightClickToUse") : undefined}
+        />
+      </div>
+    );
+  },
+);
 
 // ── Drag ghost overlay ───────────────────────────────────────────────────────
 
