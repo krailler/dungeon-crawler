@@ -1,3 +1,5 @@
+import { ItemEffectType } from "@dungeon/shared";
+import type { ItemEffectTypeValue } from "@dungeon/shared";
 import type { PlayerState } from "../state/PlayerState";
 
 type EffectHandler = (player: PlayerState, params: Record<string, unknown>) => boolean;
@@ -6,7 +8,7 @@ const handlers = new Map<string, EffectHandler>();
 
 // ── Built-in effects ─────────────────────────────────────────────────────────
 
-handlers.set("heal", (player, params) => {
+handlers.set(ItemEffectType.HEAL, (player, params) => {
   const amount = (params.amount as number) ?? 0;
   if (amount <= 0) return false;
   if (player.health >= player.maxHealth) return false;
@@ -18,7 +20,7 @@ handlers.set("heal", (player, params) => {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export function executeEffect(
-  effectType: string,
+  effectType: ItemEffectTypeValue,
   player: PlayerState,
   params: Record<string, unknown>,
 ): boolean {

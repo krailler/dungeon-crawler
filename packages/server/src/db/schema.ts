@@ -10,12 +10,22 @@ import {
   index,
   uuid,
 } from "drizzle-orm/pg-core";
-import { Role } from "@dungeon/shared";
+import { Role, StackBehavior, ItemEffectType, CreatureEffectTrigger } from "@dungeon/shared";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
 export const charactersSchema = pgSchema("characters");
 export const worldSchema = pgSchema("world");
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+export const roleEnum = charactersSchema.enum("role", Role);
+export const stackBehaviorEnum = worldSchema.enum("stack_behavior", StackBehavior);
+export const itemEffectTypeEnum = worldSchema.enum("item_effect_type", ItemEffectType);
+export const creatureEffectTriggerEnum = worldSchema.enum(
+  "creature_effect_trigger",
+  CreatureEffectTrigger,
+);
 
 // ── Characters schema (player data — backups) ───────────────────────────────
 
@@ -23,7 +33,7 @@ export const accounts = charactersSchema.table("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default(Role.USER),
+  role: roleEnum("role").notNull().default(Role.USER),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -92,7 +102,7 @@ export const items = worldSchema.table("items", {
   maxStack: integer("max_stack").notNull().default(1),
   consumable: boolean("consumable").notNull().default(false),
   cooldown: real("cooldown").notNull().default(0),
-  effectType: text("effect_type").notNull().default(""),
+  effectType: itemEffectTypeEnum("effect_type").notNull().default(ItemEffectType.NONE),
   effectParams: jsonb("effect_params").notNull().default({}),
   useSound: text("use_sound").notNull().default(""),
 });
@@ -147,7 +157,7 @@ export const effects = worldSchema.table("effects", {
   icon: text("icon").notNull(),
   duration: real("duration").notNull().default(5),
   maxStacks: integer("max_stacks").notNull().default(1),
-  stackBehavior: text("stack_behavior").notNull().default("refresh"),
+  stackBehavior: stackBehaviorEnum("stack_behavior").notNull().default(StackBehavior.REFRESH),
   isDebuff: boolean("is_debuff").notNull().default(true),
   statModifiers: jsonb("stat_modifiers").notNull().default({}),
   tickEffect: jsonb("tick_effect"),
@@ -158,7 +168,7 @@ export const creatureEffects = worldSchema.table("creature_effects", {
   creatureId: text("creature_id")
     .notNull()
     .references(() => creatures.id, { onDelete: "cascade" }),
-  trigger: text("trigger").notNull(),
+  trigger: creatureEffectTriggerEnum("trigger").notNull(),
   effectId: text("effect_id")
     .notNull()
     .references(() => effects.id, { onDelete: "cascade" }),

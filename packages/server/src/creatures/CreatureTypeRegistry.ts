@@ -1,10 +1,15 @@
-import type { CreatureTypeDefinition, CreatureLootEntry, DerivedStats } from "@dungeon/shared";
+import type {
+  CreatureTypeDefinition,
+  CreatureLootEntry,
+  DerivedStats,
+  CreatureEffectTriggerValue,
+} from "@dungeon/shared";
 import { creatures, creatureLoot, creatureEffects } from "../db/schema";
 import { getDb } from "../db/database";
 import { logger } from "../logger";
 
 export type CreatureEffectEntry = {
-  trigger: string;
+  trigger: CreatureEffectTriggerValue;
   effectId: string;
   chance: number;
   stacks: number;

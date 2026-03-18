@@ -1,3 +1,11 @@
+/** Trigger type for creature effect application */
+export const CreatureEffectTrigger = {
+  /** Applied when the creature lands a hit on a player */
+  ON_HIT: "on_hit",
+} as const;
+export type CreatureEffectTriggerValue =
+  (typeof CreatureEffectTrigger)[keyof typeof CreatureEffectTrigger];
+
 /** Stack behavior when an effect is re-applied */
 export const StackBehavior = {
   /** Reset duration timer without adding stacks */

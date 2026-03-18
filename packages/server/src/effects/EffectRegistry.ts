@@ -1,9 +1,6 @@
 import type { EffectDef, StatModifier, TickEffect } from "@dungeon/shared";
-import { StackBehavior } from "@dungeon/shared";
 import { effects } from "../db/schema.js";
 import { createRegistry } from "../db/createRegistry.js";
-
-const VALID_STACK_BEHAVIORS = new Set<string>(Object.values(StackBehavior));
 
 type EffectRow = typeof effects.$inferSelect;
 
@@ -17,9 +14,7 @@ const registry = createRegistry<EffectRow, EffectDef>({
     icon: row.icon,
     duration: row.duration,
     maxStacks: row.maxStacks,
-    stackBehavior: VALID_STACK_BEHAVIORS.has(row.stackBehavior)
-      ? (row.stackBehavior as EffectDef["stackBehavior"])
-      : StackBehavior.REFRESH,
+    stackBehavior: row.stackBehavior,
     isDebuff: row.isDebuff,
     statModifiers: (row.statModifiers ?? {}) as Record<string, StatModifier>,
     tickEffect: (row.tickEffect as TickEffect) ?? null,

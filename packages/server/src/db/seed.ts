@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { Hash } from "colyseus";
-import { Role, DEFAULT_SKILL_IDS } from "@dungeon/shared";
+import { Role, ItemEffectType, DEFAULT_SKILL_IDS } from "@dungeon/shared";
+import type { RoleValue } from "@dungeon/shared";
 import { initDatabase } from "./database";
 import { accounts, characters, items, skills, characterSkills } from "./schema";
 
@@ -8,7 +9,7 @@ interface SeedAccount {
   email: string;
   password: string;
   characterName: string;
-  role: string;
+  role: RoleValue;
 }
 
 const SEED_ACCOUNTS: SeedAccount[] = [
@@ -65,7 +66,7 @@ async function seed() {
       maxStack: 10,
       consumable: true,
       cooldown: 10,
-      effectType: "heal",
+      effectType: ItemEffectType.HEAL,
       effectParams: { amount: 50 },
       useSound: "potion_drink",
     })

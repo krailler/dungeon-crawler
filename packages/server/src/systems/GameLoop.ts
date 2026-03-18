@@ -8,6 +8,7 @@ import type { EffectSystem } from "./EffectSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
 import {
   MessageType,
+  CreatureEffectTrigger,
   computeGoldDrop,
   computeXpDrop,
   MAX_LEVEL,
@@ -159,7 +160,7 @@ export class GameLoop {
         if (creature && player.lifeState === LifeState.ALIVE) {
           const creatureEffects = getCreatureEffects(creature.creatureType);
           for (const entry of creatureEffects) {
-            if (entry.trigger === "on_hit" && Math.random() < entry.chance) {
+            if (entry.trigger === CreatureEffectTrigger.ON_HIT && Math.random() < entry.chance) {
               this.bridge.effectSystem.applyEffect(player, entry.effectId, entry.stacks);
             }
           }

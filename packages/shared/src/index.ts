@@ -90,10 +90,12 @@ export type { GateTypeValue } from "./GateTypes.js";
 export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
 
-export type { ItemDef } from "./Items.js";
+export { ItemEffectType } from "./Items.js";
+export type { ItemEffectTypeValue, ItemDef } from "./Items.js";
 
-export { StackBehavior, StatModType } from "./Effects.js";
+export { CreatureEffectTrigger, StackBehavior, StatModType } from "./Effects.js";
 export type {
+  CreatureEffectTriggerValue,
   StackBehaviorValue,
   StatModTypeValue,
   StatModifier,
