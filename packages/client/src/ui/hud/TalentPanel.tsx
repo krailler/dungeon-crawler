@@ -6,7 +6,9 @@ import { HudPanel } from "../components/HudPanel";
 import { talentStore } from "../stores/talentStore";
 import { talentDefStore } from "../stores/talentDefStore";
 import { hudStore } from "../stores/hudStore";
+import { tutorialStore } from "../stores/tutorialStore";
 import { playUiSfx } from "../../audio/uiSfx";
+import { TutorialStep } from "@dungeon/shared";
 
 /** Props for the panel */
 interface TalentPanelProps {
@@ -161,6 +163,7 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
 
   const handleAllocate = useCallback((talentId: string) => {
     talentStore.allocateTalent(talentId);
+    tutorialStore.dismiss(TutorialStep.ALLOCATE_TALENTS);
   }, []);
 
   return (
