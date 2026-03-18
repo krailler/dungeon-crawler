@@ -42,6 +42,11 @@ export type {
   EffectDefsResponseMessage,
   ClassDefsRequestMessage,
   ClassDefsResponseMessage,
+  TalentAllocateMessage,
+  TalentAllocatedMessage,
+  TalentDefsRequestMessage,
+  TalentDefsResponseMessage,
+  TalentStateMessage,
 } from "./protocol.js";
 
 export {
@@ -97,6 +102,16 @@ export type { ClassDef, ClassDefClient } from "./Classes.js";
 
 export { ItemEffectType, toItemDefClient } from "./Items.js";
 export type { ItemEffectTypeValue, ItemDef, ItemDefClient } from "./Items.js";
+
+export { TalentEffectType, toTalentDefClient } from "./Talents.js";
+export type {
+  TalentEffectTypeValue,
+  TalentStatModifier,
+  TalentSkillModifier,
+  TalentRankEffect,
+  TalentDef,
+  TalentDefClient,
+} from "./Talents.js";
 
 export {
   CreatureEffectTrigger,

@@ -89,6 +89,7 @@
     "consumable1": "Consumable",
     "characterPanel": "Character",
     "inventoryPanel": "Inventory",
+    "talentsPanel": "Talents",
     "minimapPanel": "Minimap",
     "fullscreen": "Fullscreen",
     "tabTarget": "Cycle Target",
@@ -153,7 +154,8 @@
     "itemPickup": "+{{amount}} $t({{item}})",
     "otherItemPickup": "{{player}} picked up {{amount}} $t({{item}})",
     "levelUp": "{{name}} reached level {{level}}!",
-    "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign."
+    "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign.",
+    "levelUpTalentPoint": "+1 talent point! You have {{total}} to assign."
   },
   "gate": {
     "interactHint": "Open the gate",
@@ -194,6 +196,7 @@
   "tutorial": {
     "startDungeon": "You are the party leader! Right-click the gate or press F nearby to start the dungeon.",
     "allocateStats": "You have attribute points! Press C to open the character panel and assign them.",
+    "allocateTalents": "You unlocked talents! Click the star button to open the talent tree and spend your points.",
     "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!",
     "youDowned": "You've been downed! A teammate can revive you before you bleed out. You can still use the chat.",
     "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them.",
@@ -215,6 +218,41 @@
     "title": "Inventory",
     "clickToUse": "Click to use",
     "rightClickToUse": "Right-click to use"
+  },
+  "talents": {
+    "title": "Talents",
+    "pointsAvailable": "talent points available",
+    "rank": "Rank",
+    "lockedTooltip": "Unlocks at level {{level}}",
+    "requiresLevel": "Requires level",
+    "warriorToughness": {
+      "name": "Toughness",
+      "desc": "Increases maximum health."
+    },
+    "warriorMight": {
+      "name": "Might",
+      "desc": "Increases attack damage."
+    },
+    "warriorSwiftness": {
+      "name": "Swiftness",
+      "desc": "Increases movement speed."
+    },
+    "warriorThickSkin": {
+      "name": "Thick Skin",
+      "desc": "Increases defense."
+    },
+    "warriorCleave": {
+      "name": "Cleave",
+      "desc": "Enhances Heavy Strike: faster cooldown and more damage."
+    },
+    "warriorRush": {
+      "name": "Rush",
+      "desc": "Greatly increases movement speed."
+    },
+    "warriorLastStand": {
+      "name": "Last Stand",
+      "desc": "Massively increases maximum health."
+    }
   },
   "loot": {
     "title": "Loot",

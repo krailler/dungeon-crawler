@@ -4,6 +4,7 @@ import type { ItemDefClient } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
 import type { EffectDef } from "./Effects.js";
 import type { ClassDefClient } from "./Classes.js";
+import type { TalentDefClient } from "./Talents.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -44,6 +45,11 @@ export const MessageType = {
   EXIT_INTERACT: "exit:interact",
   CLASS_DEFS_REQUEST: "class:defs:req",
   CLASS_DEFS_RESPONSE: "class:defs:res",
+  TALENT_ALLOCATE: "talent:allocate",
+  TALENT_ALLOCATED: "talent:allocated",
+  TALENT_DEFS_REQUEST: "talent:defs:req",
+  TALENT_DEFS_RESPONSE: "talent:defs:res",
+  TALENT_STATE: "talent:state",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -346,6 +352,39 @@ export interface ClassDefsResponseMessage {
   /** Cache version — changes when class definitions are modified */
   version: number;
   classes: ClassDefClient[];
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+
+// ── Talents ──────────────────────────────────────────────────────────────────
+
+/** Client → Server: allocate a talent point */
+export interface TalentAllocateMessage {
+  talentId: string;
+}
+
+/** Server → Client: talent allocation confirmed */
+export interface TalentAllocatedMessage {
+  talentId: string;
+  newRank: number;
+}
+
+/** Client → Server: request talent definitions by id */
+export interface TalentDefsRequestMessage {
+  talentIds: string[];
+}
+
+/** Server → Client: talent definitions response */
+export interface TalentDefsResponseMessage {
+  version: number;
+  talents: TalentDefClient[];
+}
+
+/** Server → Client: full talent allocation state (sent on join) */
+export interface TalentStateMessage {
+  allocations: { talentId: string; rank: number }[];
+  /** All talent IDs available for the player's class (for client to fetch defs) */
+  classTalentIds: string[];
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

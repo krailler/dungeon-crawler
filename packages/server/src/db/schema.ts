@@ -53,6 +53,7 @@ export const characters = charactersSchema.table(
     gold: integer("gold").notNull().default(0),
     xp: integer("xp").notNull().default(0),
     statPoints: integer("stat_points").notNull().default(0),
+    talentPoints: integer("talent_points").notNull().default(0),
     classId: text("class_id").notNull().default("warrior"),
     tutorialsCompleted: text("tutorials_completed").notNull().default("[]"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -75,6 +76,22 @@ export const characterInventory = charactersSchema.table(
   (table) => [
     uniqueIndex("idx_char_inventory_slot").on(table.characterId, table.slotIndex),
     index("idx_char_inventory_char").on(table.characterId),
+  ],
+);
+
+export const characterTalents = charactersSchema.table(
+  "character_talents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    talentId: text("talent_id").notNull(),
+    rank: integer("rank").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("idx_char_talents_talent").on(table.characterId, table.talentId),
+    index("idx_char_talents_char").on(table.characterId),
   ],
 );
 
@@ -190,6 +207,37 @@ export const classSkills = worldSchema.table("class_skills", {
   skillId: text("skill_id")
     .notNull()
     .references(() => skills.id, { onDelete: "cascade" }),
+});
+
+export const talents = worldSchema.table("talents", {
+  id: text("id").primaryKey(),
+  classId: text("class_id")
+    .notNull()
+    .references(() => classes.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  icon: text("icon").notNull().default(""),
+  maxRank: integer("max_rank").notNull().default(1),
+  requiredTalentId: text("required_talent_id"),
+  requiredTalentRank: integer("required_talent_rank").notNull().default(1),
+  requiredLevel: integer("required_level").notNull().default(1),
+  row: integer("row").notNull().default(0),
+  col: integer("col").notNull().default(0),
+});
+
+export const talentEffects = worldSchema.table("talent_effects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  talentId: text("talent_id")
+    .notNull()
+    .references(() => talents.id, { onDelete: "cascade" }),
+  rank: integer("rank").notNull().default(1),
+  effectType: text("effect_type").notNull(),
+  statName: text("stat_name"),
+  statModType: text("stat_mod_type"),
+  statModValue: real("stat_mod_value"),
+  skillId: text("skill_id"),
+  cooldownMul: real("cooldown_mul"),
+  damageMul: real("damage_mul"),
 });
 
 export const creatureEffects = worldSchema.table("creature_effects", {

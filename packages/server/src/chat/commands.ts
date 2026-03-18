@@ -2,7 +2,8 @@ import type { Client } from "colyseus";
 import type { ChatSystem, ChatRoomBridge } from "./ChatSystem";
 import type { CommandContext } from "./CommandRegistry";
 import type { PlayerState } from "../state/PlayerState";
-import { MAX_LEVEL, LifeState } from "@dungeon/shared";
+import { MAX_LEVEL, LifeState, MessageType } from "@dungeon/shared";
+import { getTalentsForClass } from "../talents/TalentRegistry";
 import { notifyLevelProgress } from "./notifyLevelProgress";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { getItemDef } from "../items/ItemRegistry";
@@ -219,8 +220,10 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       }
 
       target.player.setLevel(targetLevel);
+      // Recompute stats with talents cleared
+      bridge.recomputePlayerStats(target.player);
 
-      // Notify the target player about stat points and tutorial (no public broadcast)
+      // Notify the target player about stat/talent points and tutorials (no public broadcast)
       notifyLevelProgress(
         target.sessionId,
         target.player,
@@ -228,6 +231,13 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         chat,
         bridge.sendToClient.bind(bridge),
       );
+
+      // Send updated (empty) talent allocations to client
+      const classTalentIds = getTalentsForClass(target.player.classId).map((t) => t.id);
+      bridge.sendToClient(target.sessionId, MessageType.TALENT_STATE, {
+        allocations: [],
+        classTalentIds,
+      });
 
       ctx.reply(`Set ${target.player.characterName} to level ${targetLevel}.`, "cmd.setLevel", {
         name: target.player.characterName,
@@ -282,6 +292,37 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         "cmd.resetTutorials",
         { name: target.player.characterName, count },
       );
+    },
+  });
+
+  registry.register({
+    name: "resettalents",
+    usage: "/resettalents [player]",
+    description: "Reset talent allocations and refund points",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const target = ctx.resolveTarget();
+      if (!target) {
+        ctx.replyError("Usage: /resettalents <player_name>", "cmd.usageResettalents");
+        return;
+      }
+
+      const count = target.player.resetTalents();
+      // Recompute stats since talent bonuses were removed
+      bridge.recomputePlayerStats(target.player);
+
+      ctx.reply(
+        `Reset ${count} talent(s) for ${target.player.characterName}. ${target.player.talentPoints} point(s) refunded.`,
+        "cmd.resetTalents",
+        { name: target.player.characterName, count, points: target.player.talentPoints },
+      );
+
+      // Notify client about updated (empty) allocations
+      const classTalentIds = getTalentsForClass(target.player.classId).map((t) => t.id);
+      bridge.sendToClient(target.sessionId, MessageType.TALENT_STATE, {
+        allocations: [],
+        classTalentIds,
+      });
     },
   });
 

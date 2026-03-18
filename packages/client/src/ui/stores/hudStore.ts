@@ -46,6 +46,7 @@ export type PartyMember = {
   xp?: number;
   xpToNext?: number;
   statPoints?: number;
+  talentPoints?: number;
   stamina?: number;
   skills?: string[];
   autoAttackEnabled?: boolean;

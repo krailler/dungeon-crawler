@@ -4,7 +4,7 @@ import { eq, and, notInArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
 import type { DbTransaction } from "../db/database";
-import { characters, characterInventory, characterSkills } from "../db/schema";
+import { characters, characterInventory, characterSkills, characterTalents } from "../db/schema";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
@@ -18,6 +18,7 @@ import {
 } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import { getClassDef } from "../classes/ClassRegistry";
+import { getTalentsForClass } from "../talents/TalentRegistry";
 import {
   registerSession,
   unregisterSession,
@@ -80,6 +81,7 @@ export class PlayerSessionManager {
       gold,
       xp,
       statPoints,
+      talentPoints,
       classId,
       tutorialsCompleted: tutorialsRaw,
     } = client.auth as {
@@ -94,6 +96,7 @@ export class PlayerSessionManager {
       gold: number;
       xp: number;
       statPoints: number;
+      talentPoints: number;
       classId: string;
       tutorialsCompleted: string;
     };
@@ -153,6 +156,7 @@ export class PlayerSessionManager {
     player.xp = xp;
     player.xpToNext = xpToNextLevel(level);
     player.statPoints = statPoints;
+    player.talentPoints = talentPoints;
     player.characterId = characterId;
     player.classId = classId;
 
@@ -173,12 +177,23 @@ export class PlayerSessionManager {
     // Compute an initial hash so early disconnects don't skip saves
     this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-    // Load inventory + skills from DB — update hash after both complete
+    // Load inventory + skills + talents from DB — update hash after all complete
     Promise.all([
       this.loadInventory(characterId, player),
       this.loadCharacterSkills(characterId, player),
+      this.loadCharacterTalents(characterId, player),
     ]).then(() => {
       this.lastSavedHash.set(characterId, this.buildProgressHash(player));
+
+      // Send talent state to owning client (talentPoints synced via Schema)
+      const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
+      this.bridge.sendToClient(client.sessionId, MessageType.TALENT_STATE, {
+        allocations: Array.from(player.talentAllocations.entries()).map(([talentId, rank]) => ({
+          talentId,
+          rank,
+        })),
+        classTalentIds,
+      });
     });
 
     // Compute derived stats
@@ -537,24 +552,37 @@ export class PlayerSessionManager {
 
   /** Write a single player's stats + inventory inside an existing transaction. */
   private async savePlayerTx(tx: DbTransaction, player: PlayerState): Promise<void> {
-    const { characterId, gold, xp, level, strength, vitality, agility, statPoints } = player;
+    const { characterId, gold, xp, level, strength, vitality, agility, statPoints, talentPoints } =
+      player;
     const tutorialsCompleted = JSON.stringify([...player.tutorialsCompleted]);
 
     await tx
       .update(characters)
-      .set({ gold, xp, level, strength, vitality, agility, statPoints, tutorialsCompleted })
+      .set({
+        gold,
+        xp,
+        level,
+        strength,
+        vitality,
+        agility,
+        statPoints,
+        talentPoints,
+        tutorialsCompleted,
+      })
       .where(eq(characters.id, characterId));
 
     await this.saveInventoryTx(tx, characterId, player);
     await this.saveSkillsTx(tx, characterId, player);
+    await this.saveTalentsTx(tx, characterId, player);
   }
 
   private buildProgressHash(player: PlayerState): string {
-    const { gold, xp, level, strength, vitality, agility, statPoints } = player;
+    const { gold, xp, level, strength, vitality, agility, statPoints, talentPoints } = player;
     const tut = [...player.tutorialsCompleted].sort().join(",");
     const inv = this.buildInventoryHash(player);
     const sk = this.buildSkillsHash(player);
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${tut}:${inv}:${sk}`;
+    const tal = this.buildTalentsHash(player);
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${talentPoints}:${tut}:${inv}:${sk}:${tal}`;
   }
 
   private buildInventoryHash(player: PlayerState): string {
@@ -666,6 +694,46 @@ export class PlayerSessionManager {
     player.skills.forEach((skillId: string) => {
       parts.push(skillId);
     });
+    return parts.sort().join(",");
+  }
+
+  private async loadCharacterTalents(characterId: string, player: PlayerState): Promise<void> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(characterTalents)
+      .where(eq(characterTalents.characterId, characterId));
+
+    for (const row of rows) {
+      player.talentAllocations.set(row.talentId, row.rank);
+    }
+    if (rows.length > 0) {
+      this.log.debug({ characterId, talents: rows.length }, "Talents loaded");
+    }
+  }
+
+  private async saveTalentsTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
+    await tx.delete(characterTalents).where(eq(characterTalents.characterId, characterId));
+
+    const rows: { characterId: string; talentId: string; rank: number }[] = [];
+    for (const [talentId, rank] of player.talentAllocations) {
+      rows.push({ characterId, talentId, rank });
+    }
+
+    if (rows.length > 0) {
+      await tx.insert(characterTalents).values(rows);
+    }
+  }
+
+  private buildTalentsHash(player: PlayerState): string {
+    const parts: string[] = [];
+    for (const [talentId, rank] of player.talentAllocations) {
+      parts.push(`${talentId}=${rank}`);
+    }
     return parts.sort().join(",");
   }
 

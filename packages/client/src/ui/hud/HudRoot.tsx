@@ -37,10 +37,11 @@ import { BackpackIcon } from "../icons/BackpackIcon";
 import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { classDefStore } from "../stores/classDefStore";
+import { TalentPanel } from "./TalentPanel";
 
 import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
-import { LifeState, BLEEDOUT_DURATION } from "@dungeon/shared";
+import { LifeState, BLEEDOUT_DURATION, TALENT_UNLOCK_LEVEL } from "@dungeon/shared";
 
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
@@ -213,6 +214,9 @@ export const HudRoot = (): ReactNode => {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const toggleInventory = useCallback(() => setInventoryOpen((v) => !v), []);
   const closeInventory = useCallback(() => setInventoryOpen(false), []);
+  const [talentOpen, setTalentOpen] = useState(false);
+  const toggleTalent = useCallback(() => setTalentOpen((v) => !v), []);
+  const closeTalent = useCallback(() => setTalentOpen(false), []);
 
   // Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -300,6 +304,7 @@ export const HudRoot = (): ReactNode => {
       <MinimapOverlay />
       {characterOpen && <CharacterPanel onClose={closeCharacter} />}
       {inventoryOpen && <InventoryPanel onClose={closeInventory} />}
+      {talentOpen && <TalentPanel onClose={closeTalent} />}
       <LootBagPanel />
       <DeathOverlay />
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
@@ -470,6 +475,26 @@ export const HudRoot = (): ReactNode => {
       <XpBar />
       {/* HUD buttons — bottom right */}
       <div className="absolute bottom-5 right-5 flex items-center gap-2">
+        <div className="relative">
+          <HudButton
+            onClick={toggleTalent}
+            isOpen={talentOpen}
+            icon={<StarIcon />}
+            label={t("talents.title")}
+            shortcut={displayKeyName(settings.keybindings.talents)}
+            disabled={(localMember?.level ?? 1) < TALENT_UNLOCK_LEVEL}
+            tooltip={
+              (localMember?.level ?? 1) < TALENT_UNLOCK_LEVEL
+                ? t("talents.lockedTooltip", { level: TALENT_UNLOCK_LEVEL })
+                : undefined
+            }
+          />
+          {(localMember?.talentPoints ?? 0) > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow animate-pulse">
+              {localMember?.talentPoints}
+            </span>
+          )}
+        </div>
         <HudButton
           onClick={toggleInventory}
           isOpen={inventoryOpen}

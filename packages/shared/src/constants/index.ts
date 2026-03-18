@@ -10,3 +10,4 @@ export * from "./version.js";
 export * from "./stamina.js";
 export * from "./items.js";
 export * from "./death.js";
+export * from "./talents.js";

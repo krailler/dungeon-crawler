@@ -30,6 +30,7 @@ import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
 import { ATTACK_ANIM_DURATION, computeDamage, LifeState } from "@dungeon/shared";
 import { getSkillDef } from "../skills/SkillRegistry";
+import { collectTalentSkillMods } from "../talents/TalentRegistry";
 
 const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;
 
@@ -213,12 +214,17 @@ export class CombatSystem {
     const target = this.findTarget(player, creatures, combat.targetCreatureId);
     if (!target) return null;
 
+    // Apply talent skill modifiers
+    const talentMods = collectTalentSkillMods(player.talentAllocations, skillId);
+    const cooldown = def.cooldown * talentMods.cooldownMul;
+    const dmgMul = def.damageMultiplier * talentMods.damageMul;
+
     // Put skill on cooldown
-    combat.skillCooldowns.set(skillId, def.cooldown);
+    combat.skillCooldowns.set(skillId, cooldown);
 
     // Compute damage with multiplier
     const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
-    const finalDamage = Math.max(1, Math.round(baseDamage * def.damageMultiplier));
+    const finalDamage = Math.max(1, Math.round(baseDamage * dmgMul));
 
     this.scheduleHit(combat, player, target, finalDamage, def.animState);
 
@@ -228,8 +234,8 @@ export class CombatSystem {
     return {
       sessionId,
       skillId,
-      duration: def.cooldown,
-      remaining: def.cooldown,
+      duration: cooldown,
+      remaining: cooldown,
     };
   }
 

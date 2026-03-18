@@ -6,6 +6,7 @@ import {
   INVENTORY_MAX_SLOTS,
   LifeState,
   PLAYER_SCALING,
+  TALENT_UNLOCK_LEVEL,
 } from "@dungeon/shared";
 import type { AllocatableStatValue, RoleValue, StatScaling } from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
@@ -57,6 +58,8 @@ export class PlayerState extends Schema {
   staminaRegenDelay: number = 0;
   /** Per-item cooldown timers (seconds remaining) — server-only */
   itemCooldowns: Map<string, number> = new Map();
+  /** Talent allocations (talentId → current rank) — server-only, not synced */
+  talentAllocations: Map<string, number> = new Map();
 
   // ── Convenience getters (delegate to secret for server-side code) ──────────
 
@@ -141,6 +144,13 @@ export class PlayerState extends Schema {
     this.secret.autoAttackEnabled = v;
   }
 
+  get talentPoints(): number {
+    return this.secret.talentPoints;
+  }
+  set talentPoints(v: number) {
+    this.secret.talentPoints = v;
+  }
+
   get stamina(): number {
     return this.secret.stamina;
   }
@@ -171,11 +181,14 @@ export class PlayerState extends Schema {
   }
 
   /**
-   * Advance one level: grant +1 stat point (player allocates manually), full heal.
+   * Advance one level: grant +1 stat point, +1 talent point (if >= TALENT_UNLOCK_LEVEL), full heal.
    */
   levelUp(): void {
     this.level++;
     this.statPoints++;
+    if (this.level >= TALENT_UNLOCK_LEVEL) {
+      this.talentPoints++;
+    }
 
     this.applyDerivedStats();
     this.health = this.maxHealth;
@@ -216,20 +229,36 @@ export class PlayerState extends Schema {
   }
 
   /**
-   * Set player to a specific level: reset base stats to 10/10/10, grant
-   * (targetLevel - 1) unassigned stat points, full heal, reset XP.
+   * Reset all talent allocations and refund talent points based on current level.
+   * Returns the number of talents that were reset.
+   */
+  resetTalents(): number {
+    const count = this.talentAllocations.size;
+    this.talentAllocations.clear();
+    // Refund: one point per level at or above TALENT_UNLOCK_LEVEL
+    this.talentPoints = Math.max(0, this.level - TALENT_UNLOCK_LEVEL + 1);
+    return count;
+  }
+
+  /**
+   * Set player to a specific level: reset base stats to 10/10/10, clear
+   * all allocations, then apply levelUp() rewards for each level gained.
    */
   setLevel(targetLevel: number): void {
-    this.level = targetLevel;
+    this.level = 1;
     this.strength = 10;
     this.vitality = 10;
     this.agility = 10;
-    this.statPoints = targetLevel - 1;
+    this.statPoints = 0;
+    this.talentPoints = 0;
+    this.talentAllocations.clear();
     this.xp = 0;
-    this.xpToNext = xpToNextLevel(targetLevel);
+    this.xpToNext = xpToNextLevel(1);
 
-    this.applyDerivedStats();
-    this.health = this.maxHealth;
+    // Apply levelUp() rewards for each level gained — single source of truth
+    for (let i = 1; i < targetLevel; i++) {
+      this.levelUp();
+    }
   }
 
   // ── Inventory helpers ──────────────────────────────────────────────────────

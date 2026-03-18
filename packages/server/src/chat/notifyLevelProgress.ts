@@ -7,8 +7,8 @@ import { MessageType, TutorialStep } from "@dungeon/shared";
  *
  * Handles:
  *  1. Public broadcast of level-up announcements (one per level in `newLevels`).
- *  2. Private chat message about unassigned stat points.
- *  3. Tutorial hint for stat allocation (if not yet completed).
+ *  2. Private chat message about unassigned stat points + tutorial hint.
+ *  3. Private chat message about unassigned talent points + tutorial hint.
  *
  * Both the XP level-up path (GameLoop) and the admin `/setlevel` command
  * call this function — pass an empty `newLevels` array to skip the public
@@ -30,20 +30,37 @@ export function notifyLevelProgress(
     );
   }
 
-  // 2–3. Private: stat point chat message + tutorial hint
-  if (player.statPoints <= 0) return;
+  // 2. Private: stat point chat message + tutorial hint
+  if (player.statPoints > 0) {
+    chatSystem.sendSystemI18nTo(
+      sessionId,
+      "chat.levelUpStatPoint",
+      { total: player.statPoints },
+      `+1 attribute point! You have ${player.statPoints} to assign.`,
+    );
 
-  chatSystem.sendSystemI18nTo(
-    sessionId,
-    "chat.levelUpStatPoint",
-    { total: player.statPoints },
-    `+1 attribute point! You have ${player.statPoints} to assign.`,
-  );
+    if (!player.tutorialsCompleted.has(TutorialStep.ALLOCATE_STATS)) {
+      sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.ALLOCATE_STATS,
+        i18nKey: "tutorial.allocateStats",
+      });
+    }
+  }
 
-  if (!player.tutorialsCompleted.has(TutorialStep.ALLOCATE_STATS)) {
-    sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
-      step: TutorialStep.ALLOCATE_STATS,
-      i18nKey: "tutorial.allocateStats",
-    });
+  // 3. Private: talent point chat message + tutorial hint
+  if (player.talentPoints > 0) {
+    chatSystem.sendSystemI18nTo(
+      sessionId,
+      "chat.levelUpTalentPoint",
+      { total: player.talentPoints },
+      `+1 talent point! You have ${player.talentPoints} to assign.`,
+    );
+
+    if (!player.tutorialsCompleted.has(TutorialStep.ALLOCATE_TALENTS)) {
+      sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.ALLOCATE_TALENTS,
+        i18nKey: "tutorial.allocateTalents",
+      });
+    }
   }
 }

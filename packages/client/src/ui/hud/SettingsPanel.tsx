@@ -98,6 +98,7 @@ const ACTION_ORDER: { action: BindableActionValue; i18nKey: string }[] = [
   { action: BindableAction.CONSUMABLE_1, i18nKey: "settings.consumable1" },
   { action: BindableAction.CHARACTER, i18nKey: "settings.characterPanel" },
   { action: BindableAction.INVENTORY, i18nKey: "settings.inventoryPanel" },
+  { action: BindableAction.TALENTS, i18nKey: "settings.talentsPanel" },
   { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
   { action: BindableAction.FULLSCREEN, i18nKey: "settings.fullscreen" },
   { action: BindableAction.TAB_TARGET, i18nKey: "settings.tabTarget" },

@@ -1,6 +1,7 @@
 import type { PlayerState } from "../state/PlayerState.js";
 import { ActiveEffectState } from "../state/ActiveEffectState.js";
 import { getEffectDef } from "../effects/EffectRegistry.js";
+import { collectTalentStatMods } from "../talents/TalentRegistry.js";
 import { computeDerivedStats, StackBehavior, StatModType, lerpEffectValue } from "@dungeon/shared";
 import type { StatModifier, EffectScaling } from "@dungeon/shared";
 
@@ -24,11 +25,12 @@ import type { StatModifier, EffectScaling } from "@dungeon/shared";
  *   recomputeStats()
  *   ┌─────────────────────────────────────────────────────┐
  *   │ 1. Compute clean base stats from str/vit/agi       │
- *   │ 2. For each active effect:                         │
+ *   │ 2. Aggregate talent passive stat modifiers          │
+ *   │ 3. For each active effect:                         │
  *   │    └─ lerp modifier with stored scalingFactor      │
  *   │    └─ multiply by stacks if INTENSITY              │
- *   │ 3. Apply: stat = (base + flat) * (1 + percent)     │
- *   │ 4. Clamp minimums (health≥1, attack≥0, etc.)      │
+ *   │ 4. Apply: stat = (base + flat) * (1 + percent)     │
+ *   │ 5. Clamp minimums (health≥1, attack≥0, etc.)      │
  *   └─────────────────────────────────────────────────────┘
  */
 export class EffectSystem {
@@ -156,9 +158,18 @@ export class EffectSystem {
       player.statScaling,
     );
 
-    // Aggregate all modifiers from active effects
+    // Aggregate all modifiers from active effects + talents
     const flatMods: Record<string, number> = {};
     const percentMods: Record<string, number> = {};
+
+    // Talent passive stat modifiers
+    for (const mod of collectTalentStatMods(player.talentAllocations)) {
+      if (mod.type === StatModType.FLAT) {
+        flatMods[mod.stat] = (flatMods[mod.stat] ?? 0) + mod.value;
+      } else if (mod.type === StatModType.PERCENT) {
+        percentMods[mod.stat] = (percentMods[mod.stat] ?? 0) + mod.value;
+      }
+    }
 
     player.effects.forEach((effect: ActiveEffectState) => {
       const def = getEffectDef(effect.effectId);

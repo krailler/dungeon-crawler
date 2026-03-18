@@ -30,8 +30,11 @@
  *
  * Message handlers:
  *   MOVE, SPRINT, SKILL_USE, SKILL_TOGGLE, ITEM_USE, ITEM_SWAP,
- *   STAT_ALLOCATE, CHAT_SEND, GATE_INTERACT, SET_TARGET, REVIVE_START,
- *   PROMOTE_LEADER, PARTY_KICK, TUTORIAL_DISMISS, ADMIN_RESTART, etc.
+ *   STAT_ALLOCATE, TALENT_ALLOCATE, CHAT_SEND, GATE_INTERACT,
+ *   SET_TARGET, REVIVE_START, EXIT_INTERACT, LOOT_TAKE,
+ *   PROMOTE_LEADER, PARTY_KICK, TUTORIAL_DISMISS, ADMIN_RESTART,
+ *   ITEM_DEFS_REQUEST, SKILL_DEFS_REQUEST, EFFECT_DEFS_REQUEST,
+ *   CLASS_DEFS_REQUEST, TALENT_DEFS_REQUEST
  */
 import { Room, JWT } from "colyseus";
 import type { Client, AuthContext } from "colyseus";
@@ -62,6 +65,11 @@ import { getItemDef, getItemDefsForClient, getItemRegistryVersion } from "../ite
 import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
 import { getEffectDefsForClient, getEffectRegistryVersion } from "../effects/EffectRegistry";
 import { getClassDefsForClient, getClassRegistryVersion } from "../classes/ClassRegistry";
+import {
+  getTalentDef,
+  getTalentDefsForClient,
+  getTalentRegistryVersion,
+} from "../talents/TalentRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
@@ -104,6 +112,8 @@ import type {
   ItemDefsRequestMessage,
   EffectDefsRequestMessage,
   ClassDefsRequestMessage,
+  TalentAllocateMessage,
+  TalentDefsRequestMessage,
   LootTakeMessage,
   SetTargetMessage,
   ReviveStartMessage,
@@ -204,6 +214,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       killPlayer: (sessionId: string) => this.gameLoop.killPlayer(sessionId),
       revivePlayer: (sessionId: string) => this.gameLoop.revivePlayer(sessionId),
       getPlayerTarget: (sessionId: string) => this.playerTargets.get(sessionId) ?? null,
+      recomputePlayerStats: (player: PlayerState) => this.effectSystem.recomputeStats(player),
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
@@ -620,6 +631,82 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
     );
 
+    // Talent definitions: client requests defs lazily by id
+    this.onMessage(
+      MessageType.TALENT_DEFS_REQUEST,
+      (client: Client, data: TalentDefsRequestMessage) => {
+        if (!Array.isArray(data.talentIds) || data.talentIds.length === 0) return;
+        const ids = data.talentIds.slice(0, 50);
+        client.send(MessageType.TALENT_DEFS_RESPONSE, {
+          version: getTalentRegistryVersion(),
+          talents: getTalentDefsForClient(ids),
+        });
+      },
+    );
+
+    // Talent allocation: spend a talent point
+    this.onMessage(MessageType.TALENT_ALLOCATE, (client: Client, data: TalentAllocateMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+      if (player.talentPoints <= 0) return;
+
+      const talentId = data.talentId;
+      if (typeof talentId !== "string") return;
+
+      const def = getTalentDef(talentId);
+      if (!def) return;
+
+      // Class check
+      if (def.classId !== player.classId) return;
+
+      const currentRank = player.talentAllocations.get(talentId) ?? 0;
+      if (currentRank >= def.maxRank) return;
+
+      // Level requirement
+      if (player.level < def.requiredLevel) return;
+
+      // Prerequisite check
+      if (def.requiredTalentId) {
+        const prereqRank = player.talentAllocations.get(def.requiredTalentId) ?? 0;
+        if (prereqRank < def.requiredTalentRank) return;
+      }
+
+      // Apply
+      player.talentAllocations.set(talentId, currentRank + 1);
+      player.talentPoints--;
+
+      // Handle unlock_skill effect
+      const newRankEffect = def.effects.find((e) => e.rank === currentRank + 1);
+      if (newRankEffect?.effectType === "unlock_skill" && newRankEffect.skillId) {
+        let hasSkill = false;
+        player.skills.forEach((s: string) => {
+          if (s === newRankEffect.skillId) hasSkill = true;
+        });
+        if (!hasSkill) {
+          player.skills.push(newRankEffect.skillId);
+        }
+      }
+
+      // Mark tutorial as completed
+      player.tutorialsCompleted.add(TutorialStep.ALLOCATE_TALENTS);
+
+      // Recompute stats (talent stat mods apply in recomputeStats)
+      const oldMaxHealth = player.maxHealth;
+      this.effectSystem.recomputeStats(player);
+      // Grant extra HP if maxHealth increased (same as allocateStat with vitality)
+      if (player.maxHealth > oldMaxHealth) {
+        player.health = Math.min(
+          player.health + (player.maxHealth - oldMaxHealth),
+          player.maxHealth,
+        );
+      }
+
+      client.send(MessageType.TALENT_ALLOCATED, {
+        talentId,
+        newRank: currentRank + 1,
+      });
+    });
+
     // Loot: take an item from a loot bag on the ground
     this.onMessage(MessageType.LOOT_TAKE, (client: Client, data: LootTakeMessage) => {
       const player = this.state.players.get(client.sessionId);
@@ -904,6 +991,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     gold: number;
     xp: number;
     statPoints: number;
+    talentPoints: number;
     classId: string;
     tutorialsCompleted: string;
   }> {
@@ -942,6 +1030,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         gold: characters.gold,
         xp: characters.xp,
         statPoints: characters.statPoints,
+        talentPoints: characters.talentPoints,
         classId: characters.classId,
         tutorialsCompleted: characters.tutorialsCompleted,
       })
@@ -973,6 +1062,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       gold: character.gold,
       xp: character.xp,
       statPoints: character.statPoints,
+      talentPoints: character.talentPoints,
       classId: character.classId,
       tutorialsCompleted: character.tutorialsCompleted,
     };

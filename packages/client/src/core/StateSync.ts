@@ -57,6 +57,8 @@ import { itemDefStore } from "../ui/stores/itemDefStore";
 import { skillDefStore } from "../ui/stores/skillDefStore";
 import { effectDefStore } from "../ui/stores/effectDefStore";
 import { classDefStore } from "../ui/stores/classDefStore";
+import { talentDefStore } from "../ui/stores/talentDefStore";
+import { talentStore } from "../ui/stores/talentStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
@@ -130,6 +132,8 @@ export class StateSync {
     skillDefStore.connect(room);
     effectDefStore.connect(room);
     classDefStore.connect(room);
+    talentDefStore.connect(room);
+    talentStore.connect(room);
 
     // Listen for skill cooldown messages from server
     room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {
@@ -481,6 +485,7 @@ export class StateSync {
             xp: secret.xp,
             xpToNext: secret.xpToNext,
             statPoints: secret.statPoints,
+            talentPoints: secret.talentPoints,
             stamina: secret.stamina,
             skills: Array.from(secret.skills as Iterable<string>),
             autoAttackEnabled: secret.autoAttackEnabled ?? true,
@@ -526,6 +531,7 @@ export class StateSync {
               xp: secret.xp,
               xpToNext: secret.xpToNext,
               statPoints: secret.statPoints,
+              talentPoints: secret.talentPoints,
               stamina: secret.stamina,
               autoAttackEnabled: secret.autoAttackEnabled ?? true,
               stats: {
@@ -930,6 +936,8 @@ export class StateSync {
     skillDefStore.reset();
     effectDefStore.reset();
     classDefStore.reset();
+    talentDefStore.reset();
+    talentStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();

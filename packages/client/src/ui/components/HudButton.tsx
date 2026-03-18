@@ -16,6 +16,10 @@ type HudButtonProps = {
   label: string;
   /** Extra content rendered after the shortcut badge */
   suffix?: ReactNode;
+  /** Disable the button — prevents click and shortcut, dims visual */
+  disabled?: boolean;
+  /** Tooltip shown on hover (e.g. lock reason when disabled) */
+  tooltip?: string;
 };
 
 const baseClass =
@@ -45,15 +49,18 @@ export const HudButton = ({
   icon,
   label,
   suffix,
+  disabled = false,
+  tooltip,
 }: HudButtonProps): ReactNode => {
   const handleClick = useCallback(() => {
+    if (disabled) return;
     playUiSfx("ui_click");
     onClick();
-  }, [onClick]);
+  }, [onClick, disabled]);
 
   // Register keyboard shortcut (case-insensitive, skips when typing in inputs)
   useEffect(() => {
-    if (!shortcut) return;
+    if (!shortcut || disabled) return;
     const lower = shortcut.toLowerCase();
     const handleKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -61,14 +68,24 @@ export const HudButton = ({
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [shortcut, handleClick]);
+  }, [shortcut, handleClick, disabled]);
 
   return (
-    <button onClick={handleClick} className={`${baseClass} ${variantClass(variant, isOpen)}`}>
-      {icon}
-      <span className="uppercase tracking-wider">{label}</span>
-      {shortcut && <kbd className={kbdClass(variant)}>{shortcut}</kbd>}
-      {suffix}
-    </button>
+    <div className="group relative">
+      <button
+        onClick={handleClick}
+        className={`${baseClass} ${disabled ? "cursor-not-allowed border-slate-600/30 bg-slate-900/40 text-slate-600 opacity-50" : variantClass(variant, isOpen)}`}
+      >
+        {icon}
+        <span className="uppercase tracking-wider">{label}</span>
+        {shortcut && !disabled && <kbd className={kbdClass(variant)}>{shortcut}</kbd>}
+        {suffix}
+      </button>
+      {tooltip && (
+        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover:block">
+          {tooltip}
+        </div>
+      )}
+    </div>
   );
 };
