@@ -186,7 +186,8 @@
     "allocateStats": "You have attribute points! Press C to open the character panel and assign them.",
     "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!",
     "youDowned": "You've been downed! A teammate can revive you before you bleed out. You can still use the chat.",
-    "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them."
+    "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them.",
+    "firstDebuff": "You've been hit with a debuff! Check the icons below your character to see its effect and remaining time."
   },
   "reconnect": {
     "title": "Connection Lost",

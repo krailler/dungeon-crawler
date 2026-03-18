@@ -8,6 +8,7 @@ export const TutorialStep = {
   SPRINT: "sprint",
   YOU_DOWNED: "you_downed",
   TEAMMATE_DOWNED: "teammate_downed",
+  FIRST_DEBUFF: "first_debuff",
 } as const;
 
 export type TutorialStepValue = (typeof TutorialStep)[keyof typeof TutorialStep];

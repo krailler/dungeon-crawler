@@ -36,6 +36,7 @@ import type {
   DebugPathEntry,
   AdminDebugInfoMessage,
   DamageDealtMessage,
+  TutorialHintMessage,
 } from "@dungeon/shared";
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
@@ -161,7 +162,16 @@ export class GameLoop {
           const creatureEffects = getCreatureEffects(creature.creatureType);
           for (const entry of creatureEffects) {
             if (entry.trigger === CreatureEffectTrigger.ON_HIT && Math.random() < entry.chance) {
+              const isNew = !player.effects.has(entry.effectId);
               this.bridge.effectSystem.applyEffect(player, entry.effectId, entry.stacks);
+
+              // Tutorial: first time receiving a debuff
+              if (isNew && !player.tutorialsCompleted.has(TutorialStep.FIRST_DEBUFF)) {
+                this.bridge.sendToClient(event.sessionId, MessageType.TUTORIAL_HINT, {
+                  step: TutorialStep.FIRST_DEBUFF,
+                  i18nKey: "tutorial.firstDebuff",
+                } satisfies TutorialHintMessage);
+              }
             }
           }
         }
