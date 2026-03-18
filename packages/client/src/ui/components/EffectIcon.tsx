@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { EffectDef } from "@dungeon/shared";
+import type { EffectDefClient } from "@dungeon/shared";
 import { WeaknessIcon } from "../icons/WeaknessIcon";
 
 /** Map icon identifiers to SVG components */
@@ -28,7 +28,9 @@ type EffectIconProps = {
   remaining: number;
   duration: number;
   stacks: number;
-  def?: EffectDef;
+  def?: EffectDefClient;
+  /** Pre-computed modifier value from server (e.g. 25 for -25%) */
+  modValue?: number;
   /** Direction the tooltip opens: "up" (default) or "down" */
   tooltipDir?: "up" | "down";
 };
@@ -39,6 +41,7 @@ export const EffectIcon = ({
   duration,
   stacks,
   def,
+  modValue: serverModValue,
   tooltipDir = "up",
 }: EffectIconProps): ReactNode => {
   const { t } = useTranslation();
@@ -50,10 +53,10 @@ export const EffectIcon = ({
   const remainingSec = Math.max(0, remaining).toFixed(1);
   const displayName = def ? t(def.name, { defaultValue: def.name }) : effectId;
 
-  // Extract primary modifier value for i18n interpolation
-  const primaryMod = def ? Object.values(def.statModifiers)[0] : undefined;
-  const modValue = primaryMod ? Math.abs(primaryMod.value * 100) : 0;
-  const description = def ? t(def.description, { value: modValue, defaultValue: "" }) : "";
+  // Server sends pre-computed modValue (e.g. 25 for -25%)
+  const description = def
+    ? t(def.description, { value: serverModValue ?? 0, defaultValue: "" })
+    : "";
 
   const tooltipPosition =
     tooltipDir === "up"

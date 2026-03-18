@@ -25,7 +25,7 @@ import { resetTutorials } from "../tutorials/resetTutorials";
 import { PlayerSessionManager } from "./PlayerSessionManager";
 import { getItemDef, getItemDefs, getItemRegistryVersion } from "../items/ItemRegistry";
 import { getSkillDef, getSkillDefs, getSkillRegistryVersion } from "../skills/SkillRegistry";
-import { getEffectDefs, getEffectRegistryVersion } from "../effects/EffectRegistry";
+import { getEffectDefsForClient, getEffectRegistryVersion } from "../effects/EffectRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
@@ -492,7 +492,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         const ids = data.effectIds.slice(0, 50);
         client.send(MessageType.EFFECT_DEFS_RESPONSE, {
           version: getEffectRegistryVersion(),
-          effects: getEffectDefs(ids),
+          effects: getEffectDefsForClient(ids),
         });
       },
     );

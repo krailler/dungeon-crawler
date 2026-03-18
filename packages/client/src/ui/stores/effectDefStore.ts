@@ -1,8 +1,8 @@
-import type { EffectDef } from "@dungeon/shared";
+import type { EffectDefClient } from "@dungeon/shared";
 import { MessageType } from "@dungeon/shared";
 import { createDefStore } from "./createDefStore";
 
-export const effectDefStore = createDefStore<EffectDef>({
+export const effectDefStore = createDefStore<EffectDefClient>({
   requestType: MessageType.EFFECT_DEFS_REQUEST,
   responseType: MessageType.EFFECT_DEFS_RESPONSE,
   requestKey: "effectIds",

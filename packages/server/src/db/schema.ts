@@ -161,6 +161,7 @@ export const effects = worldSchema.table("effects", {
   isDebuff: boolean("is_debuff").notNull().default(true),
   statModifiers: jsonb("stat_modifiers").notNull().default({}),
   tickEffect: jsonb("tick_effect"),
+  scaling: jsonb("scaling"),
 });
 
 export const creatureEffects = worldSchema.table("creature_effects", {
@@ -174,4 +175,8 @@ export const creatureEffects = worldSchema.table("creature_effects", {
     .references(() => effects.id, { onDelete: "cascade" }),
   chance: real("chance").notNull().default(0.3),
   stacks: integer("stacks").notNull().default(1),
+  minLevel: integer("min_level").notNull().default(0),
+  maxLevel: integer("max_level").notNull().default(0),
+  maxChance: real("max_chance"),
+  scalingOverride: jsonb("scaling_override"),
 });

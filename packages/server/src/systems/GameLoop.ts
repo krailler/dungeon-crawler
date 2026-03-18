@@ -2,7 +2,7 @@ import type { ClockTimer } from "@colyseus/timer";
 import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
-import type { AISystem } from "./AISystem";
+import type { AISystem, AIHitEvent } from "./AISystem";
 import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
 import type { EffectSystem } from "./EffectSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
@@ -29,6 +29,8 @@ import {
   REVIVE_RANGE,
   REVIVE_HP_PERCENT,
   TutorialStep,
+  lerpEffectValue,
+  computeScalingFactor,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -41,6 +43,7 @@ import type {
 import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 import { getCreatureLoot, getCreatureEffects } from "../creatures/CreatureTypeRegistry";
+import { getEffectDef } from "../effects/EffectRegistry";
 import { LootBagState } from "../state/LootBagState";
 import { InventorySlotState } from "../state/InventorySlotState";
 
@@ -126,59 +129,35 @@ export class GameLoop {
       this.moveEntity(player, dtSec);
     }
 
-    // AI system: creatures chase and attack players
-
+    // ── Combat: creature → player ─────────────────────────────────────
+    //
+    //   AISystem.update()
+    //     │
+    //     ├─ onPlayerDamage ──▶ handlePlayerDamage()  (HP reduction + downed)
+    //     └─ onHit            ──▶ handleCreatureHit()  (combat log + effects)
+    //                                │
+    //                                └─▶ applyCreatureEffects()
+    //                                      ├─ level gating
+    //                                      ├─ scaling factor + chance roll
+    //                                      └─▶ EffectSystem.applyEffect()
+    //
     this.bridge.aiSystem.update(
       dtSec,
       this.tickPlayersMap,
-      (sessionId, damage) => {
-        const player = this.bridge.state.players.get(sessionId);
-        if (!player || player.lifeState !== LifeState.ALIVE) return;
-        player.health -= damage;
-        if (player.health < 0) player.health = 0;
-        if (player.health <= 0) {
-          this.transitionToDowned(player, sessionId);
-        }
-      },
-      (event) => {
-        const creature = this.bridge.state.creatures.get(event.creatureId);
-        const player = this.bridge.state.players.get(event.sessionId);
-        if (!player) return;
-        const msg: CombatLogMessage = {
-          dir: "e2p",
-          src: `${creature?.creatureType ?? "creature"}[${event.creatureId}]`,
-          tgt: player.characterName || event.sessionId.slice(0, 6),
-          atk: event.attackDamage,
-          def: event.targetDefense,
-          dmg: event.finalDamage,
-          hp: player.health,
-          maxHp: player.maxHealth,
-          kill: player.lifeState !== LifeState.ALIVE,
-        };
-        this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
-
-        // Apply creature effects (e.g. zombie applies Weakness on hit)
-        if (creature && player.lifeState === LifeState.ALIVE) {
-          const creatureEffects = getCreatureEffects(creature.creatureType);
-          for (const entry of creatureEffects) {
-            if (entry.trigger === CreatureEffectTrigger.ON_HIT && Math.random() < entry.chance) {
-              const isNew = !player.effects.has(entry.effectId);
-              this.bridge.effectSystem.applyEffect(player, entry.effectId, entry.stacks);
-
-              // Tutorial: first time receiving a debuff
-              if (isNew && !player.tutorialsCompleted.has(TutorialStep.FIRST_DEBUFF)) {
-                this.bridge.sendToClient(event.sessionId, MessageType.TUTORIAL_HINT, {
-                  step: TutorialStep.FIRST_DEBUFF,
-                  i18nKey: "tutorial.firstDebuff",
-                } satisfies TutorialHintMessage);
-              }
-            }
-          }
-        }
-      },
+      (sessionId, damage) => this.handlePlayerDamage(sessionId, damage),
+      (event) => this.handleCreatureHit(event),
     );
 
-    // Combat system: player auto-attack
+    // ── Combat: player → creature ─────────────────────────────────────
+    //
+    //   CombatSystem.update()
+    //     └─ onHit ──▶ handleCombatHit()
+    //                    ├─ threat + combat log + floating text
+    //                    └─ if killed: processCreatureKill()
+    //                          ├─ gold distribution
+    //                          ├─ XP distribution + level-ups
+    //                          └─ loot bag spawn
+    //
     this.tickCreaturesMap.clear();
     this.bridge.state.creatures.forEach((creature: CreatureState, id: string) => {
       this.tickCreaturesMap.set(id, creature);
@@ -205,7 +184,103 @@ export class GameLoop {
     }
   }
 
-  /** Handle a combat hit event — shared between auto-attack and active skills. */
+  /** Apply damage from a creature attack to a player and trigger downed state if dead. */
+  private handlePlayerDamage(sessionId: string, damage: number): void {
+    const player = this.bridge.state.players.get(sessionId);
+    if (!player || player.lifeState !== LifeState.ALIVE) return;
+    player.health -= damage;
+    if (player.health < 0) player.health = 0;
+    if (player.health <= 0) {
+      this.transitionToDowned(player, sessionId);
+    }
+  }
+
+  /** Process a creature→player hit: combat log + creature on-hit effects. */
+  private handleCreatureHit(event: AIHitEvent): void {
+    const creature = this.bridge.state.creatures.get(event.creatureId);
+    const player = this.bridge.state.players.get(event.sessionId);
+    if (!player) return;
+
+    // Combat log for admins
+    const msg: CombatLogMessage = {
+      dir: "e2p",
+      src: `${creature?.creatureType ?? "creature"}[${event.creatureId}]`,
+      tgt: player.characterName || event.sessionId.slice(0, 6),
+      atk: event.attackDamage,
+      def: event.targetDefense,
+      dmg: event.finalDamage,
+      hp: player.health,
+      maxHp: player.maxHealth,
+      kill: player.lifeState !== LifeState.ALIVE,
+    };
+    this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+    // Apply creature on-hit effects (e.g. zombie applies Weakness)
+    if (creature && player.lifeState === LifeState.ALIVE) {
+      this.applyCreatureEffects(creature, player, event.sessionId);
+    }
+  }
+
+  /**
+   * Roll and apply creature on-hit effects to a player.
+   *
+   * For each creature_effect entry with trigger ON_HIT:
+   *   1. Check level gating (minLevel/maxLevel vs dungeon level)
+   *   2. Compute scaling factor t = (dungeonLevel - min) / (max - min)
+   *   3. Interpolate chance:  effectiveChance = lerp(base, maxChance, t)
+   *   4. Roll chance → if success, apply effect with scaled values
+   *   5. Send tutorial hint on first debuff received
+   */
+  private applyCreatureEffects(
+    creature: CreatureState,
+    player: PlayerState,
+    sessionId: string,
+  ): void {
+    const dungeonLevel = this.bridge.state.dungeonLevel;
+    const creatureEffects = getCreatureEffects(creature.creatureType);
+
+    for (const entry of creatureEffects) {
+      if (entry.trigger !== CreatureEffectTrigger.ON_HIT) continue;
+
+      // Level gating
+      if (entry.minLevel > 0 && dungeonLevel < entry.minLevel) continue;
+      if (entry.maxLevel > 0 && dungeonLevel > entry.maxLevel) continue;
+
+      const t = computeScalingFactor(dungeonLevel, entry.minLevel, entry.maxLevel, MAX_LEVEL);
+
+      // Scaled chance
+      const effectiveChance =
+        entry.maxChance !== null ? lerpEffectValue(entry.chance, entry.maxChance, t) : entry.chance;
+
+      const effectDef = getEffectDef(entry.effectId);
+      if (!effectDef) continue;
+
+      if (Math.random() < effectiveChance) {
+        const isNew = !player.effects.has(entry.effectId);
+        this.bridge.effectSystem.applyEffect(
+          player,
+          entry.effectId,
+          entry.stacks,
+          t,
+          entry.scalingOverride,
+        );
+
+        // Tutorial: first time receiving a debuff
+        if (
+          isNew &&
+          effectDef.isDebuff &&
+          !player.tutorialsCompleted.has(TutorialStep.FIRST_DEBUFF)
+        ) {
+          this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+            step: TutorialStep.FIRST_DEBUFF,
+            i18nKey: "tutorial.firstDebuff",
+          } satisfies TutorialHintMessage);
+        }
+      }
+    }
+  }
+
+  /** Handle a player→creature hit — shared between auto-attack and active skills. */
   handleCombatHit(event: CombatHitEvent): void {
     // Player hit generates threat on the enemy
     this.bridge.aiSystem.addThreat(event.creatureId, event.sessionId, event.finalDamage);

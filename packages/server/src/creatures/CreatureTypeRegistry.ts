@@ -3,6 +3,7 @@ import type {
   CreatureLootEntry,
   DerivedStats,
   CreatureEffectTriggerValue,
+  EffectScaling,
 } from "@dungeon/shared";
 import { creatures, creatureLoot, creatureEffects } from "../db/schema";
 import { getDb } from "../db/database";
@@ -13,6 +14,10 @@ export type CreatureEffectEntry = {
   effectId: string;
   chance: number;
   stacks: number;
+  minLevel: number;
+  maxLevel: number;
+  maxChance: number | null;
+  scalingOverride: EffectScaling | null;
 };
 
 const typeMap = new Map<string, CreatureTypeDefinition>();
@@ -75,6 +80,10 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
       effectId: row.effectId,
       chance: row.chance,
       stacks: row.stacks,
+      minLevel: row.minLevel,
+      maxLevel: row.maxLevel,
+      maxChance: row.maxChance,
+      scalingOverride: (row.scalingOverride as EffectScaling) ?? null,
     });
     effectsMap.set(row.creatureId, entries);
   }

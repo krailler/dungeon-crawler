@@ -93,12 +93,21 @@ export type { TutorialStepValue } from "./Tutorial.js";
 export { ItemEffectType } from "./Items.js";
 export type { ItemEffectTypeValue, ItemDef } from "./Items.js";
 
-export { CreatureEffectTrigger, StackBehavior, StatModType } from "./Effects.js";
+export {
+  CreatureEffectTrigger,
+  StackBehavior,
+  StatModType,
+  lerpEffectValue,
+  computeScalingFactor,
+  toEffectDefClient,
+} from "./Effects.js";
 export type {
   CreatureEffectTriggerValue,
   StackBehaviorValue,
   StatModTypeValue,
   StatModifier,
   TickEffect,
+  EffectScaling,
   EffectDef,
+  EffectDefClient,
 } from "./Effects.js";

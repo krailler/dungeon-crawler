@@ -1,6 +1,15 @@
 import { getDb } from "./database.js";
 import { logger } from "../logger.js";
 
+/** DJB2-style string hash → 32-bit integer */
+export function simpleHash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) | 0;
+  }
+  return h;
+}
+
 export interface Registry<TDef> {
   load(): Promise<void>;
   get(id: string): TDef | undefined;
@@ -47,9 +56,7 @@ export function createRegistry<TRow, TDef extends { id: string }>(
       // Compute version hash from ids + def-specific bits
       let hash = 0;
       for (const [id, def] of map) {
-        for (let i = 0; i < id.length; i++) {
-          hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
-        }
+        hash = ((hash << 5) - hash + simpleHash(id)) | 0;
         hash = ((hash << 5) - hash + config.hashDef(def)) | 0;
       }
       version = hash >>> 0;

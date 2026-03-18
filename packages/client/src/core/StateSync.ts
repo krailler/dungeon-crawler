@@ -501,6 +501,7 @@ export class StateSync {
             remaining: number;
             duration: number;
             stacks: number;
+            modValue: number;
           }[] = [];
           player.effects?.forEach((effect: any, effectId: string) => {
             effects.push({
@@ -508,6 +509,7 @@ export class StateSync {
               remaining: effect.remaining,
               duration: effect.duration,
               stacks: effect.stacks,
+              modValue: effect.modValue ?? 0,
             });
           });
           hudStore.updateMember(sessionId, { effects });

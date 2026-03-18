@@ -131,7 +131,8 @@ CREATE TABLE "world"."effects" (
   "stack_behavior" "world"."stack_behavior" DEFAULT 'refresh' NOT NULL,
   "is_debuff" boolean DEFAULT true NOT NULL,
   "stat_modifiers" jsonb DEFAULT '{}'::jsonb NOT NULL,
-  "tick_effect" jsonb
+  "tick_effect" jsonb,
+  "scaling" jsonb
 );
 
 CREATE TABLE "world"."creature_effects" (
@@ -140,7 +141,11 @@ CREATE TABLE "world"."creature_effects" (
   "trigger" "world"."creature_effect_trigger" NOT NULL,
   "effect_id" text NOT NULL REFERENCES "world"."effects"("id") ON DELETE CASCADE,
   "chance" real DEFAULT 0.3 NOT NULL,
-  "stacks" integer DEFAULT 1 NOT NULL
+  "stacks" integer DEFAULT 1 NOT NULL,
+  "min_level" integer DEFAULT 0 NOT NULL,
+  "max_level" integer DEFAULT 0 NOT NULL,
+  "max_chance" real,
+  "scaling_override" jsonb
 );
 
 -- ── Seed data ────────────────────────────────────────────────────────────────
@@ -172,9 +177,9 @@ INSERT INTO "world"."creature_loot" ("creature_id", "item_id", "drop_chance", "m
 VALUES ('zombie', 'health_potion', 0.8, 1, 1);
 
 -- Effects
-INSERT INTO "world"."effects" ("id", "name", "description", "icon", "duration", "max_stacks", "stack_behavior", "is_debuff", "stat_modifiers", "tick_effect")
-VALUES ('weakness', 'effects.weakness', 'effects.weakness_desc', 'weakness', 5.0, 1, 'refresh', true, '{"attackDamage":{"type":"percent","value":-0.25}}', null);
+INSERT INTO "world"."effects" ("id", "name", "description", "icon", "duration", "max_stacks", "stack_behavior", "is_debuff", "stat_modifiers", "tick_effect", "scaling")
+VALUES ('weakness', 'effects.weakness', 'effects.weakness_desc', 'weakness', 5.0, 1, 'refresh', true, '{"attackDamage":{"type":"percent","value":-0.25}}', null, '{"duration":8.0,"statModifiers":{"attackDamage":{"value":-0.45}}}');
 
 -- Creature effects
-INSERT INTO "world"."creature_effects" ("creature_id", "trigger", "effect_id", "chance", "stacks")
-VALUES ('zombie', 'on_hit', 'weakness', 0.3, 1);
+INSERT INTO "world"."creature_effects" ("creature_id", "trigger", "effect_id", "chance", "stacks", "min_level", "max_level", "max_chance")
+VALUES ('zombie', 'on_hit', 'weakness', 0.3, 1, 1, 0, 0.5);

@@ -1,37 +1,117 @@
 import type { PlayerState } from "../state/PlayerState.js";
 import { ActiveEffectState } from "../state/ActiveEffectState.js";
 import { getEffectDef } from "../effects/EffectRegistry.js";
-import { computeDerivedStats, StackBehavior, StatModType } from "@dungeon/shared";
-import type { StatModifier } from "@dungeon/shared";
+import { computeDerivedStats, StackBehavior, StatModType, lerpEffectValue } from "@dungeon/shared";
+import type { StatModifier, EffectScaling } from "@dungeon/shared";
 
+/**
+ * Manages active effects (buffs/debuffs) on players.
+ *
+ * Lifecycle:
+ *   applyEffect()  ──▶  update() ticks remaining  ──▶  effect expires → recomputeStats()
+ *       │                                                     or
+ *       │                                              clearEffects() on death/respawn
+ *       ▼
+ *   New effect:         Re-application:
+ *   ┌──────────┐        ┌────────────────────────────────────┐
+ *   │ create   │        │ REFRESH: reset timer               │
+ *   │ state +  │        │ INTENSITY: add stacks (up to max)  │
+ *   │ set on   │        │                                    │
+ *   │ player   │        │ If new scalingFactor > existing:   │
+ *   └──────────┘        │   upgrade factor + recalc values   │
+ *       │               └────────────────────────────────────┘
+ *       ▼
+ *   recomputeStats()
+ *   ┌─────────────────────────────────────────────────────┐
+ *   │ 1. Compute clean base stats from str/vit/agi       │
+ *   │ 2. For each active effect:                         │
+ *   │    └─ lerp modifier with stored scalingFactor      │
+ *   │    └─ multiply by stacks if INTENSITY              │
+ *   │ 3. Apply: stat = (base + flat) * (1 + percent)     │
+ *   │ 4. Clamp minimums (health≥1, attack≥0, etc.)      │
+ *   └─────────────────────────────────────────────────────┘
+ */
 export class EffectSystem {
   /**
    * Apply an effect to a player (or refresh/stack if already present).
+   *
+   * Scaling resolution: scalingOverride > def.scaling > null
+   *
+   * @param scalingFactor 0–1 based on dungeon level vs creature_effect level range
+   * @param scalingOverride if set, overrides the effect's default scaling config
    */
-  applyEffect(player: PlayerState, effectId: string, stacks: number = 1): void {
+  applyEffect(
+    player: PlayerState,
+    effectId: string,
+    stacks: number = 1,
+    scalingFactor: number = 0,
+    scalingOverride?: EffectScaling | null,
+  ): void {
     const def = getEffectDef(effectId);
     if (!def) return;
 
+    const effectiveScaling = scalingOverride ?? def.scaling ?? null;
+    const scaledDuration = lerpEffectValue(def.duration, effectiveScaling?.duration, scalingFactor);
+    const modValue = this.computeModValue(def, effectiveScaling, scalingFactor);
+
     const existing = player.effects.get(effectId);
     if (existing) {
+      // Upgrade scaling if new application is stronger
+      if (scalingFactor > existing.scalingFactor) {
+        existing.scalingFactor = scalingFactor;
+        existing.scalingOverride = scalingOverride ?? null;
+      }
+      // Recalculate duration and modValue with the (possibly upgraded) factor
+      const bestScaling = existing.scalingOverride ?? def.scaling ?? null;
+      const bestDuration = lerpEffectValue(
+        def.duration,
+        bestScaling?.duration,
+        existing.scalingFactor,
+      );
+      existing.duration = bestDuration;
+      existing.modValue = this.computeModValue(def, bestScaling, existing.scalingFactor);
+
       if (def.stackBehavior === StackBehavior.REFRESH) {
-        // Reset timer only
-        existing.remaining = def.duration;
+        existing.remaining = bestDuration;
       } else {
         // INTENSITY: add stacks up to max, reset timer
-        existing.stacks = Math.min(existing.stacks + stacks, def.maxStacks) as number;
-        existing.remaining = def.duration;
+        existing.stacks = Math.min(existing.stacks + stacks, def.maxStacks);
+        existing.remaining = bestDuration;
       }
     } else {
       const state = new ActiveEffectState();
       state.effectId = effectId;
-      state.duration = def.duration;
-      state.remaining = def.duration;
-      state.stacks = Math.min(stacks, def.maxStacks) as number;
+      state.duration = scaledDuration;
+      state.remaining = scaledDuration;
+      state.stacks = Math.min(stacks, def.maxStacks);
+      state.modValue = modValue;
+      state.scalingFactor = scalingFactor;
+      state.scalingOverride = scalingOverride ?? null;
       player.effects.set(effectId, state);
     }
 
     this.recomputeStats(player);
+  }
+
+  /**
+   * Compute the primary modifier display value (absolute percentage as integer).
+   * e.g. -25% → 25, -45% → 45
+   */
+  private computeModValue(
+    def: { statModifiers: Record<string, StatModifier>; scaling: EffectScaling | null },
+    effectiveScaling: EffectScaling | null,
+    t: number,
+  ): number {
+    const firstMod = Object.entries(def.statModifiers)[0];
+    if (!firstMod) return 0;
+    const [statKey, mod] = firstMod;
+    const scaledValue = lerpEffectValue(
+      mod.value,
+      effectiveScaling?.statModifiers?.[statKey]?.value,
+      t,
+    );
+    // Clamp to int8 range (0–127) for Colyseus @type("int8")
+    return Math.min(127, Math.round(Math.abs(scaledValue * 100)));
   }
 
   /**
@@ -82,12 +162,18 @@ export class EffectSystem {
       if (!def) return;
 
       const multiplier = def.stackBehavior === StackBehavior.INTENSITY ? effect.stacks : 1;
+      const scaling = effect.scalingOverride ?? def.scaling ?? null;
 
       for (const [stat, mod] of Object.entries(def.statModifiers) as [string, StatModifier][]) {
+        const scaledValue = lerpEffectValue(
+          mod.value,
+          scaling?.statModifiers?.[stat]?.value,
+          effect.scalingFactor,
+        );
         if (mod.type === StatModType.FLAT) {
-          flatMods[stat] = (flatMods[stat] ?? 0) + mod.value * multiplier;
+          flatMods[stat] = (flatMods[stat] ?? 0) + scaledValue * multiplier;
         } else if (mod.type === StatModType.PERCENT) {
-          percentMods[stat] = (percentMods[stat] ?? 0) + mod.value * multiplier;
+          percentMods[stat] = (percentMods[stat] ?? 0) + scaledValue * multiplier;
         }
       }
     });
