@@ -1,3 +1,37 @@
+/**
+ * Procedural Dungeon Generator — Random room placement + L-shaped corridors.
+ *
+ * Algorithm:
+ *
+ *   1. Place rooms     Randomly generate non-overlapping rectangles (4–8 tiles)
+ *                      with 1-tile padding. Up to roomCount × 10 attempts.
+ *
+ *   2. Connect rooms   Sequential L-shaped corridors between adjacent rooms
+ *                      (room[0]→room[1]→room[2]→…). Random horizontal-first
+ *                      or vertical-first per corridor.
+ *
+ *   3. Mark special    SPAWN = center of first room
+ *      tiles           EXIT  = center of last room
+ *
+ *   4. Find gates      Scan the 4 edges of the spawn room for corridor exits.
+ *                      Each opening gets a gate position (used by GateSystem).
+ *
+ * Layout example:
+ *
+ *   ┌──────┐          ┌────────┐
+ *   │Room 0│──corr──▶ │ Room 1 │
+ *   │(spawn│  gates   │        │──corr──▶ …
+ *   │  ⊕)  │  here    └────────┘
+ *   └──────┘
+ *
+ * Room ownership:
+ *   A 2D grid (roomOwnership[][]) tracks which room index owns each tile.
+ *   Corridor tiles are assigned to their source room. Used for per-room
+ *   creature spawning and tile-set assignment.
+ *
+ * Determinism:
+ *   When a seed is provided, uses mulberry32 PRNG for reproducible layouts.
+ */
 import { TileMap, TileType, mulberry32 } from "@dungeon/shared";
 
 export interface Room {

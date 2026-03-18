@@ -1,3 +1,40 @@
+/**
+ * StateSync — Bridges Colyseus server state to Babylon.js entities + React UI stores.
+ *
+ * Data flow:
+ *
+ *   Colyseus Room State (binary sync)
+ *     │
+ *     ├─ players.onAdd/onChange/onRemove
+ *     │    ├─▶ ClientPlayer          (3D: model, interpolation, animations, life state)
+ *     │    ├─▶ hudStore              (React: health, party list, stats, effects)
+ *     │    ├─▶ deathStore            (React: death overlay, bleed/respawn timers)
+ *     │    └─▶ effectDefStore        (lazy-fetch effect defs for buff icons)
+ *     │
+ *     ├─ creatures.onAdd/onChange/onRemove
+ *     │    ├─▶ ClientCreature        (3D: model, health bar, hit flash, aggro)
+ *     │    └─▶ creatureStore         (React: TargetFrame data)
+ *     │
+ *     ├─ lootBags.onAdd/onRemove
+ *     │    ├─▶ ClientLootBag         (3D: golden sphere, bobbing animation)
+ *     │    └─▶ itemDefStore          (lazy-fetch item defs for loot panel)
+ *     │
+ *     ├─ gates.onAdd/onChange/onRemove
+ *     │    ├─▶ gateStore             (React: gate interaction prompts)
+ *     │    └─▶ DungeonRenderer       (3D: gate mesh placement/removal)
+ *     │
+ *     └─ dungeonVersion (listen)
+ *          └─▶ Full dungeon rebuild: render → input → wall occlusion → fog of war
+ *
+ * Private state (@view):
+ *   player.secret is only visible to the owning client (Colyseus @view).
+ *   Contains: gold, xp, inventory, stats, skills, stamina.
+ *
+ * Lifecycle:
+ *   setup(room) → registers all Colyseus listeners
+ *   dispose()   → cleans up 3D entities + unsubscribes all listeners
+ *   On dungeon restart: dungeonVersion listener triggers full re-render.
+ */
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";

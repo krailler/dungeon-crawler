@@ -1,3 +1,31 @@
+/**
+ * Player Combat — Auto-attack + active skills against creatures.
+ *
+ * Per-tick pipeline (update()):
+ *
+ *   For each registered player:
+ *   ┌──────────────────────────────────────────────────────┐
+ *   │ 1. Tick down skill cooldowns                        │
+ *   │ 2. Tick anim timer → clear animState when done      │
+ *   │ 3. Tick damage timer → apply damage at animation    │
+ *   │    peak (DAMAGE_DELAY) and fire onHit callback      │
+ *   │ 4. If attack cooldown ready + auto-attack enabled:  │
+ *   │    └─ findTarget() → scheduleHit()                  │
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * Target selection (findTarget):
+ *   1. Prefer player's manually-selected target (click/tab) if alive + in range
+ *   2. Fallback: closest alive creature within attackRange
+ *
+ * Active skills (useSkill):
+ *   - Validates: alive, has skill, not on cooldown, target in range
+ *   - Applies damage multiplier (e.g. heavy_strike = 2.5x)
+ *   - Resets auto-attack cooldown (so skill doesn't "waste" next auto)
+ *   - Returns SkillCooldownEvent for client feedback
+ *
+ * Damage timing (same as AISystem):
+ *   scheduleHit() → face target + play anim → damage at DAMAGE_DELAY
+ */
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
 import { ATTACK_ANIM_DURATION, computeDamage, LifeState } from "@dungeon/shared";

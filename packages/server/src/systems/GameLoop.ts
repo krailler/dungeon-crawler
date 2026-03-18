@@ -1,3 +1,34 @@
+/**
+ * GameLoop — Server tick orchestrator (runs at TICK_RATE Hz via Colyseus clock).
+ *
+ * Tick order (each call to update()):
+ *
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │ 1. Tick rate metrics                                       │
+ *   │ 2. updateStamina()           drain/regen sprint stamina    │
+ *   │ 3. tickItemCooldowns()       count down item use cooldowns │
+ *   │ 4. effectSystem.update()     tick buff/debuff timers       │
+ *   │ 5. updateLifeStates()        downed→dead→respawn, revive  │
+ *   │ 6. moveEntity()              advance players along paths   │
+ *   │ 7. aiSystem.update()         creature AI + creature→player │
+ *   │ 8. combatSystem.update()     player auto-attack→creature   │
+ *   │ 9. resolveEntityCollisions() push overlapping entities     │
+ *   │ 10. enforceWallMargin()      slide entities off walls      │
+ *   │ 11. sendDebugPaths()         admin path visualization      │
+ *   └─────────────────────────────────────────────────────────────┘
+ *
+ * Bridge pattern:
+ *   GameLoop does NOT hold direct references to DungeonRoom or subsystems.
+ *   Instead, it receives a GameLoopBridge interface with getters + methods.
+ *   This allows the room to swap implementations (e.g. on dungeon restart)
+ *   without reconstructing the game loop.
+ *
+ * Life state machine (updateLifeStates):
+ *
+ *   ALIVE ──(health≤0)──▶ DOWNED ──(bleedout 30s)──▶ DEAD ──(respawn timer)──▶ ALIVE
+ *                           │                                                     ▲
+ *                           └──(revive channel 3.5s, pauses bleedout)─────────────┘
+ */
 import type { ClockTimer } from "@colyseus/timer";
 import type { DungeonState } from "../state/DungeonState";
 import type { PlayerState } from "../state/PlayerState";

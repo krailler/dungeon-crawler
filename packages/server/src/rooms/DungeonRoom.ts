@@ -1,3 +1,38 @@
+/**
+ * DungeonRoom — Main Colyseus room orchestrating all server-side game systems.
+ *
+ * System wiring (onCreate):
+ *
+ *   DungeonRoom
+ *     ├─ DungeonGenerator   → procedural dungeon layout
+ *     ├─ Pathfinder         → A* pathfinding on tile grid
+ *     ├─ AISystem           → creature AI (threat, chase, attack, leash, roam)
+ *     ├─ CombatSystem       → player auto-attack + active skills
+ *     ├─ EffectSystem       → buff/debuff application + stat recomputation
+ *     ├─ ChatSystem         → chat messages + slash commands
+ *     ├─ GateSystem         → lobby gates with countdown
+ *     ├─ GameLoop           → tick orchestrator (32 Hz default)
+ *     └─ PlayerSessionManager → join/leave/reconnect/persistence
+ *
+ * Room lifecycle:
+ *
+ *   onCreate()  → generate dungeon, wire systems, register message handlers
+ *   onAuth()    → JWT validation, duplicate login detection
+ *   onJoin()    → load/create character from DB, spawn player, send tutorials
+ *   onDrop()    → connection lost, start reconnection window (120s)
+ *   onLeave()   → save character to DB, cleanup from all systems
+ *   onDispose() → final cleanup
+ *
+ * AOI (Area of Interest) culling:
+ *   Creatures beyond AOI_RANGE tiles from ALL players are removed from
+ *   Colyseus sync state (but kept in allCreatures map). Re-added when
+ *   a player moves within range. Checked every AOI_CHECK_TICKS.
+ *
+ * Message handlers:
+ *   MOVE, SPRINT, SKILL_USE, SKILL_TOGGLE, ITEM_USE, ITEM_SWAP,
+ *   STAT_ALLOCATE, CHAT_SEND, GATE_INTERACT, SET_TARGET, REVIVE_START,
+ *   PROMOTE_LEADER, PARTY_KICK, TUTORIAL_DISMISS, ADMIN_RESTART, etc.
+ */
 import { Room, JWT } from "colyseus";
 import type { Client, AuthContext } from "colyseus";
 import { StateView } from "@colyseus/schema";

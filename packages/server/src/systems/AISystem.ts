@@ -1,3 +1,35 @@
+/**
+ * Creature AI — Finite state machine with threat-based targeting.
+ *
+ * State machine:
+ *
+ *   ┌──────┐    player in detection    ┌───────┐    in attack   ┌────────┐
+ *   │ IDLE │ ──── range + LOS ────▶    │ CHASE │ ──── range ──▶ │ ATTACK │
+ *   └──┬───┘                           └───┬───┘               └───┬────┘
+ *      │                                   │                       │
+ *      │  roam timer expires               │    all threat lost    │
+ *      ▼                                   ▼                      │
+ *   ┌──────┐                           ┌──────┐                   │
+ *   │ ROAM │ ◄──── arrived/stuck ──────│ IDLE │ ◄─────────────────┘
+ *   └──────┘                           └──────┘
+ *                                         ▲
+ *   ┌───────┐   too far from spawn        │  arrived at spawn
+ *   │ LEASH │ ◄─── (any state) ──────    │
+ *   └───┬───┘   clears threat, heals     │
+ *       └────────────────────────────────┘
+ *
+ * Threat system:
+ *   - Each creature has a per-player threat table
+ *   - Damage dealt → +threat (THREAT_PER_DAMAGE)
+ *   - Proximity (detection range + LOS) → passive tick (THREAT_PROXIMITY_TICK/s)
+ *   - First detection → initial burst (THREAT_PROXIMITY_INITIAL)
+ *   - Out of range → decay (THREAT_DECAY_RATE/s), removed at epsilon
+ *   - Highest-threat alive player becomes the chase/attack target
+ *
+ * Damage timing:
+ *   Attack animation starts → damage scheduled at DAMAGE_DELAY (mid-animation)
+ *   This creates the "wind-up → impact" feel for creature punches.
+ */
 import type { CreatureState } from "../state/CreatureState";
 import type { PlayerState } from "../state/PlayerState";
 import type { Pathfinder, WorldPos } from "../navigation/Pathfinder";
