@@ -1034,6 +1034,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.currentPathIndex = 0;
       player.itemCooldowns.clear();
       this.effectSystem.clearEffects(player);
+      // Remove transient items (e.g. dungeon key) from inventory
+      const transientSlots: string[] = [];
+      player.inventory.forEach((slot, key) => {
+        const def = getItemDef(slot.itemId);
+        if (def?.transient) transientSlots.push(key);
+      });
+      for (const key of transientSlots) player.inventory.delete(key);
       if (spawnPos) {
         player.x = spawnPos.x;
         player.z = spawnPos.z;
