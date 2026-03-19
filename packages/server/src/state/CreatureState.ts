@@ -16,6 +16,7 @@ export class CreatureState extends Schema {
   @type("int16") level: number = 1;
 
   @type("boolean") isMoving: boolean = false;
+  @type("boolean") isWalking: boolean = false;
 
   // Server-only (not synced)
   path: { x: number; z: number }[] = [];

@@ -33,6 +33,7 @@ export class ClientCreature {
   public isDead: boolean = false;
   public isAggro: boolean = false;
   public serverMoving: boolean = false;
+  public serverWalking: boolean = false;
 
   private animController: AnimationController;
   private soundManager: SoundManager | null = null;
@@ -192,12 +193,14 @@ export class ClientCreature {
     animState: string = "",
     isAggro: boolean = false,
     isMoving: boolean = false,
+    isWalking: boolean = false,
   ): void {
     this.targetX = x;
     this.targetZ = z;
     this.targetRotY = rotY;
     this.isAggro = isAggro;
     this.serverMoving = isMoving;
+    this.serverWalking = isWalking;
 
     this.previousHealth = health;
 
@@ -265,7 +268,7 @@ export class ClientCreature {
     // Switch animation based on server movement state (only if not playing one-shot)
     if (!this.animController.isOneShotPlaying) {
       if (this.serverMoving) {
-        this.animController.playLoop("run");
+        this.animController.playLoop(this.serverWalking ? "walk" : "run");
 
         // Spatial footstep sounds
         if (this.soundManager) {

@@ -37,6 +37,19 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     ]),
     scale: 1.0,
   },
+  golem: {
+    filePath: "/models/characters/golem/idle.glb",
+    animNames: ["idle", "run", "punch", "walk", "death", "heavy_punch"],
+    animMap: new Map<AnimName, string>([["idle", "Breathe"]]),
+    animFiles: new Map<AnimName, string>([
+      ["run", "/models/characters/golem/run.glb"],
+      ["walk", "/models/characters/golem/walk.glb"],
+      ["punch", "/models/characters/golem/punch.glb"],
+      ["death", "/models/characters/golem/death.glb"],
+      ["heavy_punch", "/models/characters/golem/heavy_punch.glb"],
+    ]),
+    scale: 1.5,
+  },
 };
 
 const FALLBACK_KEY = "warrior";

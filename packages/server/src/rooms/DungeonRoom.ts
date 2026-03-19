@@ -72,7 +72,11 @@ import {
   getTalentsForClass,
 } from "../talents/TalentRegistry";
 import { executeEffect } from "../items/EffectHandlers";
-import { getCreatureTypesForLevel, getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
+import {
+  getCreatureTypesForLevel,
+  getBossTypesForLevel,
+  getCreatureTypeDef,
+} from "../creatures/CreatureTypeRegistry";
 import {
   ChatVariant,
   DUNGEON_WIDTH,
@@ -1210,13 +1214,48 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   private spawnCreatures(rooms: DungeonRoomDef[], rng: () => number, dungeonLevel: number): void {
     const availableTypes = getCreatureTypesForLevel(dungeonLevel);
-    if (availableTypes.length === 0) return;
+    const bossTypes = getBossTypesForLevel(dungeonLevel);
 
     let creatureId = 0;
+
+    // Pick a boss room: in the last third of rooms (skip room 0 = spawn)
+    let bossRoomIndex = -1;
+    if (bossTypes.length > 0 && rooms.length > 3) {
+      const farStart = Math.max(2, Math.ceil(rooms.length * 0.7));
+      const farEnd = rooms.length; // can be the last room
+      bossRoomIndex = farStart + Math.floor(rng() * (farEnd - farStart));
+    } else if (bossTypes.length > 0 && rooms.length > 1) {
+      // Small dungeon: boss in the last room
+      bossRoomIndex = rooms.length - 1;
+    }
+
     // Skip first room (player spawn)
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      // More creatures per room at higher dungeon levels
+
+      // Boss room: spawn a single boss
+      if (i === bossRoomIndex) {
+        const bossDef = bossTypes[Math.floor(rng() * bossTypes.length)];
+        const baseDerived = computeCreatureDerivedStats(bossDef);
+        const creatureLevel = Math.min(MAX_LEVEL, Math.max(1, dungeonLevel + 2));
+
+        const creature = new CreatureState();
+        creature.x = (room.x + Math.floor(room.w / 2)) * TILE_SIZE;
+        creature.z = (room.y + Math.floor(room.h / 2)) * TILE_SIZE;
+        creature.creatureType = bossDef.id;
+        creature.nameKey = bossDef.name;
+        creature.detectionRange = bossDef.detectionRange;
+        creature.applyStats(baseDerived, creatureLevel);
+
+        const id = `creature_${creatureId++}`;
+        this.allCreatures.set(id, creature);
+        this.state.creatures.set(id, creature);
+        this.aiSystem.register(creature, id, bossDef.leashRange);
+        continue; // No other creatures in boss room
+      }
+
+      // Normal room: spawn regular creatures
+      if (availableTypes.length === 0) continue;
       const minCreatures = 1 + Math.floor(dungeonLevel / 10);
       const creatureCount = minCreatures + Math.floor(rng() * 2);
 

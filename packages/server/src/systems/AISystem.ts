@@ -82,6 +82,10 @@ const ROAM_MAX_ATTEMPTS = 3;
 const ROAM_STUCK_TIMEOUT = 0.5;
 /** Minimum distance² a creature must travel per stuck-check window to not be stuck */
 const ROAM_STUCK_DIST_SQ = 0.1 * 0.1;
+/** Walk speed multiplier when roaming (fraction of full speed) */
+const ROAM_WALK_SPEED = 0.4;
+/** Speed below this threshold → walk animation instead of run */
+const WALK_SPEED_THRESHOLD = 2.5;
 /** Out-of-combat health regen: percentage of maxHealth per second */
 const OOC_REGEN_RATE = 0.2;
 
@@ -380,6 +384,7 @@ export class AISystem {
             entry.creature.path = path;
             entry.creature.currentPathIndex = 0;
             entry.creature.isMoving = true;
+            entry.creature.isWalking = false; // Chase = run (auto-check may override)
           }
         }
 
@@ -490,6 +495,7 @@ export class AISystem {
       entry.creature.path = path;
       entry.creature.currentPathIndex = 0;
       entry.creature.isMoving = true;
+      entry.creature.isWalking = true; // Leash = walk back
     }
 
     // Heal to full on leash
@@ -545,6 +551,7 @@ export class AISystem {
         entry.creature.path = path;
         entry.creature.currentPathIndex = 0;
         entry.creature.isMoving = true;
+        entry.creature.isWalking = true; // Roam = walk
         entry.state = AIState.ROAM;
         entry.roamStuckTimer = 0;
         entry.roamLastX = entry.creature.x;
@@ -580,7 +587,10 @@ export class AISystem {
 
     const ndx = dx / dist;
     const ndz = dz / dist;
-    const step = Math.min(creature.speed * dt, dist);
+    const effectiveSpeed = creature.isWalking ? creature.speed * ROAM_WALK_SPEED : creature.speed;
+    // Auto-walk if effective speed is below threshold (slow creatures look better walking)
+    if (effectiveSpeed <= WALK_SPEED_THRESHOLD) creature.isWalking = true;
+    const step = Math.min(effectiveSpeed * dt, dist);
 
     creature.x += ndx * step;
     creature.z += ndz * step;

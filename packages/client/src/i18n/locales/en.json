@@ -210,13 +210,16 @@
     }
   },
   "creatures": {
-    "zombie": "Zombie"
+    "zombie": "Zombie",
+    "golem": "Stone Golem"
   },
   "skills": {
     "basicAttack": "Basic Attack",
     "basicAttackDesc": "Automatically attacks the nearest enemy",
     "heavyStrike": "Heavy Strike",
     "heavyStrikeDesc": "A powerful blow that deals {{multiplier}}× damage",
+    "golemSlam": "Golem Slam",
+    "golemSlamDesc": "A devastating ground slam",
     "passive": "Passive",
     "disabled": "Disabled",
     "locked": "Locked",

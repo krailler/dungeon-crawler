@@ -162,6 +162,7 @@ export const creatures = worldSchema.table("creatures", {
   skin: text("skin").notNull(),
   minLevel: integer("min_level").notNull().default(1),
   maxLevel: integer("max_level").notNull().default(0),
+  isBoss: boolean("is_boss").notNull().default(false),
 });
 
 export const creatureSkills = worldSchema.table("creature_skills", {

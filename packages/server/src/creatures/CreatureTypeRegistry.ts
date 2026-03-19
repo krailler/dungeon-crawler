@@ -61,6 +61,7 @@ const registry = createRegistry<CreatureRow, CreatureTypeDefinition>({
       skin: row.skin,
       minLevel: row.minLevel,
       maxLevel: row.maxLevel,
+      isBoss: row.isBoss,
     };
   },
   hashDef: (def) => simpleHash(JSON.stringify(def)),
@@ -122,6 +123,18 @@ export const getCreatureTypeRegistryVersion = registry.getVersion;
 export function getCreatureTypesForLevel(level: number): CreatureTypeDefinition[] {
   const result: CreatureTypeDefinition[] = [];
   for (const def of registry.getAll()) {
+    if (def.isBoss) continue; // Bosses are placed separately
+    if (level >= def.minLevel && (def.maxLevel === 0 || level <= def.maxLevel)) {
+      result.push(def);
+    }
+  }
+  return result;
+}
+
+export function getBossTypesForLevel(level: number): CreatureTypeDefinition[] {
+  const result: CreatureTypeDefinition[] = [];
+  for (const def of registry.getAll()) {
+    if (!def.isBoss) continue;
     if (level >= def.minLevel && (def.maxLevel === 0 || level <= def.maxLevel)) {
       result.push(def);
     }

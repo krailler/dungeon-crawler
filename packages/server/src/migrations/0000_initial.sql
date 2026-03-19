@@ -115,7 +115,8 @@ CREATE TABLE "world"."creatures" (
   "leash_range" real NOT NULL DEFAULT 20,
   "skin" text NOT NULL,
   "min_level" integer NOT NULL DEFAULT 1,
-  "max_level" integer NOT NULL DEFAULT 0
+  "max_level" integer NOT NULL DEFAULT 0,
+  "is_boss" boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE "world"."creature_loot" (
@@ -230,7 +231,8 @@ VALUES ('health_potion', 'items.healthPotion', 'items.healthPotionDesc', 'potion
 -- Skills
 INSERT INTO "world"."skills" ("id", "name", "description", "icon", "passive", "cooldown", "damage_multiplier", "anim_state") VALUES
   ('basic_attack', 'skills.basicAttack', 'skills.basicAttackDesc', 'sword', true,  0, 1, 'punch'),
-  ('heavy_strike', 'skills.heavyStrike', 'skills.heavyStrikeDesc', 'fist',  false, 5, 2.5, 'heavy_punch');
+  ('heavy_strike', 'skills.heavyStrike', 'skills.heavyStrikeDesc', 'fist',  false, 5, 2.5, 'heavy_punch'),
+  ('golem_slam', 'skills.golemSlam', 'skills.golemSlamDesc', 'fist', true, 0, 1.5, 'punch');
 
 -- Creatures
 INSERT INTO "world"."creatures" (
@@ -245,9 +247,23 @@ INSERT INTO "world"."creatures" (
   'zombie', 1, 0
 );
 
+INSERT INTO "world"."creatures" (
+  "id", "name", "strength", "vitality", "agility",
+  "override_max_health", "override_move_speed", "override_attack_cooldown",
+  "detection_range", "attack_range", "leash_range",
+  "skin", "min_level", "max_level", "is_boss"
+) VALUES (
+  'golem', 'creatures.golem', 8, 10, 3,
+  100, 2.0, 2.5,
+  15, 3.0, 50,
+  'golem', 1, 0, true
+);
+
 -- Creature loot
 INSERT INTO "world"."creature_loot" ("creature_id", "item_id", "drop_chance", "min_quantity", "max_quantity")
-VALUES ('zombie', 'health_potion', 0.8, 1, 1);
+VALUES
+  ('zombie', 'health_potion', 0.8, 1, 1),
+  ('golem', 'health_potion', 1.0, 2, 3);
 
 -- Effects
 INSERT INTO "world"."effects" ("id", "name", "description", "icon", "duration", "max_stacks", "stack_behavior", "is_debuff", "stat_modifiers", "tick_effect", "scaling")
@@ -267,7 +283,9 @@ VALUES
 
 -- Creature skills
 INSERT INTO "world"."creature_skills" ("creature_id", "skill_id", "is_default")
-VALUES ('zombie', 'basic_attack', true);
+VALUES
+  ('zombie', 'basic_attack', true),
+  ('golem', 'golem_slam', true);
 
 -- Classes
 INSERT INTO "world"."classes" ("id", "name", "description", "icon", "hp_base", "hp_per_vit", "attack_base", "attack_per_str", "defense_base", "defense_per_vit", "speed_base", "speed_per_agi", "cooldown_base", "cooldown_per_agi", "attack_range")

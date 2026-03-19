@@ -210,13 +210,16 @@
     }
   },
   "creatures": {
-    "zombie": "Zombi"
+    "zombie": "Zombi",
+    "golem": "Gólem de Piedra"
   },
   "skills": {
     "basicAttack": "Ataque Básico",
     "basicAttackDesc": "Ataca automáticamente al enemigo más cercano",
     "heavyStrike": "Golpe Pesado",
     "heavyStrikeDesc": "Un golpe poderoso que inflige {{multiplier}}× de daño",
+    "golemSlam": "Golpe del Gólem",
+    "golemSlamDesc": "Un devastador golpe contra el suelo",
     "passive": "Pasiva",
     "disabled": "Desactivada",
     "locked": "Bloqueada",

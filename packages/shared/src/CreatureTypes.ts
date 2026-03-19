@@ -19,6 +19,8 @@ export interface CreatureTypeDefinition {
   minLevel: number;
   /** Maximum dungeon level (inclusive). 0 = no upper limit */
   maxLevel: number;
+  /** Boss creatures spawn alone in a dedicated room */
+  isBoss: boolean;
 }
 
 // ── Creature loot entry ─────────────────────────────────────────────────────

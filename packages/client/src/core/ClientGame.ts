@@ -208,7 +208,7 @@ export class ClientGame {
     try {
       // Pre-load character models + audio while connecting (with progress)
       const tasks = [
-        () => this.loaderRegistry.preload(["warrior", "zombie"]),
+        () => this.loaderRegistry.preload(["warrior", "zombie", "golem"]),
         () => this.propRegistry.preloadAll(),
         () => this.soundManager.load(),
       ];

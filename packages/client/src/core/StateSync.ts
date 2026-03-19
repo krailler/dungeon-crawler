@@ -730,6 +730,7 @@ export class StateSync {
           creature.animState,
           creature.isAggro,
           creature.isMoving,
+          creature.isWalking,
         );
         // Attach creature GLB model (use creatureType to pick the right model)
         const cType = (creature.creatureType as string) || "zombie";
@@ -764,6 +765,7 @@ export class StateSync {
             creature.animState,
             creature.isAggro,
             creature.isMoving,
+            creature.isWalking,
           );
           // Update creature store
           creatureStore.update(id, {
