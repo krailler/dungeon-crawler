@@ -183,6 +183,17 @@ body {
   .animate-low-hp {
     animation: low-hp-pulse 1.6s ease-in-out infinite;
   }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(148, 163, 184, 0.15) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.2s ease-in-out infinite;
+  }
 }
 
 @keyframes feedback-float {
@@ -196,6 +207,15 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-20px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

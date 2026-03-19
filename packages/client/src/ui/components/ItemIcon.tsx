@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 const ICON_PATH = "/textures/icons/";
@@ -9,12 +10,25 @@ export const ItemIcon = ({
 }: {
   iconId: string;
   className?: string;
-}): ReactNode => (
-  <img
-    src={`${ICON_PATH}${iconId}.png`}
-    alt=""
-    className={className ?? "h-7 w-7"}
-    draggable={false}
-    style={{ imageRendering: "auto" }}
-  />
-);
+}): ReactNode => {
+  const [loaded, setLoaded] = useState(false);
+  const cls = className ?? "h-7 w-7";
+
+  return (
+    <div className={`relative ${cls}`}>
+      {!loaded && (
+        <div className={`absolute inset-0 overflow-hidden rounded ${cls}`}>
+          <div className="absolute inset-0 bg-slate-700/50 animate-shimmer" />
+        </div>
+      )}
+      <img
+        src={`${ICON_PATH}${iconId}.png`}
+        alt=""
+        className={`${cls} ${loaded ? "opacity-100" : "opacity-0"} transition-opacity duration-150`}
+        draggable={false}
+        style={{ imageRendering: "auto" }}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
+};
