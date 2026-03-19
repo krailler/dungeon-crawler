@@ -54,6 +54,7 @@ import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
+import { levelUpStore } from "../ui/stores/levelUpStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { skillDefStore } from "../ui/stores/skillDefStore";
 import { effectDefStore } from "../ui/stores/effectDefStore";
@@ -618,10 +619,10 @@ export class StateSync {
           }
           prevHealth = player.health;
 
-          // Level-up: sound (local only) + particle aura (all players)
+          // Level-up: UI overlay (local only) + particle aura (all players)
           if (player.level > prevLevel) {
             if (isLocal) {
-              this.deps.soundManager.playSfx("level_up");
+              levelUpStore.show(player.level);
             }
             clientPlayer.playLevelUpEffect();
           }

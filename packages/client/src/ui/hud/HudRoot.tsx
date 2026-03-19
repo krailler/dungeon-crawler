@@ -26,6 +26,7 @@ import { BuffBar } from "./BuffBar";
 import { LootBagPanel } from "./LootBagPanel";
 import { DeathOverlay } from "./DeathOverlay";
 import { LowHealthVignette } from "./LowHealthVignette";
+import { LevelUpOverlay } from "./LevelUpOverlay";
 import { TargetFrame } from "./TargetFrame";
 import { targetStore } from "../stores/targetStore";
 import { HudButton } from "../components/HudButton";
@@ -310,6 +311,7 @@ export const HudRoot = (): ReactNode => {
       {talentOpen && <TalentPanel onClose={closeTalent} />}
       <LootBagPanel />
       <LowHealthVignette />
+      <LevelUpOverlay />
       <DeathOverlay />
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">

@@ -145,7 +145,8 @@
     "pingEmpty": "-- ms",
     "fps": "{{value}} FPS",
     "fpsEmpty": "-- FPS",
-    "map": "Mapa"
+    "map": "Mapa",
+    "levelUp": "¡Subida de Nivel!"
   },
   "chat": {
     "placeholder": "Escribe un mensaje o /comando...",
