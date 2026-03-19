@@ -146,11 +146,18 @@
 
 ### Skills System
 
-- **Definitions**: `Skills.ts` defines `SkillDef` type with id, icon, cooldown, damageMultiplier
-- **Current skills**: basic_attack (passive auto-attack, no cooldown), heavy_strike (active, 5s cooldown, 2.5x damage multiplier)
+- **Definitions**: `Skills.ts` defines `SkillDef` type with id, icon, cooldown, damageMultiplier, hpThreshold, resetOnKill, effectId, aoeRange
+- **DB-driven**: skills loaded from `world.skills`, class→skill mappings from `world.class_skills` (with `unlock_level`), creature→skill from `world.creature_skills`
+- **Three skill paths** in CombatSystem.useSkill():
+  - **Buff**: effectId + damageMultiplier ≤ 0 → self-buff, no enemy target needed (e.g. War Cry)
+  - **AoE**: aoeRange > 0 + damageMultiplier > 0 → area damage around player (e.g. Ground Slam)
+  - **Single-target**: default → requires enemy target in range (e.g. Heavy Strike, Execute)
+- **Conditional mechanics**: `hpThreshold` (target must be below X% HP to use), `resetOnKill` (cooldown resets if target dies from hit)
+- **Level-gated unlock**: `class_skills.unlock_level` column, `syncAndNotifySkills()` in ClassRegistry grants skills at correct level + sends i18n chat notification
+- **Current warrior skills**: basic_attack (passive, punch), heavy_strike (5s CD, 2.5x, heavy_punch), execute (10s CD, 4x, <30% HP, resetOnKill, heavy_punch), war_cry (25s CD, buff effectId=war_cry_buff, heavy_punch), ground_slam (12s CD, 1.5x, AoE 4.0, effectId=dazed, heavy_punch)
 - **Client**: `SkillBar` with hotkeys 1-5, cooldown ring overlay on `ActionSlot` component
-- **Server**: `CombatSystem` applies skill cooldowns and damage multipliers; `PlayerSecretState.skills` array synced to client
-- **Extensible**: MAX_SKILL_SLOTS = 5, new skills can be added to SKILL_DEFS
+- **Server**: `CombatSystem` applies skill cooldowns and damage multipliers; `PlayerSecretState.skills` array synced to client; `getSkillFailureReason()` returns i18n feedback key
+- **Extensible**: MAX_SKILL_SLOTS = 5, new skills added to DB
 
 ### Spatial Audio
 
@@ -165,17 +172,18 @@
 ### Effects System (Buffs & Debuffs)
 
 - **Data-driven**: effect definitions stored in `world.effects` DB table, loaded at startup by `EffectRegistry` (uses `createRegistry` factory)
-- **Creature effect triggers**: `world.creature_effects` table maps creature types to effects with trigger type (on_hit), chance (0-1), and stacks
+- **Creature effect triggers**: `world.creature_effects` table maps creature types to effects with trigger type (on_hit, on_hit_behind), chance (0-1), stacks, level gating (minLevel/maxLevel), and chance scaling (maxChance)
 - **EffectDef type**: id, name (i18n key), description (i18n key with `{{value}}` interpolation), icon, duration, maxStacks, stackBehavior, isDebuff, statModifiers, tickEffect
 - **Stat modifiers**: `Record<string, StatModifier>` where StatModifier = `{type: "flat"|"percent", value: number}`. Applied as `(base + flatSum) * (1 + percentSum)`
 - **Stack behaviors**: `StackBehavior.REFRESH` resets timer only; `StackBehavior.INTENSITY` adds stacks (up to maxStacks) and multiplies modifier values
 - **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, remove expired), `recomputeStats()` (apply all active modifiers to derived stats), `clearEffects()`, `removeEffect()`
-- **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks) stored in `MapSchema<ActiveEffectState>` on `PlayerState` (public, visible to all)
+- **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks, modValue) stored in `MapSchema<ActiveEffectState>` on both `PlayerState` and `CreatureState` (public, visible to all)
 - **Lifecycle**: effects cleared on downed, respawn, and revive (via `clearEffects()` in GameLoop)
 - **Client**: `effectDefStore` (lazy-loaded via `createDefStore`, batched requests, version-based cache invalidation)
-- **Client UI**: `BuffBar` (positioned below player center, normal-size EffectIcons with timers), `TargetFrame` (small EffectIcons below frame), `EffectIcon` (reusable component with timer sweep overlay, stacks badge, styled tooltip with name + description + remaining time)
+- **Creature effects**: `GameLoop.applyCreatureEffect()` creates/refreshes ActiveEffectState on creature's MapSchema (simplified, no stacking/scaling), `tickCreatureEffects()` ticks timers and removes expired, `recomputeCreatureSpeed()` applies moveSpeed percent modifiers. Creature effects cleared on death.
+- **Client UI**: `BuffBar` (positioned below player center, normal-size EffectIcons with timers), `TargetFrame` (small EffectIcons below frame for both players and creatures), `EffectIcon` (reusable component with timer sweep overlay, stacks badge, styled tooltip with name + description + remaining time)
 - **Protocol**: `EFFECT_DEFS_REQUEST` / `EFFECT_DEFS_RESPONSE` messages (same pattern as items/skills)
-- **Current effects**: Weakness (zombie on_hit 30% chance, -25% attackDamage percent modifier, 5s duration, refresh stacking)
+- **Current effects**: Weakness (zombie on_hit 30%, -25% attack, 5s, refresh), Hamstring (zombie on_hit_behind 50%, -35% speed, 3s, refresh), War Cry buff (+25% attack, 10s, self-buff via skill), Dazed (ground_slam AoE, -40% speed, 3s, applied to creatures)
 - **DB validation**: EffectRegistry validates `stackBehavior` values from DB, falls back to REFRESH for invalid entries
 - **Registry hash**: includes duration, maxStacks, statModifiers (JSON), isDebuff, and stackBehavior for full version detection
 - **Shared**: `Effects.ts` (EffectDef, StatModifier, StackBehavior, StatModType, TickEffect types)
@@ -183,7 +191,7 @@
 
 ### Tutorial System
 
-- **Steps**: `TutorialStep` = "start_dungeon" | "allocate_stats" | "sprint" | "you_downed" | "teammate_downed"
+- **Steps**: `TutorialStep` = "start_dungeon" | "allocate_stats" | "sprint" | "you_downed" | "teammate_downed" | "first_debuff" | "allocate_talents"
 - **Server-driven**: server sends `TUTORIAL_HINT` messages contextually (e.g. on gate open, level-up, death)
 - **Tracking**: `PlayerState.tutorials` (server-only Set) tracks completed steps; persisted in DB save hash
 - **Client**: `tutorialStore` uses LIFO stack — multiple hints queue up instead of replacing each other
@@ -250,11 +258,11 @@
 - `Economy.ts` — `computeGoldDrop(creatureLevel, avgPartyLevel, aliveCount)` with anti-farming modifiers
 - `Leveling.ts` — `xpToNextLevel(level)`, `computeXpDrop(creatureLevel, playerLevel)` with level diff modifier
 - `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight)
-- `Skills.ts` — `SkillDef` type, `SKILL_DEFS` (basic_attack passive, heavy_strike 5s cooldown 2.5x), `MAX_SKILL_SLOTS`
-- `Effects.ts` — `EffectDef`, `StatModifier`, `StackBehavior`, `StatModType`, `TickEffect` types for buff/debuff system
+- `Skills.ts` — `SkillDef` type (id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange), `MAX_SKILL_SLOTS`, `DEFAULT_SKILL_IDS`
+- `Effects.ts` — `EffectDef`, `EffectDefClient`, `StatModifier`, `StackBehavior`, `StatModType`, `TickEffect`, `EffectScaling`, `CreatureEffectTrigger` types + `lerpEffectValue()`, `computeScalingFactor()`, `toEffectDefClient()` for buff/debuff system
 - `Roles.ts` — `Role` type ("admin", "user")
 - `GateTypes.ts` — `GateType` ("lobby")
-- `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed)
+- `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents)
 - `RoomNames.ts` — `generateRoomName(seed)` — procedural dungeon names (adjective + noun, mulberry32 RNG)
 - `constants/economy.ts` — Economy + XP tuning constants (BASE_GOLD_PER_KILL, BASE_XP_PER_KILL, XP_CURVE_BASE, MAX_LEVEL, CREATURE_STAT_SCALE_PER_LEVEL, save interval)
 - `constants/items.ts` — Item balance constants (INVENTORY_MAX_SLOTS, POTION_DROP_CHANCE)
@@ -276,37 +284,40 @@
 
 ### Server (`packages/server/src/`)
 
-- `main.ts` — Colyseus Server entry, defines "dungeon" room, loads ItemRegistry + SkillRegistry + EffectRegistry + CreatureTypeRegistry at startup
+- `main.ts` — Colyseus Server entry, defines "dungeon" room, loads registries at startup (items → skills → effects → creatures → classes → talents)
 - `logger.ts` — Pino-based structured logging (pretty in dev, JSON in prod), room-scoped child loggers
 - `auth/authConfig.ts` — JWT authentication setup, email/password registration (dev-only), auto-creates character
 - `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save, reconnection with session migration + countdown warnings, gate system, party kick, ITEM_USE/ITEM_DEFS_REQUEST/SKILL_USE handlers, AOI culling
 - `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle (300s window), session migration, `savePlayerProgress()` (stats + inventory upsert), `loadInventory()`, leader reassignment, tutorial hint sending
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
-- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /leader, /setlevel, /kick, /give, /reset-tutorials
+- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /reset-tutorials, /resettalents
 - `chat/notifyLevelProgress.ts` — Level-up notification: public announcement + private stat-point message + tutorial hints
 - `items/ItemRegistry.ts` — Loads item definitions from DB at startup, provides `getItemDef()`, `getDroppableItems()`, versioned cache
 - `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP)
 - `effects/EffectRegistry.ts` — Loads effect definitions from DB using `createRegistry` factory, with stackBehavior validation and comprehensive hash for version detection
-- `creatures/CreatureTypeRegistry.ts` — Loads creature types + loot tables + effect triggers from DB, level-based filtering, loot/effect entry lookups
+- `skills/SkillRegistry.ts` — Loads skill definitions from DB using `createRegistry` factory, provides `getSkillDef()`, versioned cache
+- `classes/ClassRegistry.ts` — Loads class definitions + class→skill mappings from DB, `getClassDefaultSkill()`, `getSkillsForLevel()`, `syncAndNotifySkills()` (grants level-gated skills + sends i18n chat notifications)
+- `talents/TalentRegistry.ts` — Loads talent definitions + effects from DB, `collectTalentSkillMods()` for cooldown/damage modifiers, `collectTalentStatMods()` for stat bonuses
+- `creatures/CreatureTypeRegistry.ts` — Loads creature types + loot tables + effect triggers + skills from DB, level-based filtering, loot/effect/skill entry lookups
 - `state/DungeonState.ts` — Root Schema state (MapSchema players/creatures/gates/lootBags, tileMapData, tickRate, dungeonLevel, dungeonVersion, serverRuntime)
 - `state/PlayerState.ts` — Player Schema (position, health, animation, lifeState, bleed/respawn/revive timers, level, sprint) + server-only (path, combat data, characterId, itemCooldowns, tutorials) + `addXp()`, `setLevel()`, `applyDerivedStats()`, `addItem()`, `removeItem()`, `countItem()`
 - `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: base/derived stats, gold, xp, skills, stamina, inventory (MapSchema\<InventorySlotState\>), role, auto-attack toggle
 - `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16)
-- `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level, animation, aggro) + server-only AI/combat data
+- `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level, animation, aggro, isMoving, isWalking, MapSchema effects) + server-only (path, baseSpeed, speed, AI/combat data)
 - `state/GateState.ts` — Gate Schema (position, type, N/S vs E/W orientation, open state)
 - `state/LootBagState.ts` — Loot bag Schema (position, MapSchema\<InventorySlotState\>)
-- `state/ActiveEffectState.ts` — Active effect Schema class (effectId, remaining, duration, stacks) synced via MapSchema on PlayerState
+- `state/ActiveEffectState.ts` — Active effect Schema class (effectId, remaining, duration, stacks, modValue) synced via MapSchema on PlayerState and CreatureState
 - `systems/EffectSystem.ts` — Buff/debuff system: apply/refresh/stack effects, tick timers, recompute derived stats with flat+percent modifiers, clear on death/respawn
-- `systems/GameLoop.ts` — 32-tick simulation: movement, sprint/stamina, effect ticking, item drops on kill, item cooldown ticking, life state transitions (ALIVE→DOWNED→DEAD→respawn), revive channel management, loot bag creation, creature effect application on hit, entity collision, wall margin enforcement
+- `systems/GameLoop.ts` — 32-tick simulation: movement, sprint/stamina, player effect ticking (via EffectSystem), creature effect ticking (tickCreatureEffects + recomputeCreatureSpeed), item drops on kill, item cooldown ticking, life state transitions (ALIVE→DOWNED→DEAD→respawn), revive channel management, loot bag creation, creature effect application on hit (applyCreatureEffects with level-scaled chance), creature effect application from skills (applyCreatureEffect), level-up skill unlock (syncAndNotifySkills), entity collision, wall margin enforcement
 - `systems/AISystem.ts` — Creature AI: IDLE/CHASE/ATTACK/LEASH/ROAM, multi-player targeting (threat table with decay), A\* repath, proximity threat, stuck detection, leash range
-- `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, skill cooldown application, damage multipliers, closest creature targeting, combat event callbacks
+- `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, three skill paths (buff/AoE/single-target), HP threshold gating, resetOnKill, talent skill modifiers, facing check with throttled feedback, combat event callbacks, `getSkillFailureReason()` for i18n feedback
 - `systems/GateSystem.ts` — Gate interaction: lobby gate countdown with warning broadcasts, pathfinder tile blocking/unblocking, post-gate tutorial hints
 - `tutorials/resetTutorials.ts` — Clear and resend applicable tutorial hints (used by /reset-tutorials command)
 - `dungeon/DungeonGenerator.ts` — Procedural dungeon (BSP, no Babylon deps)
 - `navigation/Pathfinder.ts` — A\* on TileMap (8-directional, diagonal wall check, line-of-sight via Bresenham, tile blocking for gates)
 - `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
-- `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory), `world` schema (items, creatures, creature_loot, skills, effects, creature_effects)
+- `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory, character_talents, character_skills), `world` schema (items, skills, creatures, creature_skills, creature_loot, effects, creature_effects, classes, class_skills, talents, talent_effects)
 - `db/database.ts` — PostgreSQL connection pool (max 10) + auto-migration
 - `db/seed.ts` — Seed data: health_potion item definition
 
@@ -314,7 +325,7 @@
 
 - `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame, auth state watcher
 - `core/ClientGame.ts` — Colyseus client, render loop, reconnection, combat log, chat, debug paths, itemDefStore connect, audio listener on camera target, throttled render on blur
-- `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect, inventory sync, life state), creatures (level), loot bags, minimap sync, item def preloading, gate/target changes
+- `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect, inventory sync, life state, effects), creatures (level, effects with throttled sync at 10Hz), loot bags, minimap sync, item/effect def preloading, gate/target changes
 - `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms), entity picking via raycast, generic interactable system (gates, loot bags), revive keybind (R), sprint (Shift), Tab target cycling
 - `core/ClientUpdateLoop.ts` — Frame-by-frame entity interpolation (lerp position/rotation) + animation updates + fog of war updates
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15, smooth follow
@@ -346,7 +357,7 @@
 - `ui/stores/gateStore.ts` — Gate state: positions, open state, nearest interactable
 - `ui/stores/promptStore.ts` — Confirmation prompt state
 - `ui/stores/announcementStore.ts` — Center-screen announcement overlay
-- `ui/stores/creatureStore.ts` — All visible creature state tracking
+- `ui/stores/creatureStore.ts` — All visible creature state tracking (position, health, level, animation, effects)
 - `ui/stores/targetStore.ts` — Currently selected target entity (creature/player)
 - `ui/stores/deathStore.ts` — Life state (ALIVE/DOWNED/DEAD), bleed/respawn timers, revive progress
 - `ui/stores/lootBagStore.ts` — Open loot bag ID, slot contents (item/quantity)
@@ -362,7 +373,7 @@
 - `ui/hud/ConsumableSlots.tsx` — Quick consumable slot (Q hotkey), first consumable from inventory
 - `ui/hud/InventoryPanel.tsx` — 4x3 inventory grid (B hotkey) with item tooltips, click-to-use (uses HudPanel + ActionSlot)
 - `ui/hud/BuffBar.tsx` — Active effects display below player center (normal-size EffectIcons with timers)
-- `ui/hud/TargetFrame.tsx` — Selected target health/stats + revive button for downed allies + effect icons below frame
+- `ui/hud/TargetFrame.tsx` — Selected target health/stats + revive button for downed allies + effect icons below frame (for both players and creatures)
 - `ui/hud/DeathOverlay.tsx` — Death/downed screen with bleed/respawn timer + revive progress bar
 - `ui/hud/LootBagPanel.tsx` — Floating loot bag grid (4 columns) with take-all functionality
 - `ui/hud/ActionFeedback.tsx` — Floating error messages (red, bottom-center, auto-dismiss)
@@ -384,6 +395,6 @@
 - `ui/components/healthColor.ts` — Health bar color utility (green → red gradient)
 - `ui/components/lifeState.ts` — Life state CSS class mapping (alive/downed/dead)
 - `ui/hooks/useDraggable.ts` — Draggable panel handle logic
-- `ui/icons/` — SVG icon components (CharacterIcon, MapIcon, StarIcon, CoinIcon, PotionIcon, BackpackIcon, SwordIcon, FistIcon, FullscreenIcon, LockIcon, WeaknessIcon)
+- `ui/icons/` — SVG icon components (CharacterIcon, MapIcon, StarIcon, CoinIcon, BackpackIcon, FullscreenIcon, LockIcon, WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon)
 - `ui/screens/LoginScreen.tsx` — Login form + dev quick-login
 - `ui/screens/LoadingScreen.tsx` — Loading progress bar

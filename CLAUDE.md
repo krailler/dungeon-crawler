@@ -44,7 +44,7 @@ packages/
       Economy.ts      # computeGoldDrop(), computeLevelModifier() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
       Items.ts        # ItemDef, ItemRarity, InventorySlot types
-      Skills.ts       # SkillDef type
+      Skills.ts       # SkillDef type (hpThreshold, resetOnKill, effectId, aoeRange)
       Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType, CreatureEffectTrigger
       Classes.ts      # ClassDef, ClassDefClient types
       Talents.ts      # TalentDef type
@@ -89,7 +89,7 @@ packages/
         hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay)
         components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
         hooks/        # useDraggable
-        icons/        # SVG icon components (CharacterIcon, MapIcon, BackpackIcon, WeaknessIcon, HamstringIcon, LockIcon, etc.)
+        icons/        # SVG icon components (CharacterIcon, MapIcon, BackpackIcon, WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon, LockIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
       main.ts         # Client entry point
     public/
@@ -233,10 +233,14 @@ packages/
 
 ### Skills
 
-- Skills defined in DB (`world.skills`): id, name, icon, passive, cooldown, damageMultiplier, animState
-- Class skills in DB (`world.class_skills`): maps classes to skills with `is_default` flag
+- Skills defined in DB (`world.skills`): id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange
+- Class skills in DB (`world.class_skills`): maps classes to skills with `is_default` flag and `unlock_level` (level-gated unlock)
 - Creature skills in DB (`world.creature_skills`): maps creatures to skills with `is_default` flag
-- Current skills: basic_attack (passive, punch anim), heavy_strike (active, 5s CD, 2.5x dmg, heavy_punch anim), golem_slam (passive, punch anim, 1.5x dmg)
+- Three skill paths in CombatSystem: buff (effectId + no damage → self-buff), AoE (aoeRange > 0 → area damage), single-target (default → needs enemy target)
+- Conditional mechanics: `hpThreshold` (target must be below X% HP), `resetOnKill` (cooldown resets if target dies)
+- Level-gated unlock: `ClassRegistry.syncAndNotifySkills()` grants skills at the correct level, sends i18n chat notification
+- Current warrior skills: basic_attack (passive), heavy_strike (5s CD, 2.5x), execute (10s CD, 4x, <30% HP, resetOnKill), war_cry (25s CD, self-buff), ground_slam (12s CD, 1.5x, AoE 4.0, applies dazed)
+- Current creature skills: golem_slam (passive, 1.5x dmg)
 - SkillBar with 1-5 hotkeys, cooldown overlay via ActionSlot component
 - Icons: PNG images via ItemIcon component
 
@@ -259,11 +263,12 @@ packages/
 ### Effects (Buffs & Debuffs)
 
 - Data-driven: effect definitions in DB (`world.effects`), loaded by EffectRegistry at startup
-- Creature effect triggers in DB (`world.creature_effects`): on_hit, on_hit_behind
-- Current effects: Weakness (zombie on_hit, -25% attack, 5s), Hamstring (zombie on_hit_behind, -35% speed, 3s)
-- Server: EffectSystem ticks timers, recomputes derived stats with modifiers
-- Client: effectDefStore (lazy-loaded), BuffBar, EffectIcon with tooltip
-- Effects cleared on death, respawn, revive, and dungeon restart
+- Creature effect triggers in DB (`world.creature_effects`): on_hit, on_hit_behind with level-scaled chance
+- **Player effects**: EffectSystem ticks timers, recomputes derived stats with modifiers, cleared on death/respawn/revive
+- **Creature effects**: GameLoop.tickCreatureEffects() ticks timers, recomputeCreatureSpeed() applies speed modifiers; GameLoop.applyCreatureEffect() creates/refreshes effects (simplified, no stacking/scaling)
+- CreatureState has `MapSchema<ActiveEffectState>` for synced creature debuffs (visible in TargetFrame)
+- Current effects: Weakness (zombie on_hit, -25% attack, 5s), Hamstring (zombie on_hit_behind, -35% speed, 3s), War Cry buff (+25% attack, 10s), Dazed (ground_slam AoE, -40% speed, 3s)
+- Client: effectDefStore (lazy-loaded), BuffBar (player), EffectIcon with tooltip, TargetFrame shows effects for both players and creatures
 
 ### Graphics Settings
 

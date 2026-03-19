@@ -17,10 +17,12 @@
  *   1. Prefer player's manually-selected target (click/tab) if alive + in range
  *   2. Fallback: closest alive creature within attackRange
  *
- * Active skills (useSkill):
- *   - Validates: alive, has skill, not on cooldown, target in range
- *   - Applies damage multiplier (e.g. heavy_strike = 2.5x)
- *   - Resets auto-attack cooldown (so skill doesn't "waste" next auto)
+ * Active skills (useSkill) — three paths:
+ *   1. Buff: effectId + no damage → self-buff, no enemy target needed
+ *   2. AoE: aoeRange > 0 → area damage (applied in DungeonRoom handler)
+ *   3. Single-target: needs enemy target, optional hpThreshold check
+ *   - Applies talent modifiers (cooldownMul, damageMul)
+ *   - resetOnKill: cooldown deleted if target dies from hit
  *   - Returns SkillCooldownEvent for client feedback
  *
  * Damage timing (same as AISystem):

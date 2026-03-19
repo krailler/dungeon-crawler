@@ -47,7 +47,7 @@ The `distSq()` function was added to `@dungeon/shared/math.ts` but is not yet us
 
 **Status:** Partially done — `ItemIcon` component now renders PNGs from `/textures/icons/`. SVG icon maps fully removed from SkillBar, InventoryPanel, LootBagPanel, ConsumableSlots. TalentPanel also uses ItemIcon.
 
-Remaining: ensure no orphan SVG icon files (some like WeaknessIcon, HamstringIcon, LockIcon still used by EffectIcon).
+Remaining: EffectIcon still uses SVG icons for effects (WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon). LockIcon used in TalentPanel. Consider whether these should also migrate to PNGs.
 
 ## Delay AoE damage to match animation
 

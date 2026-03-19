@@ -3,19 +3,20 @@
  *
  * Tick order (each call to update()):
  *
- *   ┌─────────────────────────────────────────────────────────────┐
- *   │ 1. Tick rate metrics                                       │
- *   │ 2. updateStamina()           drain/regen sprint stamina    │
- *   │ 3. tickItemCooldowns()       count down item use cooldowns │
- *   │ 4. effectSystem.update()     tick buff/debuff timers       │
- *   │ 5. updateLifeStates()        downed→dead→respawn, revive  │
- *   │ 6. moveEntity()              advance players along paths   │
- *   │ 7. aiSystem.update()         creature AI + creature→player │
- *   │ 8. combatSystem.update()     player auto-attack→creature   │
- *   │ 9. resolveEntityCollisions() push overlapping entities     │
- *   │ 10. enforceWallMargin()      slide entities off walls      │
- *   │ 11. sendDebugPaths()         admin path visualization      │
- *   └─────────────────────────────────────────────────────────────┘
+ *   ┌──────────────────────────────────────────────────────────────┐
+ *   │ 1. Tick rate metrics                                        │
+ *   │ 2. updateStamina()            drain/regen sprint stamina    │
+ *   │ 3. tickItemCooldowns()        count down item use cooldowns │
+ *   │ 4. effectSystem.update()      tick player buff/debuff timers│
+ *   │ 5. tickCreatureEffects()      tick creature effect timers   │
+ *   │ 6. updateLifeStates()         downed→dead→respawn, revive  │
+ *   │ 7. moveEntity()               advance players along paths  │
+ *   │ 8. aiSystem.update()          creature AI + creature→player│
+ *   │ 9. combatSystem.update()      player auto-attack→creature  │
+ *   │ 10. resolveEntityCollisions() push overlapping entities    │
+ *   │ 11. enforceWallMargin()       slide entities off walls     │
+ *   │ 12. sendDebugPaths()          admin path visualization     │
+ *   └──────────────────────────────────────────────────────────────┘
  *
  * Bridge pattern:
  *   GameLoop does NOT hold direct references to DungeonRoom or subsystems.
