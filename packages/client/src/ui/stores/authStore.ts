@@ -5,9 +5,12 @@ const AUTH_TOKEN_KEY = "authToken";
 // Connect directly to the game server.
 // In production, this would be the same origin; in dev, we bypass Vite proxy
 // so the SDK's WebSocket connects directly to the Colyseus port.
-const SERVER_URL = import.meta.env.DEV
-  ? "http://localhost:3000"
-  : `${window.location.protocol}//${window.location.host}`;
+// Use VITE_SERVER_URL env var to override (e.g. for LAN play).
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ??
+  (import.meta.env.DEV
+    ? `http://${window.location.hostname}:3000`
+    : `${window.location.protocol}//${window.location.host}`);
 
 type Listener = () => void;
 
