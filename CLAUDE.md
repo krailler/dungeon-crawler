@@ -1,4 +1,4 @@
-# Dungeon Crawler - Project Guide
+# KrawlHero - Project Guide
 
 > For detailed architecture, design decisions, and full file inventory, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
@@ -25,27 +25,33 @@ npm run dev          # Client dev server with HMR (Vite)
 npm run build        # Client production build
 npm run server       # Start game server
 npm run server:dev   # Start game server with watch (auto-restart)
+./scripts/reset-db.sh  # Drop DB + re-run migrations + seed
 ```
 
 ## Project Structure (monorepo with npm workspaces)
 
 ```
+scripts/
+  reset-db.sh         # Drop schemas, run migrations + seed
 packages/
   shared/           # Code shared between client and server
     src/
-      constants/      # Game balance constants (economy, items, death, stamina, camera, lighting, etc.)
+      constants/      # Game balance constants (economy, items, death, stamina, camera, lighting, talents)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + CloseCode + all message interfaces
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
       CreatureTypes.ts # Creature type definitions + computeCreatureDerivedStats() + scaleCreatureDerivedStats()
       Economy.ts      # computeGoldDrop(), computeLevelModifier() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
-      Items.ts        # ItemDef type, InventorySlot type
-      Skills.ts       # SkillDef type, SKILL_DEFS (basic_attack, heavy_strike)
-      Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType — buff/debuff types
+      Items.ts        # ItemDef, ItemRarity, InventorySlot types
+      Skills.ts       # SkillDef type
+      Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType, CreatureEffectTrigger
+      Classes.ts      # ClassDef, ClassDefClient types
+      Talents.ts      # TalentDef type
       Roles.ts        # Role type (admin, user)
       GateTypes.ts    # GateType (lobby)
       Tutorial.ts     # TutorialStep type
+      math.ts         # angleBetween(), isFromBehind(), distSq() — shared math utilities
       RoomNames.ts    # generateRoomName() — procedural dungeon names
       FloorVariants.ts, WallVariants.ts, TileSets.ts, random.ts
       index.ts        # Barrel export
@@ -57,7 +63,10 @@ packages/
       chat/           # ChatSystem, CommandRegistry, commands, notifyLevelProgress
       items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, etc.)
       effects/        # EffectRegistry (DB-loaded effect defs)
-      creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables + effect triggers)
+      creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables + effect triggers + skills)
+      classes/        # ClassRegistry (DB-loaded class defs + default skills)
+      talents/        # TalentRegistry (DB-loaded talent defs + effects)
+      skills/         # SkillRegistry (DB-loaded skill defs)
       dungeon/        # DungeonGenerator (procedural, no Babylon deps)
       navigation/     # Pathfinder (A* on TileMap)
       sessions/       # activeSessionRegistry (duplicate login detection)
@@ -69,20 +78,29 @@ packages/
   client/           # Babylon.js renderer + Colyseus client
     src/
       core/           # ClientGame, StateSync, InputManager, ClientUpdateLoop
-      camera/         # IsometricCamera
-      entities/       # ClientPlayer, ClientCreature, ClientLootBag, SelectionRing, CharacterAssetLoader, AnimationController
+      camera/         # IsometricCamera (locked + free camera with WASD)
+      entities/       # ClientPlayer, ClientCreature, ClientLootBag, SelectionRing, CharacterAssetLoader, AnimationController, CharacterLoaderRegistry, PropRegistry
       dungeon/        # DungeonRenderer, FloorAssetLoader, WallAssetLoader
       systems/        # WallOcclusionSystem, WallFadePlugin, FogOfWarSystem
       audio/          # SoundManager (ambient + spatial audio), uiSfx
-      i18n/           # i18next config + locales (en.json)
+      i18n/           # i18next config + locales (en.json, es.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, creature, target, death, lootBag, settings, tutorial, feedback)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar)
-        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, skillDef, classDefStore, talentDefStore, talentStore, creature, target, death, lootBag, settings, tutorial, feedback, levelUp)
+        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
         hooks/        # useDraggable
-        icons/        # SVG icon components (CharacterIcon, MapIcon, PotionIcon, BackpackIcon, SwordIcon, FistIcon, WeaknessIcon, etc.)
+        icons/        # SVG icon components (CharacterIcon, MapIcon, BackpackIcon, WeaknessIcon, HamstringIcon, LockIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
       main.ts         # Client entry point
+    public/
+      models/
+        characters/   # warrior/, zombie/, golem/ (multi-file GLBs per animation)
+        props/        # chest.glb, portal.glb
+      textures/
+        icons/        # PNG item/skill/talent icons (potion_red, key, sword, fist, shield, etc.)
+        logo.png      # KrawlHero logo
+        login-bg.png  # Login screen background
+      audio/          # SFX, ambient, UI sounds
 ```
 
 ## Code Conventions
@@ -114,11 +132,22 @@ packages/
 - Each store: `subscribe()`, `getSnapshot()`, mutation methods
 - Stores emit on state change; React re-renders only subscribed components
 
-### Database migrations
+### Database
 
 - Manual SQL migrations in `packages/server/src/migrations/`
 - Journal + snapshot metadata in `migrations/meta/`
 - Auto-applied on server start via Drizzle `migrate()`
+- Two schemas: `characters` (player data) and `world` (game data: items, creatures, skills, effects, classes, talents)
+- Reset: `./scripts/reset-db.sh` drops all + re-runs migrations + seed
+- Registry load order: items → skills → effects → creatures → classes → talents (dependency order)
+
+### Asset Pipeline
+
+- **Characters**: Meshy AI → multi-file GLBs (idle.glb as base + run/walk/punch/death/heavy_punch.glb)
+- **Props**: Meshy AI → single GLB (chest.glb, portal.glb)
+- **Icons**: craftpix.net PNG → `/public/textures/icons/{iconId}.png`
+- **Model registry**: `CharacterLoaderRegistry` maps skin names to model configs
+- **Prop registry**: `PropRegistry` maps prop names to GLB paths, preloaded at startup
 
 ## Key Game Systems
 
@@ -130,26 +159,51 @@ packages/
 - Gold per kill: `(5 + creatureLevel*3) * levelModifier / alivePartyCount` (min 1)
 - XP per kill: `(20 + creatureLevel*6) * levelModifier` — NOT split among party (incentivizes grouping)
 - XP curve: `xpToNextLevel(level) = floor(50 × level²)` — exponential, MAX_LEVEL = 30
-- Level-up: +1 str/vit/agi, full heal, carry-over excess XP, chat announcement
+- Level-up: +1 str/vit/agi, full heal, carry-over excess XP, chat announcement, golden overlay with sound
 - Gold + XP + level + stats persisted to DB on leave + auto-save every 60s (skip if unchanged)
-- Shared: `Economy.ts`, `Leveling.ts`, `constants/economy.ts`, `CreatureTypes.ts`
-- Server: `DungeonRoom.ts` (distribution + persistence), `PlayerState` (gold, xp, xpToNext, level, addXp, setLevel)
-- Client: gold pill with floating "+amount" animation, XP bar (bottom center, WoW-style) with floating "+XP" text, level-up particle effect (golden aura)
 
 ### Combat
 
 - Server-authoritative: AISystem (creature AI + threat), CombatSystem (player auto-attack)
-- Damage: `max(1, attackDamage - defense)`
-- Stats derived from base stats (strength/vitality/agility) via shared formulas
+- Auto-attack requires: active target + facing within 120° arc + target in range
+- Auto-target: when hit with no target, automatically select the attacker
+- Chase mode: clicking a creature makes server re-path toward it every 4 ticks until in range
+- Creature skills from DB: `world.creature_skills` with `is_default` flag → animState + damageMultiplier
+- Player auto-attack uses class default skill from DB: `world.class_skills` with `is_default` flag
+- Damage: `max(1, attackDamage - defense) * damageMultiplier`
+- Facing check: player must face target to auto-attack (120° arc), "Not facing" feedback if blocked
+- Back-hit detection: `isFromBehind()` shared utility for directional effects (>100° from facing)
+- Right-click creature: select target + enable auto-attack (no movement)
+- Creature walk/run: ROAM/LEASH = walk (40% speed), CHASE = run. Auto-walk if speed ≤ 2.5
+
+### Boss System
+
+- `is_boss` flag on creature types in DB — bosses spawn alone in dedicated rooms
+- Boss room placed in last 30% of dungeon rooms (far from spawn)
+- Current boss: Stone Golem (golem_slam skill, 1.5x damage, 100HP, scale 1.5x)
+- Boss drops Dungeon Key (transient, legendary rarity) required to use exit portal
+
+### Dungeon Key & Exit
+
+- Dungeon Key: `transient=true` item, not persisted to DB, cleared on dungeon restart
+- Exit portal requires key to activate (checked before combat validation)
+- Key consumed on portal use → countdown for all players
+- Items with `transient=true` filtered from inventory save in `PlayerSessionManager`
+
+### Item Rarity
+
+- Rarity field on items: common, uncommon, rare, epic, legendary
+- UI: colored borders on ActionSlot (green/blue/purple/gold)
+- Health potion = common, Dungeon Key = legendary
 
 ### Reconnection
 
-- Token in localStorage, 120s reconnect window, session migration for re-login without token
+- Token in localStorage, 300s reconnect window, session migration for re-login without token
 
 ### Chat
 
 - Server-side ChatSystem with rate limiting, command parsing, broadcasting
-- Slash commands: /help, /players, /kill, /heal, /revive, /tp, /leader, /setlevel, /kick, /give, /reset-tutorials (admin)
+- Slash commands: /help, /players, /kill (player or creature target), /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /reset-tutorials, /resettalents (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
 - Messages fade after 10s, hover to reveal all
@@ -159,13 +213,14 @@ packages/
 - Life states: ALIVE → DOWNED (bleedout 30s) → DEAD (respawn timer)
 - Revive: other players can channel (R key, 3.5s) within range 3.0 to revive downed allies at 30% HP
 - Respawn: base 5s + 5s per death (max 30s), full heal at spawn point
+- Creature death: freeze animation on last frame, corpse visible 5s, hitbox disabled
 - Client: DeathOverlay with timers, downed/dead audio loops, tutorial hints
 - Server: GameLoop ticks life state transitions, CombatSystem stops targeting dead players
 
 ### Loot System
 
 - Creatures drop loot bags on death (per-creature loot tables from DB)
-- Loot bags: golden sphere with bobbing animation, clickable to open grid panel
+- Loot bags: 3D treasure chest model with ground glow disc (emissive, no PointLight)
 - Each alive player rolls drops independently; notifications sent to other players
 - Server: LootBagState (MapSchema), CreatureTypeRegistry loads loot tables
 - Client: ClientLootBag entity, lootBagStore, LootBagPanel
@@ -178,9 +233,21 @@ packages/
 
 ### Skills
 
-- 2 skills: basic_attack (passive auto-attack), heavy_strike (active, 5s cooldown, 2.5x damage)
+- Skills defined in DB (`world.skills`): id, name, icon, passive, cooldown, damageMultiplier, animState
+- Class skills in DB (`world.class_skills`): maps classes to skills with `is_default` flag
+- Creature skills in DB (`world.creature_skills`): maps creatures to skills with `is_default` flag
+- Current skills: basic_attack (passive, punch anim), heavy_strike (active, 5s CD, 2.5x dmg, heavy_punch anim), golem_slam (passive, punch anim, 1.5x dmg)
 - SkillBar with 1-5 hotkeys, cooldown overlay via ActionSlot component
-- Server: CombatSystem applies skill cooldowns and damage multipliers
+- Icons: PNG images via ItemIcon component
+
+### Classes & Talents
+
+- Classes in DB (`world.classes`): stat scaling formulas, skill assignments
+- Talents in DB (`world.talents` + `world.talent_effects`): tree with rows, dependencies, max ranks
+- Talent points: 1 per level starting at TALENT_UNLOCK_LEVEL (5)
+- Talent effects: stat_mod (flat/percent), unlock_skill, modify_skill
+- Talent reset: `/resettalents` command, gold cost per level
+- Client: TalentPanel with tree layout, connector lines, rank display
 
 ### Spatial Audio
 
@@ -192,25 +259,32 @@ packages/
 ### Effects (Buffs & Debuffs)
 
 - Data-driven: effect definitions in DB (`world.effects`), loaded by EffectRegistry at startup
-- Creature effect triggers in DB (`world.creature_effects`): trigger type, chance, stacks
-- EffectDef: id, name (i18n), icon, duration, maxStacks, stackBehavior (refresh/intensity), isDebuff, statModifiers, tickEffect
-- StatModifiers: flat or percent, keyed by stat name (e.g. `attackDamage: {type:"percent", value:-0.25}`)
-- Stack behaviors: REFRESH (reset timer), INTENSITY (add stacks up to max, multiply modifier)
-- Server: EffectSystem ticks remaining timers, recomputes derived stats with modifiers applied
-- ActiveEffectState synced via Colyseus MapSchema on PlayerState (visible to all players)
-- Effects cleared on death (downed), respawn, and revive
-- Client: effectDefStore (lazy-loaded like itemDefStore), BuffBar below player center, EffectIcon with styled tooltip
-- TargetFrame shows target's active effects below the frame
-- Current effects: Weakness (zombie, 30% chance on hit, -25% attack damage, 5s, refresh)
-- Shared: `Effects.ts` (EffectDef, StatModifier, StackBehavior, StatModType)
-- Server: `EffectSystem`, `EffectRegistry`, `ActiveEffectState`, `CreatureTypeRegistry` (effect triggers)
+- Creature effect triggers in DB (`world.creature_effects`): on_hit, on_hit_behind
+- Current effects: Weakness (zombie on_hit, -25% attack, 5s), Hamstring (zombie on_hit_behind, -35% speed, 3s)
+- Server: EffectSystem ticks timers, recomputes derived stats with modifiers
+- Client: effectDefStore (lazy-loaded), BuffBar, EffectIcon with tooltip
+- Effects cleared on death, respawn, revive, and dungeon restart
+
+### Graphics Settings
+
+- Settings panel with toggles: shadows, shadow quality (Low/Medium/High), particles, glow, AA (reload), FXAA, sharpen, HiDPI/Retina (reload), resolution scale, show performance
+- Reload-required banner when AA or HiDPI changed
+- All persisted to localStorage, applied at runtime (except AA/HiDPI = reload)
 
 ### Tutorial System
 
 - LIFO hint stack — multiple hints queue up and display sequentially
-- Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed
+- Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents
 - Server sends hints contextually; client dismisses on action
 - Admin: /reset-tutorials command re-sends applicable hints
+
+### Visual Effects
+
+- Level-up: golden overlay with animated text + number + radial glow burst + 3D particle aura
+- Heal: green particles rising from character when health increases
+- Low health: red vignette border below 30% HP (intensity scales with HP)
+- Loot glow: emissive chest + ground glow disc (DynamicTexture, no light cost)
+- Portal: unlit material + cyan particles + point light
 
 ## Vite Configuration
 

@@ -43,6 +43,12 @@ Both `attachModel()` methods perform near-identical setup:
 
 The `distSq()` function was added to `@dungeon/shared/math.ts` but is not yet used in server systems that calculate inline squared distances. Replace inline calculations with the shared utility for consistency.
 
+## Centralize ITEM_ICON_MAP
+
+**Status:** Partially done — `ItemIcon` component now renders PNGs from `/textures/icons/`. SVG icon maps fully removed from SkillBar, InventoryPanel, LootBagPanel, ConsumableSlots. TalentPanel also uses ItemIcon.
+
+Remaining: ensure no orphan SVG icon files (some like WeaknessIcon, HamstringIcon, LockIcon still used by EffectIcon).
+
 ## Native desktop client (Electron)
 
 Wrap the web client in Electron for a native desktop experience:
