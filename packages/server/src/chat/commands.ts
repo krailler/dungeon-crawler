@@ -378,6 +378,29 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   });
 
   registry.register({
+    name: "resetstats",
+    usage: "/resetstats [player]",
+    description: "Reset stat allocations and refund points",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const target = ctx.resolveTarget();
+      if (!target) {
+        ctx.replyError("Usage: /resetstats <player_name>", "cmd.usageResetstats");
+        return;
+      }
+
+      const points = target.player.resetStats();
+      bridge.recomputePlayerStats(target.player);
+
+      ctx.reply(
+        `Reset stats for ${target.player.characterName}. ${points} point(s) refunded.`,
+        "cmd.resetStats",
+        { name: target.player.characterName, points },
+      );
+    },
+  });
+
+  registry.register({
     name: "give",
     usage: "/give [player] <item_id> [quantity]",
     description: "Give an item (target if no player specified)",

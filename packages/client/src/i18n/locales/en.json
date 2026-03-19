@@ -140,7 +140,13 @@
     "derivedStats": "Combat",
     "gold": "Gold",
     "xp": "Experience",
-    "statPoints": "{{count}} pt"
+    "statPoints": "{{count}} pt",
+    "reset": "Reset Stats ({{cost}} gold)",
+    "resetTitle": "Reset Stats?",
+    "resetMessage": "All attribute points will be refunded. This costs {{cost}} gold.",
+    "resetConfirm": "Reset",
+    "resetCancel": "Cancel",
+    "resetNotEnoughGold": "Not enough gold ({{cost}} needed)"
   },
   "devBanner": "Early development — everything may change",
   "hud": {
@@ -186,6 +192,7 @@
     "levelUpTalentPoint": "+1 talent point! You have {{total}} to assign.",
     "goldReceived": "+{{amount}} gold",
     "talentsReset": "Talents reset for {{cost}} gold. {{points}} point(s) refunded.",
+    "statsReset": "Stats reset for {{cost}} gold. {{points}} point(s) refunded.",
     "skillUnlocked": "New skill unlocked: $t({{skill}})!"
   },
   "gate": {

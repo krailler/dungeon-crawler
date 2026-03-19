@@ -140,7 +140,13 @@
     "derivedStats": "Combate",
     "gold": "Oro",
     "xp": "Experiencia",
-    "statPoints": "{{count}} pt"
+    "statPoints": "{{count}} pt",
+    "reset": "Reiniciar atributos ({{cost}} oro)",
+    "resetTitle": "¿Reiniciar atributos?",
+    "resetMessage": "Todos los puntos de atributo serán devueltos. Esto cuesta {{cost}} de oro.",
+    "resetConfirm": "Reiniciar",
+    "resetCancel": "Cancelar",
+    "resetNotEnoughGold": "No tienes suficiente oro ({{cost}} necesario)"
   },
   "devBanner": "En desarrollo — todo puede cambiar",
   "hud": {
@@ -186,6 +192,7 @@
     "levelUpTalentPoint": "+1 punto de talento. Tienes {{total}} por asignar.",
     "goldReceived": "+{{amount}} oro",
     "talentsReset": "Talentos reiniciados por {{cost}} de oro. {{points}} punto(s) devueltos.",
+    "statsReset": "Atributos reiniciados por {{cost}} de oro. {{points}} punto(s) devueltos.",
     "skillUnlocked": "¡Nueva habilidad desbloqueada: $t({{skill}})!"
   },
   "gate": {

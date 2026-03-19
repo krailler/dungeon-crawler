@@ -1,7 +1,7 @@
-import { useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { AllocatableStat, TutorialStep } from "@dungeon/shared";
+import { AllocatableStat, STAT_RESET_GOLD_PER_LEVEL, TutorialStep } from "@dungeon/shared";
 import type { AllocatableStatValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
@@ -9,6 +9,7 @@ import { tutorialStore } from "../stores/tutorialStore";
 import { CoinIcon } from "../icons/CoinIcon";
 import { Tooltip } from "../components/Tooltip";
 import { ProgressBar } from "../components/ProgressBar";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { playUiSfx } from "../../audio/uiSfx";
 
 const StatRow = ({
@@ -64,11 +65,23 @@ export const CharacterTab = (): ReactNode => {
   const stats: CharacterStats = local.stats;
   const statPoints = local.statPoints ?? 0;
 
+  const playerLevel = local.level ?? 1;
+  const spent = stats.strength - 10 + (stats.vitality - 10) + (stats.agility - 10);
+  const resetCost = playerLevel * STAT_RESET_GOLD_PER_LEVEL;
+  const canReset = spent > 0 && (local.gold ?? 0) >= resetCost;
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const handleAllocate = (stat: AllocatableStatValue): void => {
     playUiSfx("ui_click");
     tutorialStore.dismiss(TutorialStep.ALLOCATE_STATS);
     hudStore.allocateStat(stat);
   };
+
+  const handleResetConfirm = useCallback(() => {
+    hudStore.resetStats();
+    setShowResetConfirm(false);
+    playUiSfx("ui_click");
+  }, []);
 
   return (
     <>
@@ -160,6 +173,44 @@ export const CharacterTab = (): ReactNode => {
           tooltip={t("character.defenseTip")}
         />
       </div>
+
+      {/* Reset stats button */}
+      {spent > 0 && (
+        <div className="mt-3 border-t border-zinc-700/50 pt-3">
+          <Tooltip
+            content={!canReset ? t("character.resetNotEnoughGold", { cost: resetCost }) : ""}
+          >
+            <button
+              onClick={() => {
+                if (canReset) {
+                  playUiSfx("ui_click");
+                  setShowResetConfirm(true);
+                }
+              }}
+              className={`w-full rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                canReset
+                  ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  : "cursor-not-allowed text-zinc-600"
+              }`}
+            >
+              {t("character.reset", { cost: resetCost })}
+            </button>
+          </Tooltip>
+        </div>
+      )}
+
+      {/* Reset confirmation dialog */}
+      {showResetConfirm && (
+        <ConfirmDialog
+          variant="inline"
+          title={t("character.resetTitle")}
+          message={t("character.resetMessage", { cost: resetCost })}
+          confirmLabel={t("character.resetConfirm")}
+          cancelLabel={t("character.resetCancel")}
+          onConfirm={handleResetConfirm}
+          onCancel={() => setShowResetConfirm(false)}
+        />
+      )}
     </>
   );
 };

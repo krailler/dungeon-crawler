@@ -25,6 +25,7 @@ export const MessageType = {
   TUTORIAL_DISMISS: "tutorial:dismiss",
   TUTORIAL_RESET: "tutorial:reset",
   STAT_ALLOCATE: "stat:allocate",
+  STAT_RESET: "stat:reset",
   SPRINT: "sprint",
   ADMIN_DEBUG_INFO: "admin:debug_info",
   DAMAGE_DEALT: "combat:damage",

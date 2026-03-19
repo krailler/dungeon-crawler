@@ -231,6 +231,24 @@ export class PlayerState extends Schema {
   }
 
   /**
+   * Reset all manually allocated stat points: revert to base 10/10/10 and refund
+   * all stat points earned through leveling. Returns the number of refunded points.
+   */
+  resetStats(): number {
+    const spent = this.strength - 10 + (this.vitality - 10) + (this.agility - 10);
+    this.strength = 10;
+    this.vitality = 10;
+    this.agility = 10;
+    this.statPoints = this.level - 1;
+    this.applyDerivedStats();
+    // Cap health to new (lower) maxHealth
+    if (this.health > this.maxHealth) {
+      this.health = this.maxHealth;
+    }
+    return spent;
+  }
+
+  /**
    * Reset all talent allocations and refund talent points based on current level.
    * Returns the number of talents that were reset.
    */

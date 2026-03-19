@@ -102,6 +102,7 @@ import {
   MAX_LEVEL,
   LifeState,
   TALENT_RESET_GOLD_PER_LEVEL,
+  STAT_RESET_GOLD_PER_LEVEL,
   computeDamage,
 } from "@dungeon/shared";
 import type {
@@ -832,6 +833,31 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         "chat.talentsReset",
         { cost, points: player.talentPoints },
         `Talents reset for ${cost} gold. ${player.talentPoints} point(s) refunded.`,
+      );
+    });
+
+    // Stat reset: spend gold to refund all allocated stat points
+    this.onMessage(MessageType.STAT_RESET, (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+
+      // Nothing to reset if stats are all at base
+      const spent = player.strength - 10 + (player.vitality - 10) + (player.agility - 10);
+      if (spent === 0) return;
+
+      const cost = player.level * STAT_RESET_GOLD_PER_LEVEL;
+      if (player.gold < cost) return;
+
+      player.gold -= cost;
+      const points = player.resetStats();
+      this.effectSystem.recomputeStats(player);
+
+      // Notify player via chat
+      this.chatSystem.sendSystemI18nTo(
+        client.sessionId,
+        "chat.statsReset",
+        { cost, points },
+        `Stats reset for ${cost} gold. ${points} point(s) refunded.`,
       );
     });
 

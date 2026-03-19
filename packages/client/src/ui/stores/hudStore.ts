@@ -292,6 +292,10 @@ export const hudStore = {
     const msg: StatAllocateMessage = { stat };
     room.send(MessageType.STAT_ALLOCATE, msg);
   },
+  resetStats(): void {
+    if (!room) return;
+    room.send(MessageType.STAT_RESET, {});
+  },
   setRoomName(name: string): void {
     if (roomName === name) return;
     roomName = name;

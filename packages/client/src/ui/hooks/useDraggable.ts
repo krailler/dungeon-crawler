@@ -48,6 +48,7 @@ export function useDraggable(
   panelRef: React.RefObject<HTMLDivElement | null>;
   isDragging: boolean;
   enabled: boolean;
+  fitToViewport: (margin?: number) => void;
 } {
   const enabled = panelId !== undefined;
   const panelRef = useRef<HTMLDivElement | null>(null);
