@@ -44,7 +44,7 @@ export const DebugPanel = (): ReactNode => {
         variant="amber"
         icon={<span>⚙</span>}
         label="Debug"
-        shortcut="D"
+        shortcut="F9"
         suffix={<span className="text-[10px] text-amber-400/60">{open ? "▲" : "▼"}</span>}
       />
 

@@ -309,6 +309,7 @@
   "feedback": {
     "dead": "Estás muerto",
     "noTarget": "No hay enemigo en rango",
+    "notFacing": "No estás mirando al objetivo",
     "onCooldown": "Aún no está listo",
     "noItem": "No tienes ese objeto",
     "alreadyFull": "Ya tienes la vida llena",
@@ -316,7 +317,9 @@
   },
   "effects": {
     "weakness": "Debilidad",
-    "weakness_desc": "Daño de ataque reducido en {{value}}%"
+    "weakness_desc": "Daño de ataque reducido en {{value}}%",
+    "hamstring": "Desgarro",
+    "hamstringDesc": "Velocidad de movimiento reducida en {{value}}%"
   },
   "cmd": {
     "playerNotFound": "Jugador no encontrado: {{name}}",

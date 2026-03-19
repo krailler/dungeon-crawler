@@ -63,6 +63,7 @@ import {
   TutorialStep,
   lerpEffectValue,
   computeScalingFactor,
+  isFromBehind,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -168,11 +169,12 @@ export class GameLoop {
           const dz = creature.z - player.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
           if (dist <= player.attackRange) {
-            // In range — stop chasing
+            // In range — stop chasing and face the target
             player.chaseCreatureId = null;
             player.path = [];
             player.currentPathIndex = 0;
             player.isMoving = false;
+            player.rotY = Math.atan2(dx, dz);
           } else if (this.tickCount % 4 === 0) {
             // Re-path every 4 ticks (~8 times/s) to avoid A* spam
             const path = this.bridge.pathfinder.findPath(
@@ -224,9 +226,17 @@ export class GameLoop {
       this.tickCreaturesMap.set(id, creature);
     });
 
-    this.bridge.combatSystem.update(dtSec, this.tickPlayersMap, this.tickCreaturesMap, (event) => {
-      this.handleCombatHit(event);
-    });
+    this.bridge.combatSystem.update(
+      dtSec,
+      this.tickPlayersMap,
+      this.tickCreaturesMap,
+      (event) => this.handleCombatHit(event),
+      (sessionId) => {
+        this.bridge.sendToClient(sessionId, MessageType.ACTION_FEEDBACK, {
+          i18nKey: "feedback.notFacing",
+        });
+      },
+    );
 
     // Resolve entity-to-entity collisions (push overlapping entities apart)
     this.resolveEntityCollisions();
@@ -288,9 +298,14 @@ export class GameLoop {
       }
     }
 
-    // Apply creature on-hit effects (e.g. zombie applies Weakness)
+    // Detect back-hit: creature attacked from behind the player (>100° from facing)
+    const isBackHit = creature
+      ? isFromBehind(player.rotY, player.x, player.z, creature.x, creature.z, 100)
+      : false;
+
+    // Apply creature on-hit effects (e.g. zombie applies Weakness, Hamstring on back-hit)
     if (creature && player.lifeState === LifeState.ALIVE) {
-      this.applyCreatureEffects(creature, player, event.sessionId);
+      this.applyCreatureEffects(creature, player, event.sessionId, isBackHit);
     }
   }
 
@@ -308,12 +323,19 @@ export class GameLoop {
     creature: CreatureState,
     player: PlayerState,
     sessionId: string,
+    isBackHit: boolean = false,
   ): void {
     const dungeonLevel = this.bridge.state.dungeonLevel;
     const creatureEffects = getCreatureEffects(creature.creatureType);
 
     for (const entry of creatureEffects) {
-      if (entry.trigger !== CreatureEffectTrigger.ON_HIT) continue;
+      // Match trigger type: ON_HIT always fires, ON_HIT_BEHIND only on back-hits
+      if (entry.trigger === CreatureEffectTrigger.ON_HIT_BEHIND && !isBackHit) continue;
+      if (
+        entry.trigger !== CreatureEffectTrigger.ON_HIT &&
+        entry.trigger !== CreatureEffectTrigger.ON_HIT_BEHIND
+      )
+        continue;
 
       // Level gating
       if (entry.minLevel > 0 && dungeonLevel < entry.minLevel) continue;

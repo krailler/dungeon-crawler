@@ -10,8 +10,14 @@ import {
   CAMERA_RADIUS_MIN,
 } from "@dungeon/shared";
 
+const FREE_CAM_SPEED = 0.5;
+
 export class IsometricCamera {
   public camera: ArcRotateCamera;
+  private freeMode: boolean = false;
+  private keysHeld: Set<string> = new Set();
+  private keyDownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private keyUpHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.camera = new ArcRotateCamera(
@@ -45,6 +51,7 @@ export class IsometricCamera {
   }
 
   setFreeCamera(on: boolean): void {
+    this.freeMode = on;
     if (on) {
       this.camera.lowerAlphaLimit = null;
       this.camera.upperAlphaLimit = null;
@@ -52,6 +59,11 @@ export class IsometricCamera {
       this.camera.upperBetaLimit = Math.PI / 2;
       this.camera.lowerRadiusLimit = 5;
       this.camera.upperRadiusLimit = 50;
+      // Enable WASD panning
+      this.keyDownHandler = (e: KeyboardEvent) => this.keysHeld.add(e.key.toLowerCase());
+      this.keyUpHandler = (e: KeyboardEvent) => this.keysHeld.delete(e.key.toLowerCase());
+      window.addEventListener("keydown", this.keyDownHandler);
+      window.addEventListener("keyup", this.keyUpHandler);
     } else {
       this.camera.alpha = CAMERA_ALPHA;
       this.camera.beta = CAMERA_BETA;
@@ -62,6 +74,30 @@ export class IsometricCamera {
       this.camera.upperBetaLimit = CAMERA_BETA;
       this.camera.lowerRadiusLimit = CAMERA_RADIUS_MIN;
       this.camera.upperRadiusLimit = CAMERA_RADIUS_MAX;
+      // Remove WASD listeners
+      if (this.keyDownHandler) window.removeEventListener("keydown", this.keyDownHandler);
+      if (this.keyUpHandler) window.removeEventListener("keyup", this.keyUpHandler);
+      this.keysHeld.clear();
+    }
+  }
+
+  /** Call each frame to apply WASD movement in free camera mode */
+  updateFreeCamera(): void {
+    if (!this.freeMode || this.keysHeld.size === 0) return;
+
+    // Calculate forward/right vectors relative to camera angle
+    const forward = new Vector3(Math.sin(this.camera.alpha), 0, Math.cos(this.camera.alpha));
+    const right = new Vector3(Math.cos(this.camera.alpha), 0, -Math.sin(this.camera.alpha));
+
+    const move = Vector3.Zero();
+    if (this.keysHeld.has("w")) move.addInPlace(forward);
+    if (this.keysHeld.has("s")) move.subtractInPlace(forward);
+    if (this.keysHeld.has("a")) move.subtractInPlace(right);
+    if (this.keysHeld.has("d")) move.addInPlace(right);
+
+    if (move.lengthSquared() > 0) {
+      move.normalize().scaleInPlace(FREE_CAM_SPEED);
+      this.camera.target.addInPlace(move);
     }
   }
 }

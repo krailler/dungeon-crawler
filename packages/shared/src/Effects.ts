@@ -51,6 +51,8 @@
 export const CreatureEffectTrigger = {
   /** Applied when the creature lands a hit on a player */
   ON_HIT: "on_hit",
+  /** Applied when the creature hits a player from behind */
+  ON_HIT_BEHIND: "on_hit_behind",
 } as const;
 export type CreatureEffectTriggerValue =
   (typeof CreatureEffectTrigger)[keyof typeof CreatureEffectTrigger];

@@ -129,6 +129,8 @@ export class ClientUpdateLoop {
       const debug = debugStore.getSnapshot();
       if (!debug.freeCamera) {
         this.deps.isoCamera.followTarget(pos);
+      } else {
+        this.deps.isoCamera.updateFreeCamera();
       }
 
       // Wall occlusion

@@ -942,7 +942,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.pathfinder.blockTile(exitTileX, exitTileZ);
 
     // Setup AI + combat systems
-    this.aiSystem = new AISystem(this.pathfinder);
+    this.aiSystem = new AISystem(this.pathfinder, this.tileMap);
     this.combatSystem = new CombatSystem();
 
     // Reset gate system with new dependencies (null on first call — created in onCreate after)

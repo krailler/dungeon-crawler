@@ -66,6 +66,8 @@ export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
 
 export { mulberry32 } from "./random.js";
 
+export { angleBetween, isFromBehind } from "./math.js";
+
 export { generateRoomName } from "./RoomNames.js";
 
 export {

@@ -77,7 +77,7 @@ const ROAM_MAX_WAIT = 6.0;
 /** Max attempts to find a walkable roam target */
 const ROAM_MAX_ATTEMPTS = 3;
 /** Seconds without progress before a roaming creature is considered stuck */
-const ROAM_STUCK_TIMEOUT = 1.5;
+const ROAM_STUCK_TIMEOUT = 0.5;
 /** Minimum distance² a creature must travel per stuck-check window to not be stuck */
 const ROAM_STUCK_DIST_SQ = 0.1 * 0.1;
 /** Out-of-combat health regen: percentage of maxHealth per second */
@@ -129,9 +129,11 @@ export class AISystem {
   private entries: CreatureAI[] = [];
   private entryById: Map<string, CreatureAI> = new Map();
   private pathfinder: Pathfinder;
+  private tileMap: { isFloor(x: number, y: number): boolean };
 
-  constructor(pathfinder: Pathfinder) {
+  constructor(pathfinder: Pathfinder, tileMap: { isFloor(x: number, y: number): boolean }) {
     this.pathfinder = pathfinder;
+    this.tileMap = tileMap;
   }
 
   register(creature: CreatureState, creatureId: string, leashRange: number): void {
@@ -507,6 +509,18 @@ export class AISystem {
       const dist = (1 + Math.random() * (ROAM_RADIUS - 1)) * TILE_SIZE;
       const targetX = entry.spawnX + Math.cos(angle) * dist;
       const targetZ = entry.spawnZ + Math.sin(angle) * dist;
+
+      // Skip tiles adjacent to walls to avoid walking-into-wall animation
+      const tx = Math.round(targetX / TILE_SIZE);
+      const tz = Math.round(targetZ / TILE_SIZE);
+      if (
+        !this.tileMap.isFloor(tx, tz) ||
+        !this.tileMap.isFloor(tx - 1, tz) ||
+        !this.tileMap.isFloor(tx + 1, tz) ||
+        !this.tileMap.isFloor(tx, tz - 1) ||
+        !this.tileMap.isFloor(tx, tz + 1)
+      )
+        continue;
 
       const from: WorldPos = { x: entry.creature.x, z: entry.creature.z };
       const to: WorldPos = { x: targetX, z: targetZ };

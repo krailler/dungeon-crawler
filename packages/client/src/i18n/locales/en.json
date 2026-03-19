@@ -309,6 +309,7 @@
   "feedback": {
     "dead": "You are dead",
     "noTarget": "No enemy in range",
+    "notFacing": "Not facing the target",
     "onCooldown": "Not ready yet",
     "noItem": "You don't have that item",
     "alreadyFull": "Already at full health",
@@ -316,7 +317,9 @@
   },
   "effects": {
     "weakness": "Weakness",
-    "weakness_desc": "Attack damage reduced by {{value}}%"
+    "weakness_desc": "Attack damage reduced by {{value}}%",
+    "hamstring": "Hamstring",
+    "hamstringDesc": "Movement speed reduced by {{value}}%"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

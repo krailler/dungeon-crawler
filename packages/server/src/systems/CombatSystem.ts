@@ -28,7 +28,13 @@
  */
 import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
-import { ATTACK_ANIM_DURATION, DAMAGE_DELAY, computeDamage, LifeState } from "@dungeon/shared";
+import {
+  ATTACK_ANIM_DURATION,
+  DAMAGE_DELAY,
+  computeDamage,
+  LifeState,
+  angleBetween,
+} from "@dungeon/shared";
 
 import { getSkillDef } from "../skills/SkillRegistry";
 import { collectTalentSkillMods } from "../talents/TalentRegistry";
@@ -67,6 +73,8 @@ interface PlayerCombat {
   skillCooldowns: Map<string, number>;
   /** Player's selected target creature (null = no target, no auto-attack) */
   targetCreatureId: string | null;
+  /** Timestamp of last "not facing" feedback to throttle messages */
+  lastNotFacingFeedback: number;
 }
 
 /** Result of finding the closest alive creature in range */
@@ -91,6 +99,7 @@ export class CombatSystem {
       damageDefense: 0,
       skillCooldowns: new Map(),
       targetCreatureId: null,
+      lastNotFacingFeedback: 0,
     });
   }
 
@@ -235,6 +244,7 @@ export class CombatSystem {
     players: Map<string, PlayerState>,
     creatures: Map<string, CreatureState>,
     onHit?: (event: CombatHitEvent) => void,
+    onNotFacing?: (sessionId: string) => void,
   ): void {
     for (const [sessionId, combat] of this.playerCooldowns) {
       const player = players.get(sessionId);
@@ -296,6 +306,21 @@ export class CombatSystem {
 
       const target = this.findTarget(player, creatures, combat.targetCreatureId);
       if (target) {
+        // Only auto-attack if player is roughly facing the target (120° arc)
+        const angleToTarget = Math.atan2(
+          target.creature.x - player.x,
+          target.creature.z - player.z,
+        );
+        if (angleBetween(player.rotY, angleToTarget) > (120 * Math.PI) / 180) {
+          // Throttled feedback: only send once every 2 seconds
+          const now = Date.now();
+          if (!combat.lastNotFacingFeedback || now - combat.lastNotFacingFeedback > 2000) {
+            combat.lastNotFacingFeedback = now;
+            if (onNotFacing) onNotFacing(sessionId);
+          }
+          continue;
+        }
+
         combat.attackCooldown = player.attackCooldown;
         const damage = computeDamage(player.attackDamage, target.creature.defense);
         this.scheduleHit(combat, player, target, damage);
