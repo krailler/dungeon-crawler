@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { tutorialStore } from "../stores/tutorialStore";
+import { targetStore } from "../stores/targetStore";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { MenuButton } from "../components/MenuButton";
 import { SettingsPanel } from "./SettingsPanel";
@@ -18,6 +19,12 @@ export const PauseMenu = (): ReactNode => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // If a target is selected, clear it first before opening pause menu
+        const target = targetStore.getSnapshot();
+        if (target.targetId !== null) {
+          targetStore.clear();
+          return;
+        }
         setOpen((prev) => {
           if (prev) {
             setConfirmReset(false);
