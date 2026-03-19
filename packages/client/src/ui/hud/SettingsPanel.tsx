@@ -274,10 +274,20 @@ const SHADOW_OPTIONS: { value: ShadowQualityValue; i18nKey: string }[] = [
   { value: ShadowQuality.HIGH, i18nKey: "settings.shadowHigh" },
 ];
 
+/** Track initial values of reload-requiring settings to detect changes */
+const useNeedsReload = (gfx: GraphicsSettings): boolean => {
+  const [initial] = useState(() => ({
+    antiAliasing: gfx.antiAliasing,
+    hiDpi: gfx.hiDpi,
+  }));
+  return gfx.antiAliasing !== initial.antiAliasing || gfx.hiDpi !== initial.hiDpi;
+};
+
 const GraphicsTab = (): ReactNode => {
   const { t } = useTranslation();
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
   const gfx = settings.graphics;
+  const needsReload = useNeedsReload(gfx);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -337,6 +347,19 @@ const GraphicsTab = (): ReactNode => {
         note={t("settings.fxaaNote")}
       />
 
+      <ToggleRow
+        label={t("settings.sharpen")}
+        checked={gfx.sharpen}
+        onChange={(v) => settingsStore.setGraphics("sharpen", v)}
+      />
+
+      <ToggleRow
+        label={t("settings.hiDpi")}
+        checked={gfx.hiDpi}
+        onChange={(v) => settingsStore.setGraphics("hiDpi", v)}
+        note={t("settings.hiDpiNote")}
+      />
+
       {/* Resolution scale slider */}
       <div className="flex items-center gap-3">
         <span className="w-28 shrink-0 text-xs text-slate-300">
@@ -365,6 +388,18 @@ const GraphicsTab = (): ReactNode => {
           onChange={(v) => settingsStore.setGraphics("showPerformance", v)}
         />
       </div>
+
+      {needsReload && (
+        <div className="mt-2 flex items-center justify-between rounded bg-amber-500/15 px-3 py-2 border border-amber-500/30">
+          <span className="text-[11px] text-amber-300">{t("settings.reloadRequired")}</span>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded bg-amber-500/30 px-3 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/50 transition-colors"
+          >
+            {t("settings.reloadNow")}
+          </button>
+        </div>
+      )}
 
       <div className="mt-2 border-t border-slate-600/30 pt-2">
         <MenuButton onClick={() => settingsStore.resetGraphics()} className="w-full">

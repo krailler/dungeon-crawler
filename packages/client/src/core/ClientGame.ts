@@ -26,6 +26,7 @@ import { adminStore } from "../ui/stores/adminStore";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { FxaaPostProcess } from "@babylonjs/core/PostProcesses/fxaaPostProcess";
+import { SharpenPostProcess } from "@babylonjs/core/PostProcesses/sharpenPostProcess";
 import {
   CloseCode,
   MessageType,
@@ -92,6 +93,7 @@ export class ClientGame {
   private settingsUnsub: (() => void) | null = null;
   private glowLayer: GlowLayer | null = null;
   private fxaaPostProcess: FxaaPostProcess | null = null;
+  private sharpenPostProcess: SharpenPostProcess | null = null;
   private lastGraphics: GraphicsSettings;
   private renderObserver: Observer<Scene> | null = null;
 
@@ -101,6 +103,7 @@ export class ClientGame {
       preserveDrawingBuffer: true,
       stencil: true,
       audioEngine: true,
+      adaptToDeviceRatio: gfx.hiDpi,
     });
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.02, 0.02, 0.05, 1);
@@ -203,12 +206,23 @@ export class ClientGame {
     hudStore.setConnection("connecting", "");
     loadingStore.setPhase(LoadingPhase.MODELS);
     try {
-      // Pre-load character models + audio while connecting
-      await Promise.all([
-        this.loaderRegistry.preload(["warrior", "zombie"]),
-        this.propRegistry.preloadAll(),
-        this.soundManager.load(),
-      ]);
+      // Pre-load character models + audio while connecting (with progress)
+      const tasks = [
+        () => this.loaderRegistry.preload(["warrior", "zombie"]),
+        () => this.propRegistry.preloadAll(),
+        () => this.soundManager.load(),
+      ];
+      let completed = 0;
+      const total = tasks.length;
+      await Promise.all(
+        tasks.map((task) =>
+          task().then(() => {
+            completed++;
+            // Models phase goes from 0% to 30%
+            loadingStore.setProgress(Math.round((completed / total) * 30));
+          }),
+        ),
+      );
 
       // Apply volume settings from settingsStore and subscribe to changes
       this.soundManager.applyVolumes(settingsStore.getSnapshot().volume);
@@ -466,6 +480,11 @@ export class ClientGame {
 
     // FXAA post-process for smoother edges (works on top of hardware AA)
     this.fxaaPostProcess = new FxaaPostProcess("fxaa", 1.0, this.isoCamera.camera);
+
+    // Sharpen post-process for crisper edges
+    this.sharpenPostProcess = new SharpenPostProcess("sharpen", 1.0, this.isoCamera.camera);
+    this.sharpenPostProcess.colorAmount = 1.0;
+    this.sharpenPostProcess.edgeAmount = 0.3;
   }
 
   /** Force-apply all graphics settings (used on startup). */
@@ -474,6 +493,7 @@ export class ClientGame {
     this.scene.particlesEnabled = gfx.particles;
     this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
     if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
+    if (this.sharpenPostProcess) this.sharpenPostProcess.isEnabled = gfx.sharpen;
     const local = this.stateSync.players.get(this.stateSync.localSessionId);
     local?.setShadowConfig(gfx.shadows, gfx.shadowQuality);
     this.lastGraphics = gfx;
@@ -495,6 +515,9 @@ export class ClientGame {
     }
     if (gfx.fxaa !== prev.fxaa) {
       if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
+    }
+    if (gfx.sharpen !== prev.sharpen) {
+      if (this.sharpenPostProcess) this.sharpenPostProcess.isEnabled = gfx.sharpen;
     }
     if (gfx.shadows !== prev.shadows || gfx.shadowQuality !== prev.shadowQuality) {
       const local = this.stateSync.players.get(this.stateSync.localSessionId);

@@ -47,6 +47,8 @@ export type GraphicsSettings = {
   glow: boolean;
   antiAliasing: boolean;
   fxaa: boolean;
+  sharpen: boolean;
+  hiDpi: boolean;
   resolutionScale: number; // 0.5 to 1.0
   showPerformance: boolean;
 };
@@ -92,6 +94,8 @@ const DEFAULT_GRAPHICS: GraphicsSettings = {
   glow: true,
   antiAliasing: true,
   fxaa: false,
+  sharpen: true,
+  hiDpi: true,
   resolutionScale: 1.0,
   showPerformance: true,
 };

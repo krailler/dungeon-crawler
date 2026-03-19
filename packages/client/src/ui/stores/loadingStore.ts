@@ -77,6 +77,13 @@ export const loadingStore = {
     emit();
   },
 
+  /** Set progress directly (0-100) for granular updates within a phase */
+  setProgress(value: number): void {
+    progress = Math.min(100, Math.max(0, value));
+    rebuildSnapshot();
+    emit();
+  },
+
   startFadeOut(): void {
     fadingOut = true;
     rebuildSnapshot();
