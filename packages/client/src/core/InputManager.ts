@@ -6,6 +6,7 @@ import { MessageType, TutorialStep, ENTITY_COLLISION_RADIUS } from "@dungeon/sha
 import type { SprintMessage } from "@dungeon/shared";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { settingsStore } from "../ui/stores/settingsStore";
+import { hudStore } from "../ui/stores/hudStore";
 
 /** Min interval (ms) between MOVE messages while holding mouse */
 const HOLD_SEND_INTERVAL = 150;
@@ -116,8 +117,9 @@ export class InputManager {
     this.handlePointerDown = (ev: PointerEvent) => {
       if (this.isOverUi(ev)) return;
 
-      // Right-click → interact with objects (gates, chests, etc.)
+      // Right-click → target enemy (no move) or interact with objects
       if (ev.button === 2) {
+        if (this.tryEntityPickNoMove()) return;
         if (this.tryInteractableClick()) return;
         return;
       }
@@ -344,6 +346,23 @@ export class InputManager {
     return true;
   }
 
+  /** Raycast to find an entity (creature/player) under the pointer. */
+  private pickEntityUnderPointer(): {
+    pickType: string;
+    pickId: string;
+    mesh: AbstractMesh;
+  } | null {
+    const pick = this.scene.pick(
+      this.scene.pointerX,
+      this.scene.pointerY,
+      (mesh) => !!(mesh.metadata && mesh.metadata.pickType),
+    );
+    if (!pick?.hit || !pick.pickedMesh) return null;
+    const meta = pick.pickedMesh.metadata;
+    if (!meta?.pickType || !meta?.pickId) return null;
+    return { pickType: meta.pickType, pickId: meta.pickId, mesh: pick.pickedMesh };
+  }
+
   /**
    * Try to pick a creature or player entity under the pointer.
    * Returns true if an entity was picked (cancels hold-to-move).
@@ -351,23 +370,15 @@ export class InputManager {
    */
   private tryEntityPick(): boolean {
     if (!this.onEntityPicked) return false;
+    const entity = this.pickEntityUnderPointer();
+    if (!entity) return false;
 
-    const pick = this.scene.pick(
-      this.scene.pointerX,
-      this.scene.pointerY,
-      (mesh) => !!(mesh.metadata && mesh.metadata.pickType),
-    );
-    if (!pick?.hit || !pick.pickedMesh) return false;
-
-    const meta = pick.pickedMesh.metadata;
-    if (!meta?.pickType || !meta?.pickId) return false;
-
-    this.onEntityPicked(meta.pickType, meta.pickId);
+    this.onEntityPicked(entity.pickType, entity.pickId);
 
     // Walk toward the picked entity, stopping just outside collision range.
-    const pos = pick.pickedMesh.getAbsolutePosition();
+    const pos = entity.mesh.getAbsolutePosition();
     const playerPos = this.interactable?.getPlayerPosition();
-    const chaseCreatureId = meta.pickType === "creature" ? meta.pickId : undefined;
+    const chaseCreatureId = entity.pickType === "creature" ? entity.pickId : undefined;
 
     if (playerPos) {
       const dx = pos.x - playerPos.x;
@@ -389,6 +400,25 @@ export class InputManager {
     }
     this.lastSendTime = performance.now();
 
+    return true;
+  }
+
+  /**
+   * Right-click entity pick: select target + enable auto-attack, without moving.
+   * Only picks creatures (not players).
+   */
+  private tryEntityPickNoMove(): boolean {
+    if (!this.onEntityPicked) return false;
+    const entity = this.pickEntityUnderPointer();
+    if (!entity || entity.pickType !== "creature") return false;
+
+    this.onEntityPicked(entity.pickType, entity.pickId);
+    // Enable auto-attack if not already active (toggle it on)
+    const hud = hudStore.getSnapshot();
+    const localMember = hud.members?.find((m) => m.sessionId === hud.localSessionId);
+    if (!localMember?.autoAttackEnabled) {
+      this.room.send(MessageType.SKILL_TOGGLE, { skillId: "basic_attack" });
+    }
     return true;
   }
 
