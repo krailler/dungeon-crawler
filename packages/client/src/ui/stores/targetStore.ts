@@ -46,12 +46,14 @@ export const targetStore = {
   },
 
   selectCreature(id: string): void {
+    if (snapshot.targetId === id && snapshot.targetType === "creature") return;
     snapshot = { targetId: id, targetType: "creature", inReviveRange: false };
     emit();
     room?.send(MessageType.SET_TARGET, { targetId: id } satisfies SetTargetMessage);
   },
 
   selectPlayer(id: string): void {
+    if (snapshot.targetId === id && snapshot.targetType === "player") return;
     snapshot = { targetId: id, targetType: "player", inReviveRange: false };
     emit();
     room?.send(MessageType.SET_TARGET, {

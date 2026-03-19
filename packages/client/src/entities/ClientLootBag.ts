@@ -124,7 +124,7 @@ export class ClientLootBag {
     // Dispose meshes but NOT materials (shared across all chest instances)
     this.anchor.dispose(false, false);
     this.hitbox.dispose();
-    this.glowDisc.material?.dispose();
+    this.glowDisc.material?.dispose(true, true); // dispose textures + effects
     this.glowDisc.dispose();
   }
 }

@@ -143,7 +143,7 @@ export class CombatSystem {
 
     const dx = target.x - player.x;
     const dz = target.z - player.z;
-    if (Math.sqrt(dx * dx + dz * dz) > player.attackRange) return null;
+    if (dx * dx + dz * dz > player.attackRange * player.attackRange) return null;
 
     return { creature: target, creatureId: targetId };
   }
@@ -271,12 +271,12 @@ export class CombatSystem {
       if (combat.damageTimer > 0) {
         combat.damageTimer -= dt;
         if (combat.damageTimer <= 0 && combat.damageTarget) {
-          combat.damageTarget.health -= combat.damageAmount;
+          combat.damageTarget.health = Math.max(
+            0,
+            combat.damageTarget.health - combat.damageAmount,
+          );
           const killed = combat.damageTarget.health <= 0;
-          if (killed) {
-            combat.damageTarget.health = 0;
-            combat.damageTarget.isDead = true;
-          }
+          if (killed) combat.damageTarget.isDead = true;
           if (onHit) {
             onHit({
               sessionId,

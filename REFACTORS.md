@@ -24,3 +24,21 @@ Both `attachModel()` methods perform near-identical setup:
 **Files:** `ClientCreature.ts`, `ui/components/healthColor.ts`
 
 `ClientCreature.updateHealthBar()` hardcodes the same 60%/30% color thresholds that already exist in the shared `healthColor` utility. Should reuse the shared function instead.
+
+## Consolidate movement code (server)
+
+**Files:** `AISystem.ts:moveCreature()`, `GameLoop.ts:moveEntity()`
+
+70% identical waypoint traversal logic. Key differences:
+
+- GameLoop supports multi-waypoint traversal in one frame (while loop)
+- AISystem processes one waypoint per tick
+- Sprint multiplier only on player side
+
+**Proposed solution:** Extract base `moveAlongPath()` to `packages/server/src/systems/Movement.ts`, parameterize waypoint threshold, speed multiplier, and multi-waypoint mode.
+
+## Use `distSq()` utility across server systems
+
+**Files:** `AISystem.ts`, `GameLoop.ts`, `CombatSystem.ts`
+
+The `distSq()` function was added to `@dungeon/shared/math.ts` but is not yet used in server systems that calculate inline squared distances. Replace inline calculations with the shared utility for consistency.

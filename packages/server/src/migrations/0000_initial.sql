@@ -238,7 +238,7 @@ VALUES ('zombie', 'health_potion', 0.8, 1, 1);
 -- Effects
 INSERT INTO "world"."effects" ("id", "name", "description", "icon", "duration", "max_stacks", "stack_behavior", "is_debuff", "stat_modifiers", "tick_effect", "scaling")
 VALUES
-  ('weakness', 'effects.weakness', 'effects.weakness_desc', 'weakness', 5.0, 1, 'refresh', true,
+  ('weakness', 'effects.weakness', 'effects.weaknessDesc', 'weakness', 5.0, 1, 'refresh', true,
    '{"attackDamage":{"type":"percent","value":-0.25}}', null,
    '{"duration":8.0,"statModifiers":{"attackDamage":{"value":-0.45}}}'),
   ('hamstring', 'effects.hamstring', 'effects.hamstringDesc', 'hamstring', 3.0, 1, 'refresh', true,

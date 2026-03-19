@@ -770,6 +770,7 @@ export class GameLoop {
     player.isSprinting = false;
     player.sprintRequested = false;
     player.chaseCreatureId = null;
+    player.animState = "";
     player.path = [];
     this.bridge.effectSystem.clearEffects(player);
 

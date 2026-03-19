@@ -4,7 +4,6 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
@@ -18,7 +17,6 @@ import { SelectionRing } from "./SelectionRing";
 
 /** Smoothing factor — higher = snappier (0 = no movement, 1 = instant) */
 const LERP_FACTOR = 12;
-const HIT_FLASH_DURATION = 0.12;
 
 /** Interval between footstep sounds for creatures (seconds) */
 const CREATURE_FOOTSTEP_INTERVAL = 0.35;
@@ -49,9 +47,6 @@ export class ClientCreature {
   private previousHealth: number;
 
   // Hit flash
-  private baseMaterials: Map<AbstractMesh, Material | null> = new Map();
-  private hitMaterial: PBRMaterial;
-  private hitFlashTimer: number = 0;
 
   // Floating health bar + level label
   private barAnchor: TransformNode;
@@ -92,12 +87,6 @@ export class ClientCreature {
     this.mesh.position.y = 0;
 
     this.selectionRing = new SelectionRing(id, new Color3(0.9, 0.2, 0.2), this.mesh, scene);
-
-    // White PBR material for hit flash
-    this.hitMaterial = new PBRMaterial(`creatureHitMat_${id}`, scene);
-    this.hitMaterial.albedoColor = new Color3(1, 1, 1);
-    this.hitMaterial.metallic = 0;
-    this.hitMaterial.roughness = 1;
 
     // Anchor node at head height (matches player name anchor)
     this.barAnchor = new TransformNode(`creatureBarAnchor_${id}`, scene);
@@ -165,8 +154,6 @@ export class ClientCreature {
         // Meshy exports bake lighting into emissive — scale it down
         mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
       }
-      // Store original materials for hit flash restore
-      this.baseMaterials.set(m, m.material);
       m.isPickable = false;
     }
 
@@ -212,9 +199,6 @@ export class ClientCreature {
     this.isAggro = isAggro;
     this.serverMoving = isMoving;
 
-    if (health < this.previousHealth && !isDead) {
-      this.triggerHitFlash();
-    }
     this.previousHealth = health;
 
     this.updateHealthBar(health, maxHealth);
@@ -236,7 +220,6 @@ export class ClientCreature {
         child.isPickable = false;
         child.metadata = null;
       }
-      // Play death animation and freeze on last frame
       this.animController.playOneShotAndFreeze("death");
     }
   }
@@ -298,14 +281,6 @@ export class ClientCreature {
       }
     }
 
-    // Hit flash timer
-    if (this.hitFlashTimer > 0) {
-      this.hitFlashTimer -= dt;
-      if (this.hitFlashTimer <= 0) {
-        this.restoreMaterials();
-      }
-    }
-
     // Animate floating damage texts
     for (let i = this.damageTexts.length - 1; i >= 0; i--) {
       const entry = this.damageTexts[i];
@@ -339,20 +314,6 @@ export class ClientCreature {
       this.healthBarFill.background = "#ff9800";
     } else {
       this.healthBarFill.background = "#f44336";
-    }
-  }
-
-  private triggerHitFlash(): void {
-    for (const m of this.modelMeshes) {
-      m.material = this.hitMaterial;
-    }
-    this.hitFlashTimer = HIT_FLASH_DURATION;
-  }
-
-  private restoreMaterials(): void {
-    for (const m of this.modelMeshes) {
-      const original = this.baseMaterials.get(m);
-      if (original) m.material = original;
     }
   }
 
@@ -407,6 +368,5 @@ export class ClientCreature {
     this.animController.dispose();
     this.modelRoot?.dispose(false, false);
     this.mesh.dispose();
-    this.hitMaterial.dispose();
   }
 }

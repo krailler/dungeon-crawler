@@ -317,7 +317,7 @@
   },
   "effects": {
     "weakness": "Weakness",
-    "weakness_desc": "Attack damage reduced by {{value}}%",
+    "weaknessDesc": "Attack damage reduced by {{value}}%",
     "hamstring": "Hamstring",
     "hamstringDesc": "Movement speed reduced by {{value}}%"
   },

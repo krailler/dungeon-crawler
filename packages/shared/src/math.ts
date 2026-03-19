@@ -1,3 +1,10 @@
+/** Squared distance between two points on the XZ plane. */
+export function distSq(ax: number, az: number, bx: number, bz: number): number {
+  const dx = ax - bx;
+  const dz = az - bz;
+  return dx * dx + dz * dz;
+}
+
 /**
  * Compute the absolute angle difference between two angles in radians.
  * Uses atan2(dx, dz) convention (same as game rotY).

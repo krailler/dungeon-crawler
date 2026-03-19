@@ -99,6 +99,13 @@ export class AnimationController {
 
   /** Play a one-shot animation that freezes on the last frame (e.g. death). */
   playOneShotAndFreeze(name: AnimName): void {
+    // Clear any prior one-shot to avoid stale callbacks
+    if (this.isPlayingOneShot && this.activeOneShot) {
+      this.activeOneShot.onAnimationGroupEndObservable.clear();
+      this.activeOneShot.stop();
+      this.activeOneShot = null;
+    }
+
     if (this.currentAnim) {
       const current = this.animations.get(this.currentAnim);
       current?.stop();
@@ -107,6 +114,7 @@ export class AnimationController {
     const anim = this.animations.get(name);
     if (anim) {
       this.isPlayingOneShot = true;
+      this.activeOneShot = anim;
       anim.start(false);
       anim.onAnimationGroupEndObservable.addOnce(() => {
         // Pause on last frame instead of resetting
