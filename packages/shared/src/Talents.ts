@@ -50,21 +50,12 @@ export type TalentDef = {
   readonly effects: TalentRankEffect[];
 };
 
-/** Presentation-only talent info sent to the client */
-export type TalentDefClient = {
-  readonly id: string;
-  readonly classId: string;
-  readonly name: string;
-  readonly description: string;
-  readonly icon: string;
-  readonly maxRank: number;
-  readonly requiredTalentId: string | null;
-  readonly requiredTalentRank: number;
-  readonly requiredLevel: number;
-  readonly row: number;
-  readonly col: number;
-  readonly effects: TalentRankEffect[];
-};
+/**
+ * Presentation-only talent info sent to the client.
+ * Currently identical to TalentDef — kept as a separate type for forward
+ * compatibility when server-only fields are added (e.g. internal balancing flags).
+ */
+export type TalentDefClient = Omit<TalentDef, never>;
 
 /** Strip server-only fields from a TalentDef for client consumption */
 export function toTalentDefClient(def: TalentDef): TalentDefClient {

@@ -1,7 +1,7 @@
 import { TileMap } from "./TileMap.js";
 import { TILE_SETS, TILE_SET_NAMES } from "./TileSets.js";
 import type { TileSetName } from "./TileSets.js";
-import { mulberry32 } from "./random.js";
+import { mulberry32, selectByWeight } from "./random.js";
 
 /** Number of floor tile variants in a set */
 export const FLOOR_VARIANT_COUNT = 8;
@@ -9,7 +9,7 @@ export const FLOOR_VARIANT_COUNT = 8;
 // ─── Pack / Unpack helpers ──────────────────────────────────────────
 
 /** Encode setId + variant into a single number: (setId << 8) | variant */
-export function packFloorTile(setId: number, variant: number): number {
+export function packTileVariant(setId: number, variant: number): number {
   return (setId << 8) | variant;
 }
 
@@ -81,15 +81,7 @@ const WEIGHT_TOTAL = VARIANT_WEIGHTS.reduce((sum, w) => sum + w, 0);
  * Pick a variant (1-8) using weighted random.
  */
 function pickVariant(rand: () => number): number {
-  const r = rand() * WEIGHT_TOTAL;
-  let cumulative = 0;
-  for (let i = 0; i < VARIANT_WEIGHTS.length; i++) {
-    cumulative += VARIANT_WEIGHTS[i];
-    if (r < cumulative) {
-      return i + 1; // variants are 1-indexed
-    }
-  }
-  return VARIANT_WEIGHTS.length; // fallback
+  return selectByWeight(VARIANT_WEIGHTS, WEIGHT_TOTAL, rand);
 }
 
 // ─── Floor variant generation ───────────────────────────────────────
@@ -130,7 +122,7 @@ export function generateFloorVariants(
         const roomIdx = roomOwnership[y][x];
         const setId = roomSetMap.get(roomIdx) ?? defaultSetId;
         const variant = pickVariant(rand);
-        result[idx] = packFloorTile(setId, variant);
+        result[idx] = packTileVariant(setId, variant);
       } else {
         result[idx] = 0;
       }

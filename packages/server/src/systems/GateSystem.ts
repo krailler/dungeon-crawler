@@ -33,6 +33,7 @@ export class GateSystem {
   private log: Logger;
   private sendToClient: (sessionId: string, type: string, message: unknown) => void;
   private gateCountdowns: Set<string> = new Set();
+  private pendingTimers: { clear(): void }[] = [];
 
   constructor(deps: GateSystemDeps) {
     this.state = deps.state;
@@ -45,10 +46,17 @@ export class GateSystem {
 
   /** Reset countdowns (called on dungeon regeneration). */
   reset(deps: Omit<GateSystemDeps, "clock" | "log" | "sendToClient">): void {
+    this.clearPendingTimers();
     this.gateCountdowns.clear();
     this.state = deps.state;
     this.pathfinder = deps.pathfinder;
     this.chatSystem = deps.chatSystem;
+  }
+
+  /** Cancel all pending timers (called on reset/dispose). */
+  private clearPendingTimers(): void {
+    for (const timer of this.pendingTimers) timer.clear();
+    this.pendingTimers.length = 0;
   }
 
   /** Handle a GATE_INTERACT message from a client. */
@@ -94,7 +102,7 @@ export class GateSystem {
       );
 
       for (let s = GATE_COUNTDOWN_SECONDS - 1; s >= 1; s--) {
-        this.clock.setTimeout(
+        const t = this.clock.setTimeout(
           () => {
             if (gate.open) return;
             this.chatSystem.broadcastAnnouncement(
@@ -105,9 +113,10 @@ export class GateSystem {
           },
           (GATE_COUNTDOWN_SECONDS - s) * 1000,
         );
+        this.pendingTimers.push(t);
       }
 
-      this.clock.setTimeout(() => {
+      const tOpen = this.clock.setTimeout(() => {
         if (gate.open) return;
         // Open ALL lobby gates simultaneously
         this.openAllLobbyGates();
@@ -125,6 +134,7 @@ export class GateSystem {
           "The gate opens... The dungeon awaits!",
         );
       }, GATE_COUNTDOWN_SECONDS * 1000);
+      this.pendingTimers.push(tOpen);
     } else {
       // Non-lobby gates open immediately
       gate.open = true;
@@ -143,7 +153,7 @@ export class GateSystem {
     });
 
     // Send sprint tutorial hint to all players after a short delay
-    this.clock.setTimeout(() => {
+    const tTutorial = this.clock.setTimeout(() => {
       this.state.players.forEach((p: PlayerState, sid: string) => {
         if (!p.online || p.health <= 0) return;
         if (p.tutorialsCompleted.has(TutorialStep.SPRINT)) return;
@@ -153,5 +163,6 @@ export class GateSystem {
         } satisfies TutorialHintMessage);
       });
     }, 5000);
+    this.pendingTimers.push(tTutorial);
   }
 }

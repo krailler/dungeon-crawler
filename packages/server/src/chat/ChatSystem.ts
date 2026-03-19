@@ -58,7 +58,13 @@ export class ChatSystem {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
 
-    // Rate limit check
+    // Commands bypass rate limiting (they have their own role checks)
+    if (trimmed.startsWith("/")) {
+      this.handleCommand(client, trimmed);
+      return;
+    }
+
+    // Rate limit check (chat messages only)
     if (!this.checkRateLimit(client.sessionId)) {
       this.sendToClientI18n(
         client,
@@ -71,12 +77,7 @@ export class ChatSystem {
       return;
     }
 
-    // Command or chat?
-    if (trimmed.startsWith("/")) {
-      this.handleCommand(client, trimmed);
-    } else {
-      this.handleChat(client, trimmed);
-    }
+    this.handleChat(client, trimmed);
   }
 
   /** Broadcast a system event to all clients (plain text, no i18n). */

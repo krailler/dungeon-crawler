@@ -52,7 +52,7 @@ export type {
 export {
   generateFloorVariants,
   assignRoomSets,
-  packFloorTile,
+  packTileVariant,
   unpackSetId,
   unpackVariant,
   FLOOR_VARIANT_COUNT,
@@ -64,7 +64,7 @@ export type { TileSetName } from "./TileSets.js";
 
 export { generateWallVariants, WALL_VARIANT_COUNT } from "./WallVariants.js";
 
-export { mulberry32 } from "./random.js";
+export { mulberry32, selectByWeight } from "./random.js";
 
 export { distSq, angleBetween, isFromBehind } from "./math.js";
 

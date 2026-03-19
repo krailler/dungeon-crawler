@@ -50,8 +50,8 @@ export class ClientCreature {
   // Hit flash
 
   // Floating health bar + level label
-  private barAnchor: TransformNode;
-  private healthBarContainer: Rectangle;
+  private barAnchor: TransformNode | null;
+  private healthBarContainer: Rectangle | null;
   private healthBarBg: Rectangle;
   private healthBarFill: Rectangle;
   private levelLabel: TextBlock;
@@ -215,8 +215,10 @@ export class ClientCreature {
     if (isDead) {
       if (this.isDead) return; // Already processed death
       this.isDead = true;
-      this.healthBarContainer.dispose();
-      this.barAnchor.dispose();
+      this.healthBarContainer?.dispose();
+      this.healthBarContainer = null;
+      this.barAnchor?.dispose();
+      this.barAnchor = null;
       this.selectionRing.setSelected(false);
       // Disable hitbox so corpse can't be selected/hovered
       for (const child of this.mesh.getChildMeshes(false)) {
@@ -307,7 +309,7 @@ export class ClientCreature {
   }
 
   private updateHealthBar(health: number, maxHealth: number): void {
-    if (maxHealth <= 0) return;
+    if (maxHealth <= 0 || !this.healthBarContainer) return;
     const ratio = health / maxHealth;
     this.healthBarContainer.isVisible = ratio < 1 && health > 0;
     this.healthBarFill.width = Math.max(ratio, 0);
@@ -366,8 +368,8 @@ export class ClientCreature {
       entry.anchor.dispose();
     }
     this.damageTexts.length = 0;
-    this.healthBarContainer.dispose();
-    this.barAnchor.dispose();
+    this.healthBarContainer?.dispose();
+    this.barAnchor?.dispose();
     this.animController.dispose();
     this.modelRoot?.dispose(false, false);
     this.mesh.dispose();

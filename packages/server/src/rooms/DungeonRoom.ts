@@ -477,14 +477,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.dead" });
         return;
       }
-      // Build creatures map for combat system
-      const creaturesMap = new Map<string, CreatureState>();
-      this.state.creatures.forEach((c: CreatureState, id: string) => creaturesMap.set(id, c));
       const result = this.combatSystem.useSkill(
         client.sessionId,
         data.skillId,
         player,
-        creaturesMap,
+        this.state.creatures as unknown as Map<string, CreatureState>,
       );
       if (result) {
         client.send(MessageType.SKILL_COOLDOWN, {
@@ -570,6 +567,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const success = executeEffect(def.effectType, player, def.effectParams);
       if (!success) {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.alreadyFull" });
+        // Set a short cooldown even on failure to prevent spam
+        if (def.cooldown > 0) {
+          player.itemCooldowns.set(data.itemId, Math.min(def.cooldown, 0.5));
+        }
         return;
       }
 

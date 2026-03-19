@@ -80,6 +80,8 @@ import { getEffectDef } from "../effects/EffectRegistry";
 import { LootBagState } from "../state/LootBagState";
 import { InventorySlotState } from "../state/InventorySlotState";
 
+const REVIVE_RANGE_SQ = REVIVE_RANGE * REVIVE_RANGE;
+
 export interface GameLoopBridge {
   readonly state: DungeonState;
   readonly aiSystem: AISystem;
@@ -930,7 +932,7 @@ export class GameLoop {
   private isInReviveRange(reviver: PlayerState, target: PlayerState): boolean {
     const dx = reviver.x - target.x;
     const dz = reviver.z - target.z;
-    return dx * dx + dz * dz <= REVIVE_RANGE * REVIVE_RANGE;
+    return dx * dx + dz * dz <= REVIVE_RANGE_SQ;
   }
 
   private cancelReviveOn(player: PlayerState): void {

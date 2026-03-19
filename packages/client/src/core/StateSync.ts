@@ -575,15 +575,24 @@ export class StateSync {
           }
         };
         if (player.effects) {
+          // Throttle onChange syncs to avoid 32Hz re-renders from remaining ticking
+          let lastEffectChangeSync = 0;
+          const throttledSyncEffects = (): void => {
+            const now = performance.now();
+            if (now - lastEffectChangeSync < 100) return; // max 10Hz
+            lastEffectChangeSync = now;
+            syncEffects();
+          };
+
           $(player).effects.onAdd((effect: any, _effectId: string) => {
             // Listen for changes within each ActiveEffectState (e.g. remaining ticking down)
             $(effect).onChange(() => {
-              syncEffects();
+              throttledSyncEffects();
             });
-            syncEffects();
+            syncEffects(); // immediate on add
           });
           $(player).effects.onRemove(() => {
-            syncEffects();
+            syncEffects(); // immediate on remove
           });
         }
 

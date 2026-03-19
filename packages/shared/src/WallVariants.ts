@@ -1,8 +1,8 @@
 import { TileMap, TileType } from "./TileMap.js";
 import { TILE_SETS } from "./TileSets.js";
-import { packFloorTile } from "./FloorVariants.js";
+import { packTileVariant } from "./FloorVariants.js";
 import type { RoomSetAssignment } from "./FloorVariants.js";
-import { mulberry32 } from "./random.js";
+import { mulberry32, selectByWeight } from "./random.js";
 
 /** Number of wall decoration variants in a set */
 export const WALL_VARIANT_COUNT = 3;
@@ -25,15 +25,7 @@ const WALL_WEIGHT_TOTAL = WALL_VARIANT_WEIGHTS.reduce((sum, w) => sum + w, 0);
  * Pick a wall variant (1-3) using weighted random.
  */
 function pickWallVariant(rand: () => number): number {
-  const r = rand() * WALL_WEIGHT_TOTAL;
-  let cumulative = 0;
-  for (let i = 0; i < WALL_VARIANT_WEIGHTS.length; i++) {
-    cumulative += WALL_VARIANT_WEIGHTS[i];
-    if (r < cumulative) {
-      return i + 1; // variants are 1-indexed
-    }
-  }
-  return WALL_VARIANT_WEIGHTS.length; // fallback
+  return selectByWeight(WALL_VARIANT_WEIGHTS, WALL_WEIGHT_TOTAL, rand);
 }
 
 // ─── Wall variant generation ─────────────────────────────────────────
@@ -103,7 +95,7 @@ export function generateWallVariants(
         const adjacentRoom = findAdjacentRoom(tileMap, x, y, roomOwnership);
         const setId = roomSetMap.get(adjacentRoom) ?? defaultSetId;
         const variant = pickWallVariant(rand);
-        result[idx] = packFloorTile(setId, variant);
+        result[idx] = packTileVariant(setId, variant);
       } else {
         result[idx] = 0;
       }
