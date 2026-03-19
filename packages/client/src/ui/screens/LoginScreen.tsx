@@ -72,16 +72,10 @@ export const LoginScreen = (): ReactNode => {
   if (auth.canReconnect) {
     return (
       <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
-        <div
-          className="absolute inset-0 bg-contain bg-center bg-no-repeat"
-          style={{ backgroundImage: "url(/textures/login-bg.png)" }}
-        />
-        <div className="absolute inset-0 bg-[#05070d]/75" />
-        <ParticleBackground />
         <img
           src="/textures/logo.png"
           alt="KrawlHero"
-          className="relative z-10 mb-4 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
+          className="mb-4 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
         />
         <p className="mb-8 max-w-sm text-center text-sm text-slate-400">{t("reconnect.message")}</p>
         {auth.characterName && (

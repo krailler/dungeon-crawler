@@ -18,10 +18,12 @@ export const LoadingScreen = (): ReactNode => {
         snapshot.fadingOut ? "opacity-0" : "opacity-100"
       }`}
     >
-      {/* Title */}
-      <h1 className="mb-12 text-4xl font-bold tracking-widest text-slate-200">
-        {t("loading.title")}
-      </h1>
+      {/* Logo */}
+      <img
+        src="/textures/logo.png"
+        alt="KrawlHero"
+        className="mb-12 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
+      />
 
       {/* Progress bar */}
       <div className="w-80 overflow-hidden rounded-full border border-slate-600/40 bg-slate-900/80 p-0.5">
