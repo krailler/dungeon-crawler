@@ -2,32 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { EffectDefClient } from "@dungeon/shared";
-import { WeaknessIcon } from "../icons/WeaknessIcon";
-import { HamstringIcon } from "../icons/HamstringIcon";
-import { WarCryIcon } from "../icons/WarCryIcon";
-import { DazedIcon } from "../icons/DazedIcon";
-
-/** Map icon identifiers to SVG components */
-const EFFECT_ICONS: Record<string, (props: { className?: string }) => ReactNode> = {
-  weakness: WeaknessIcon,
-  hamstring: HamstringIcon,
-  war_cry: WarCryIcon,
-  dazed: DazedIcon,
-};
-
-const DefaultIcon = ({ className = "h-5 w-5" }: { className?: string }): ReactNode => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    className={className}
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 8v4M12 16h.01" />
-  </svg>
-);
+import { ItemIcon } from "./ItemIcon";
 
 type EffectIconProps = {
   effectId: string;
@@ -54,7 +29,6 @@ export const EffectIcon = ({
   const [hovered, setHovered] = useState(false);
 
   const isDebuff = def?.isDebuff ?? true;
-  const IconComponent = EFFECT_ICONS[def?.icon ?? ""] ?? DefaultIcon;
   const pct = duration > 0 ? (remaining / duration) * 100 : 0;
   const remainingSec = Math.max(0, remaining).toFixed(1);
   const displayName = def ? t(def.name, { defaultValue: def.name }) : effectId;
@@ -77,11 +51,11 @@ export const EffectIcon = ({
     >
       <div
         className={[
-          "relative flex h-7 w-7 items-center justify-center rounded border shadow-md shadow-black/30",
+          "relative flex h-9 w-9 items-center justify-center overflow-hidden rounded border shadow-md shadow-black/30",
           isDebuff ? "border-red-500/50 bg-red-950/60" : "border-emerald-500/50 bg-emerald-950/60",
         ].join(" ")}
       >
-        <IconComponent className="h-4 w-4 text-slate-200" />
+        <ItemIcon iconId={def?.icon ?? effectId} fill />
         {/* Timer sweep overlay */}
         <div
           className="absolute inset-0 rounded bg-black/50"

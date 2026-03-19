@@ -133,7 +133,9 @@ export const SkillBar = (): ReactNode => {
               active={!!skill}
               disabled={skill ? !active : false}
               disabledSlash={!!skill?.passive && !active}
-              icon={skill ? <ItemIcon iconId={skill.icon} /> : <LockIcon className="h-4 w-4" />}
+              icon={
+                skill ? <ItemIcon iconId={skill.icon} fill /> : <LockIcon className="h-4 w-4" />
+              }
               onClick={skill ? () => activateSlot(i) : undefined}
               keybind={displayKeyName(skillBindKeys[i])}
               cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}

@@ -7,12 +7,15 @@ const ICON_PATH = "/textures/icons/";
 export const ItemIcon = ({
   iconId,
   className,
+  fill,
 }: {
   iconId: string;
   className?: string;
+  /** When true, icon fills its parent container (h-full w-full rounded-lg) */
+  fill?: boolean;
 }): ReactNode => {
   const [loaded, setLoaded] = useState(false);
-  const cls = className ?? "h-7 w-7";
+  const cls = fill ? "h-full w-full rounded-lg" : (className ?? "h-7 w-7");
 
   return (
     <div className={`relative ${cls}`}>
