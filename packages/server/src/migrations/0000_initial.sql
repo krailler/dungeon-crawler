@@ -85,7 +85,9 @@ CREATE TABLE "world"."items" (
   "cooldown" real NOT NULL DEFAULT 0,
   "effect_type" "world"."item_effect_type" NOT NULL DEFAULT 'none',
   "effect_params" jsonb NOT NULL DEFAULT '{}'::jsonb,
-  "use_sound" text NOT NULL DEFAULT ''
+  "use_sound" text NOT NULL DEFAULT '',
+  "transient" boolean NOT NULL DEFAULT false,
+  "rarity" text NOT NULL DEFAULT 'common'
 );
 
 CREATE TABLE "world"."skills" (
@@ -225,8 +227,10 @@ CREATE TABLE "world"."talent_effects" (
 -- ══════════════════════════════════════════════════════════════════════════════
 
 -- Items
-INSERT INTO "world"."items" ("id", "name", "description", "icon", "max_stack", "consumable", "cooldown", "effect_type", "effect_params", "use_sound")
-VALUES ('health_potion', 'items.healthPotion', 'items.healthPotionDesc', 'potion_red', 10, true, 10, 'heal', '{"amount": 50}', 'potion_drink');
+INSERT INTO "world"."items" ("id", "name", "description", "icon", "max_stack", "consumable", "cooldown", "effect_type", "effect_params", "use_sound", "transient", "rarity")
+VALUES
+  ('health_potion', 'items.healthPotion', 'items.healthPotionDesc', 'potion_red', 10, true, 10, 'heal', '{"amount": 50}', 'potion_drink', false, 'common'),
+  ('dungeon_key', 'items.dungeonKey', 'items.dungeonKeyDesc', 'key', 1, false, 0, 'none', '{}', '', true, 'legendary');
 
 -- Skills
 INSERT INTO "world"."skills" ("id", "name", "description", "icon", "passive", "cooldown", "damage_multiplier", "anim_state") VALUES
@@ -263,7 +267,8 @@ INSERT INTO "world"."creatures" (
 INSERT INTO "world"."creature_loot" ("creature_id", "item_id", "drop_chance", "min_quantity", "max_quantity")
 VALUES
   ('zombie', 'health_potion', 0.8, 1, 1),
-  ('golem', 'health_potion', 1.0, 2, 3);
+  ('golem', 'health_potion', 1.0, 2, 3),
+  ('golem', 'dungeon_key', 1.0, 1, 1);
 
 -- Effects
 INSERT INTO "world"."effects" ("id", "name", "description", "icon", "duration", "max_stacks", "stack_behavior", "is_debuff", "stat_modifiers", "tick_effect", "scaling")

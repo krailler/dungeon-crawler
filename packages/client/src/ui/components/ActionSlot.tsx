@@ -60,6 +60,13 @@ const CooldownOverlay = ({
 
 type Variant = "default" | "red" | "empty";
 
+const RARITY_BORDER: Record<string, string> = {
+  uncommon: "border-emerald-400/80 shadow-[0_0_6px_rgba(52,211,153,0.3)]",
+  rare: "border-blue-400/80 shadow-[0_0_6px_rgba(96,165,250,0.3)]",
+  epic: "border-purple-400/80 shadow-[0_0_6px_rgba(192,132,252,0.3)]",
+  legendary: "border-amber-400/80 shadow-[0_0_6px_rgba(251,191,36,0.3)]",
+};
+
 const VARIANT_COLORS: Record<
   Variant,
   {
@@ -160,6 +167,8 @@ export type ActionSlotProps = {
   tooltipHint?: string;
   /** Custom tooltip content — overrides structured tooltip props */
   tooltip?: ReactNode;
+  /** Item rarity — adds a colored border (uncommon=green, rare=blue, epic=purple, legendary=gold) */
+  rarity?: string;
 };
 
 export const ActionSlot = ({
@@ -181,6 +190,7 @@ export const ActionSlot = ({
   tooltipDescParams,
   tooltipHint,
   tooltip,
+  rarity,
 }: ActionSlotProps): ReactNode => {
   const { t } = useTranslation();
   const colors = VARIANT_COLORS[variant];
@@ -263,6 +273,7 @@ export const ActionSlot = ({
         className={[
           `relative flex ${sizeClass} items-center justify-center rounded-lg border`,
           slotStyle,
+          rarity && active && RARITY_BORDER[rarity] ? RARITY_BORDER[rarity] : "",
           showClick && active ? "scale-90" : "",
         ]
           .filter(Boolean)

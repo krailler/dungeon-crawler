@@ -491,6 +491,23 @@ export class GameLoop {
     }, 5000);
   }
 
+  /** Admin-kill a creature: triggers the full kill flow (gold, XP, loot, removal). */
+  handleAdminCreatureKill(creatureId: string): void {
+    // Find any alive player as the "killer" for loot distribution
+    let killerSessionId = "";
+    this.bridge.state.players.forEach((p: PlayerState, sid: string) => {
+      if (!killerSessionId && p.lifeState === LifeState.ALIVE) killerSessionId = sid;
+    });
+    this.processCreatureKill({
+      creatureId,
+      sessionId: killerSessionId,
+      damage: 0,
+      attackDamage: 0,
+      defense: 0,
+      killed: true,
+    });
+  }
+
   /** Drain / regenerate stamina for all players each tick. */
   private updateStamina(dt: number): void {
     for (const [, player] of this.bridge.state.players) {

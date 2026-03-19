@@ -102,8 +102,8 @@ export type { TutorialStepValue } from "./Tutorial.js";
 export { toClassDefClient } from "./Classes.js";
 export type { ClassDef, ClassDefClient } from "./Classes.js";
 
-export { ItemEffectType, toItemDefClient } from "./Items.js";
-export type { ItemEffectTypeValue, ItemDef, ItemDefClient } from "./Items.js";
+export { ItemEffectType, ItemRarity, toItemDefClient } from "./Items.js";
+export type { ItemEffectTypeValue, ItemRarityValue, ItemDef, ItemDefClient } from "./Items.js";
 
 export { TalentEffectType, toTalentDefClient } from "./Talents.js";
 export type {

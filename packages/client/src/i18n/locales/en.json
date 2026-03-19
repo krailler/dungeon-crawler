@@ -201,7 +201,8 @@
     "gateOpened": "The gate opens... The dungeon awaits!",
     "dungeonCompleted": "Dungeon completed! Closing in {{seconds}}...",
     "dungeonCompletedFinal": "Dungeon completed! Well done!",
-    "exitCombatActive": "Cannot exit while enemies are in combat!"
+    "exitCombatActive": "Cannot exit while enemies are in combat!",
+    "exitNeedKey": "You need the Dungeon Key to open the portal!"
   },
   "classes": {
     "warrior": {
@@ -247,7 +248,9 @@
   },
   "items": {
     "healthPotion": "Health Potion",
-    "healthPotionDesc": "Restores {{amount}} health"
+    "healthPotionDesc": "Restores {{amount}} health",
+    "dungeonKey": "Dungeon Key",
+    "dungeonKeyDesc": "Opens the exit portal. Lost when leaving the dungeon."
   },
   "inventory": {
     "title": "Inventory",

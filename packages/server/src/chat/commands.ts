@@ -51,12 +51,21 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
   registry.register({
     name: "kill",
     usage: "/kill [player]",
-    description: "Kill a player (or current target)",
+    description: "Kill a player or creature (uses current target)",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
+      // Try creature target first (if no args)
+      if (!ctx.args[0]) {
+        const creatureId = bridge.getCreatureTarget(ctx.sessionId);
+        if (creatureId) {
+          bridge.killCreature(creatureId);
+          ctx.reply("Creature slain by divine intervention!", "cmd.creatureKilled");
+          return;
+        }
+      }
       const target = ctx.resolveTarget();
       if (!target) {
-        ctx.replyError("Usage: /kill <player_name>", "cmd.usageKill");
+        ctx.replyError("Usage: /kill <player_name> (or target a creature)", "cmd.usageKill");
         return;
       }
       bridge.killPlayer(target.sessionId);

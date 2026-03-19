@@ -31,6 +31,10 @@ export interface ChatRoomBridge {
   revivePlayer(sessionId: string): boolean;
   /** Get the session ID of the player that this player is targeting, if any. */
   getPlayerTarget(sessionId: string): string | null;
+  /** Get the creature ID that this player is targeting, if any. */
+  getCreatureTarget(sessionId: string): string | null;
+  /** Kill a creature instantly. */
+  killCreature(creatureId: string): void;
   /** Recompute derived stats for a player (base + talents + effects) */
   recomputePlayerStats(player: PlayerState): void;
 }

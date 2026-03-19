@@ -4,14 +4,8 @@ import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
-import { PotionIcon } from "../icons/PotionIcon";
 import { ActionSlot } from "../components/ActionSlot";
-
-// ── Icon map (item icon name → component) ────────────────────────────────────
-
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
-  potion_red: PotionIcon,
-};
+import { ItemIcon } from "../components/ItemIcon";
 
 // ── Aggregated consumable (unique item from inventory with total qty) ────────
 
@@ -85,7 +79,7 @@ export const ConsumableSlots = (): ReactNode => {
         variant="red"
         size="md"
         active={hasPotion}
-        icon={<PotionIcon />}
+        icon={hasPotion ? <ItemIcon iconId={firstEntry.icon} /> : <></>}
         onClick={hasPotion ? () => handleUse(firstEntry.itemId) : undefined}
         keybind={displayKeyName(consumableKey)}
         quantity={hasPotion ? firstEntry.totalQty : undefined}
@@ -99,7 +93,6 @@ export const ConsumableSlots = (): ReactNode => {
 
       {/* Extra consumable slots (if more than one type) */}
       {consumables.slice(1).map((entry, i) => {
-        const IconComponent = ITEM_ICON_MAP[entry.icon];
         const def = itemDefs.get(entry.itemId);
         return (
           <ActionSlot
@@ -107,7 +100,7 @@ export const ConsumableSlots = (): ReactNode => {
             variant="red"
             size="md"
             active
-            icon={IconComponent ? <IconComponent /> : <span className="text-[16px]">?</span>}
+            icon={<ItemIcon iconId={entry.icon} />}
             onClick={() => handleUse(entry.itemId)}
             keybind={String(i + 2)}
             quantity={entry.totalQty}

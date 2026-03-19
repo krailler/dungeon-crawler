@@ -201,7 +201,8 @@
     "gateOpened": "La puerta se abre... ¡La mazmorra os espera!",
     "dungeonCompleted": "¡Mazmorra completada! Cerrando en {{seconds}}...",
     "dungeonCompletedFinal": "¡Mazmorra completada! ¡Buen trabajo!",
-    "exitCombatActive": "¡No se puede salir mientras haya enemigos en combate!"
+    "exitCombatActive": "¡No se puede salir mientras haya enemigos en combate!",
+    "exitNeedKey": "¡Necesitas la Llave de Mazmorra para abrir el portal!"
   },
   "classes": {
     "warrior": {
@@ -247,7 +248,9 @@
   },
   "items": {
     "healthPotion": "Poción de Vida",
-    "healthPotionDesc": "Restaura {{amount}} de vida"
+    "healthPotionDesc": "Restaura {{amount}} de vida",
+    "dungeonKey": "Llave de Mazmorra",
+    "dungeonKeyDesc": "Abre el portal de salida. Se pierde al salir de la mazmorra."
   },
   "inventory": {
     "title": "Inventario",

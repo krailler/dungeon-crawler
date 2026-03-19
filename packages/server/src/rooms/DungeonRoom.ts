@@ -220,6 +220,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       killPlayer: (sessionId: string) => this.gameLoop.killPlayer(sessionId),
       revivePlayer: (sessionId: string) => this.gameLoop.revivePlayer(sessionId),
       getPlayerTarget: (sessionId: string) => this.playerTargets.get(sessionId) ?? null,
+      getCreatureTarget: (sessionId: string) => this.combatSystem.getTarget(sessionId),
+      killCreature: (creatureId: string) => {
+        const creature = this.state.creatures.get(creatureId);
+        if (!creature || creature.isDead) return;
+        creature.health = 0;
+        creature.isDead = true;
+        // Trigger loot + XP + gold through the normal kill flow
+        this.gameLoop.handleAdminCreatureKill(creatureId);
+      },
       recomputePlayerStats: (player: PlayerState) => this.effectSystem.recomputeStats(player),
     };
     this.chatSystem = new ChatSystem(chatBridge);
@@ -369,6 +378,24 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const dz = player.z - this.exitPos.z;
       if (dx * dx + dz * dz > INTERACT_RANGE * INTERACT_RANGE) return;
 
+      // Require dungeon key to use the exit portal
+      let keySlotIndex: string | null = null;
+      player.inventory.forEach((slot, key) => {
+        if (slot.itemId === "dungeon_key" && slot.quantity > 0) {
+          keySlotIndex = key;
+        }
+      });
+      if (keySlotIndex === null) {
+        this.chatSystem.sendAnnouncementTo(
+          client,
+          "announce.exitNeedKey",
+          {},
+          "You need the Dungeon Key to open the portal!",
+          ChatVariant.ERROR,
+        );
+        return;
+      }
+
       // Block exit if any creature is in active combat
       if (this.aiSystem.hasActiveCombat()) {
         this.chatSystem.sendAnnouncementTo(
@@ -379,6 +406,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           ChatVariant.ERROR,
         );
         return;
+      }
+
+      // All checks passed — consume the dungeon key
+      const keySlot = player.inventory.get(keySlotIndex!);
+      if (keySlot) {
+        keySlot.quantity -= 1;
+        if (keySlot.quantity <= 0) {
+          player.inventory.delete(keySlotIndex!);
+        }
       }
 
       this.exitCountdownActive = true;

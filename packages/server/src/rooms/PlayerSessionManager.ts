@@ -5,6 +5,7 @@ import { pid } from "../logger";
 import { getDb } from "../db/database";
 import type { DbTransaction } from "../db/database";
 import { characters, characterInventory, characterSkills, characterTalents } from "../db/schema";
+import { getItemDef } from "../items/ItemRegistry";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
@@ -619,6 +620,9 @@ export class PlayerSessionManager {
     const rows: { characterId: string; slotIndex: number; itemId: string; quantity: number }[] = [];
     player.inventory.forEach((slot, key) => {
       if (slot.quantity > 0) {
+        // Skip transient items (e.g. dungeon key) — they don't persist across sessions
+        const itemDef = getItemDef(slot.itemId);
+        if (itemDef?.transient) return;
         const slotIndex = Number(key);
         activeSlots.push(slotIndex);
         rows.push({ characterId, slotIndex, itemId: slot.itemId, quantity: slot.quantity });

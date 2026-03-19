@@ -5,12 +5,8 @@ import { lootBagStore } from "../stores/lootBagStore";
 import { itemDefStore } from "../stores/itemDefStore";
 import { HudPanel } from "../components/HudPanel";
 import { ActionSlot } from "../components/ActionSlot";
-import { PotionIcon } from "../icons/PotionIcon";
+import { ItemIcon } from "../components/ItemIcon";
 import { playUiSfx } from "../../audio/uiSfx";
-
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
-  potion_red: PotionIcon,
-};
 
 export const LootBagPanel = (): ReactNode => {
   const { t } = useTranslation();
@@ -35,12 +31,11 @@ export const LootBagPanel = (): ReactNode => {
       panelId="loot"
       defaultPosition={{ x: window.innerWidth / 2 - 100, y: window.innerHeight / 3 }}
       persistPosition={false}
-      className="w-[200px]"
+      className="w-[220px]"
     >
       <div className="grid grid-cols-4 gap-1.5">
         {snap.slots.map((slot, i) => {
           const def = slot ? itemDefs.get(slot.itemId) : undefined;
-          const IconComponent = def ? ITEM_ICON_MAP[def.icon] : undefined;
 
           return (
             <ActionSlot
@@ -49,8 +44,8 @@ export const LootBagPanel = (): ReactNode => {
               size="sm"
               active={!!slot}
               icon={
-                IconComponent ? (
-                  <IconComponent />
+                def ? (
+                  <ItemIcon iconId={def.icon} />
                 ) : slot ? (
                   <span className="text-[14px]">?</span>
                 ) : (
@@ -65,6 +60,7 @@ export const LootBagPanel = (): ReactNode => {
               tooltipDesc={def?.description}
               tooltipDescParams={def?.effectParams}
               tooltipHint={slot ? clickToTake : undefined}
+              rarity={def?.rarity}
             />
           );
         })}

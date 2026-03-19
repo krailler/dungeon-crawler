@@ -5,16 +5,10 @@ import { INVENTORY_MAX_SLOTS } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { SkillCooldownState } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
-import { PotionIcon } from "../icons/PotionIcon";
 import { ActionSlot } from "../components/ActionSlot";
 import { HudPanel } from "../components/HudPanel";
 import { playUiSfx } from "../../audio/uiSfx";
-
-// ── Icon map ─────────────────────────────────────────────────────────────────
-
-const ITEM_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
-  potion_red: PotionIcon,
-};
+import { ItemIcon } from "../components/ItemIcon";
 
 // ── Drag ghost ───────────────────────────────────────────────────────────────
 
@@ -59,7 +53,6 @@ const InventorySlot = memo(
     const { t } = useTranslation();
     const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
     const def = slot ? itemDefs.get(slot.itemId) : undefined;
-    const IconComponent = def ? ITEM_ICON_MAP[def.icon] : undefined;
     const isConsumable = def?.consumable;
 
     const handleDragStart = useCallback(
@@ -128,8 +121,8 @@ const InventorySlot = memo(
           size="sm"
           active={!!slot}
           icon={
-            IconComponent ? (
-              <IconComponent />
+            def ? (
+              <ItemIcon iconId={def.icon} />
             ) : slot ? (
               <span className="text-[14px]">?</span>
             ) : (
@@ -144,6 +137,7 @@ const InventorySlot = memo(
           tooltipDesc={def?.description}
           tooltipDescParams={def?.effectParams}
           tooltipHint={isConsumable ? t("inventory.rightClickToUse") : undefined}
+          rarity={def?.rarity}
         />
       </div>
     );
@@ -161,7 +155,6 @@ const DragGhost = ({
 }): ReactNode => {
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
   const def = itemDefs.get(slot.itemId);
-  const IconComponent = def ? ITEM_ICON_MAP[def.icon] : undefined;
 
   return (
     <div
@@ -172,8 +165,8 @@ const DragGhost = ({
       }}
     >
       <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-sky-400/60 bg-slate-900/90 shadow-lg shadow-sky-500/20">
-        <span className="[&>svg]:h-5 [&>svg]:w-5 text-sky-300">
-          {IconComponent ? <IconComponent /> : <span className="text-[14px]">?</span>}
+        <span className="text-sky-300">
+          {def ? <ItemIcon iconId={def.icon} /> : <span className="text-[14px]">?</span>}
         </span>
         {slot.quantity >= 2 && (
           <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded bg-slate-900/90 px-0.5 text-[9px] font-bold text-slate-300 ring-1 ring-slate-600/50">

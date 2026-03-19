@@ -1,4 +1,4 @@
-import type { ItemDef, ItemDefClient } from "@dungeon/shared";
+import type { ItemDef, ItemDefClient, ItemRarityValue } from "@dungeon/shared";
 import { toItemDefClient } from "@dungeon/shared";
 import { items } from "../db/schema.js";
 import { createRegistry } from "../db/createRegistry.js";
@@ -19,6 +19,8 @@ const registry = createRegistry<ItemRow, ItemDef>({
     effectType: row.effectType,
     effectParams: row.effectParams as Record<string, unknown>,
     useSound: row.useSound,
+    transient: row.transient,
+    rarity: row.rarity as ItemRarityValue,
   }),
   hashDef: (def) => ((def.maxStack << 16) + def.cooldown * 100) | 0,
 });

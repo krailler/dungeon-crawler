@@ -132,6 +132,8 @@ export const items = worldSchema.table("items", {
   effectType: itemEffectTypeEnum("effect_type").notNull().default(ItemEffectType.NONE),
   effectParams: jsonb("effect_params").notNull().default({}),
   useSound: text("use_sound").notNull().default(""),
+  transient: boolean("transient").notNull().default(false),
+  rarity: text("rarity").notNull().default("common"),
 });
 
 export const skills = worldSchema.table("skills", {
