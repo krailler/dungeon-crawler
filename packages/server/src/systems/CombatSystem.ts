@@ -37,6 +37,8 @@ import {
 } from "@dungeon/shared";
 
 import { getSkillDef } from "../skills/SkillRegistry";
+import { getClassDefaultSkill } from "../classes/ClassRegistry";
+import { logger } from "../logger";
 import { collectTalentSkillMods } from "../talents/TalentRegistry";
 
 export interface CombatHitEvent {
@@ -321,9 +323,19 @@ export class CombatSystem {
           continue;
         }
 
+        const defaultSkill = getClassDefaultSkill(player.classId);
+        if (!defaultSkill) {
+          logger.warn(
+            { classId: player.classId },
+            "No default skill for class — skipping auto-attack",
+          );
+          continue;
+        }
+
         combat.attackCooldown = player.attackCooldown;
-        const damage = computeDamage(player.attackDamage, target.creature.defense);
-        this.scheduleHit(combat, player, target, damage);
+        const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
+        const damage = Math.max(1, Math.round(baseDamage * defaultSkill.damageMultiplier));
+        this.scheduleHit(combat, player, target, damage, defaultSkill.animState);
       }
     }
   }

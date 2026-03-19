@@ -23,9 +23,9 @@ const server = new Server({
   beforeListen: async () => {
     await initDatabase();
     await loadItemRegistry();
-    await loadCreatureTypeRegistry();
     await loadSkillRegistry();
     await loadEffectRegistry();
+    await loadCreatureTypeRegistry();
     await loadClassRegistry();
     await loadTalentRegistry();
   },

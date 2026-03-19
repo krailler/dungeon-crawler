@@ -5,7 +5,9 @@ import type {
   CreatureEffectTriggerValue,
   EffectScaling,
 } from "@dungeon/shared";
-import { creatures, creatureLoot, creatureEffects } from "../db/schema.js";
+import { creatures, creatureLoot, creatureEffects, creatureSkills } from "../db/schema.js";
+import { getSkillDef } from "../skills/SkillRegistry.js";
+import type { SkillDef } from "@dungeon/shared";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
 
@@ -22,9 +24,16 @@ export type CreatureEffectEntry = {
 
 type CreatureRow = typeof creatures.$inferSelect;
 
+export type CreatureSkillEntry = {
+  skillId: string;
+  isDefault: boolean;
+  def: SkillDef;
+};
+
 /** Pre-loaded related data — populated before registry.load() */
 let lootByCreature = new Map<string, CreatureLootEntry[]>();
 let effectsByCreature = new Map<string, CreatureEffectEntry[]>();
+let skillsByCreature = new Map<string, CreatureSkillEntry[]>();
 
 const registry = createRegistry<CreatureRow, CreatureTypeDefinition>({
   table: creatures,
@@ -92,6 +101,17 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
     effectsByCreature.set(row.creatureId, entries);
   }
 
+  // Pre-load creature skills
+  const skillRows = await db.select().from(creatureSkills);
+  skillsByCreature = new Map<string, CreatureSkillEntry[]>();
+  for (const row of skillRows) {
+    const def = getSkillDef(row.skillId);
+    if (!def) continue;
+    const entries = skillsByCreature.get(row.creatureId) ?? [];
+    entries.push({ skillId: row.skillId, isDefault: row.isDefault, def });
+    skillsByCreature.set(row.creatureId, entries);
+  }
+
   await registry.load();
 }
 
@@ -115,4 +135,15 @@ export function getCreatureLoot(creatureTypeId: string): CreatureLootEntry[] {
 
 export function getCreatureEffects(creatureTypeId: string): CreatureEffectEntry[] {
   return effectsByCreature.get(creatureTypeId) ?? [];
+}
+
+export function getCreatureSkills(creatureTypeId: string): CreatureSkillEntry[] {
+  return skillsByCreature.get(creatureTypeId) ?? [];
+}
+
+/** Get the default attack skill for a creature (fallback: "punch" anim, 1x damage) */
+export function getCreatureDefaultSkill(creatureTypeId: string): CreatureSkillEntry | null {
+  const skills = skillsByCreature.get(creatureTypeId);
+  if (!skills || skills.length === 0) return null;
+  return skills.find((s) => s.isDefault) ?? skills[0];
 }

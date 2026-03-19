@@ -154,6 +154,16 @@ CREATE TABLE "world"."creature_effects" (
   "scaling_override" jsonb
 );
 
+CREATE TABLE "world"."creature_skills" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "creature_id" text NOT NULL REFERENCES "world"."creatures"("id") ON DELETE CASCADE,
+  "skill_id" text NOT NULL REFERENCES "world"."skills"("id") ON DELETE CASCADE,
+  "is_default" boolean NOT NULL DEFAULT false
+);
+
+-- Only one default skill per creature
+CREATE UNIQUE INDEX "creature_skills_one_default" ON "world"."creature_skills" ("creature_id") WHERE "is_default" = true;
+
 CREATE TABLE "world"."classes" (
   "id" text PRIMARY KEY NOT NULL,
   "name" text NOT NULL,
@@ -175,8 +185,12 @@ CREATE TABLE "world"."classes" (
 CREATE TABLE "world"."class_skills" (
   "class_id" text NOT NULL REFERENCES "world"."classes"("id"),
   "skill_id" text NOT NULL REFERENCES "world"."skills"("id"),
+  "is_default" boolean NOT NULL DEFAULT false,
   PRIMARY KEY ("class_id", "skill_id")
 );
+
+-- Only one default skill per class
+CREATE UNIQUE INDEX "class_skills_one_default" ON "world"."class_skills" ("class_id") WHERE "is_default" = true;
 
 CREATE TABLE "world"."talents" (
   "id" text PRIMARY KEY NOT NULL,
@@ -251,12 +265,16 @@ VALUES
   ('zombie', 'on_hit', 'weakness', 0.3, 1, 1, 0, 0.5),
   ('zombie', 'on_hit_behind', 'hamstring', 0.5, 1, 1, 0, 0.7);
 
+-- Creature skills
+INSERT INTO "world"."creature_skills" ("creature_id", "skill_id", "is_default")
+VALUES ('zombie', 'basic_attack', true);
+
 -- Classes
 INSERT INTO "world"."classes" ("id", "name", "description", "icon", "hp_base", "hp_per_vit", "attack_base", "attack_per_str", "defense_base", "defense_per_vit", "speed_base", "speed_per_agi", "cooldown_base", "cooldown_per_agi", "attack_range")
 VALUES ('warrior', 'classes.warrior.name', 'classes.warrior.desc', '⚔️', 50, 5, 5, 0.5, 0, 0.3, 4, 0.1, 1.2, 0.02, 2.5);
 
 -- Class skills
-INSERT INTO "world"."class_skills" ("class_id", "skill_id") VALUES ('warrior', 'basic_attack'), ('warrior', 'heavy_strike');
+INSERT INTO "world"."class_skills" ("class_id", "skill_id", "is_default") VALUES ('warrior', 'basic_attack', true), ('warrior', 'heavy_strike', false);
 
 -- ── Talents: Warrior tree ────────────────────────────────────────────────────
 

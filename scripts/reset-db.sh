@@ -21,4 +21,7 @@ DROP TABLE IF EXISTS "drizzle"."__drizzle_migrations" CASCADE;
 DROP SCHEMA IF EXISTS "drizzle" CASCADE;
 SQL
 
-echo "✅ Database reset. Start the server to re-run migrations."
+echo "Running migrations + seed..."
+npm run seed --workspace=packages/server
+
+echo "✅ Database reset and seeded."

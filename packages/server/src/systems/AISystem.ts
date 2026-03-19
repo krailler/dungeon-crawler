@@ -42,6 +42,8 @@ import {
   computeDamage,
   LifeState,
 } from "@dungeon/shared";
+import { getCreatureDefaultSkill } from "../creatures/CreatureTypeRegistry.js";
+import { logger } from "../logger.js";
 
 const AIState = {
   IDLE: 0,
@@ -333,12 +335,25 @@ export class AISystem {
         entry.creature.rotY = angle;
 
         if (entry.attackTimer <= 0) {
+          const skill = getCreatureDefaultSkill(entry.creature.creatureType);
+          if (!skill) {
+            logger.warn(
+              { creatureType: entry.creature.creatureType },
+              "No default skill for creature type — skipping attack",
+            );
+            entry.attackTimer = entry.creature.attackCooldown;
+            continue;
+          }
+          const animState = skill.def.animState;
+          const dmgMul = skill.def.damageMultiplier;
+
           entry.attackTimer = entry.creature.attackCooldown;
-          entry.creature.animState = "punch";
+          entry.creature.animState = animState;
           entry.animTimer = ATTACK_ANIM_DURATION;
           entry.damageTimer = DAMAGE_DELAY;
           entry.damageSessionId = targetSessionId;
-          entry.damageAmount = computeDamage(entry.creature.attackDamage, targetPlayer.defense);
+          const baseDamage = computeDamage(entry.creature.attackDamage, targetPlayer.defense);
+          entry.damageAmount = Math.max(1, Math.round(baseDamage * dmgMul));
           entry.damageAttack = entry.creature.attackDamage;
           entry.damageDefense = targetPlayer.defense;
 

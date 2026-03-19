@@ -164,6 +164,17 @@ export const creatures = worldSchema.table("creatures", {
   maxLevel: integer("max_level").notNull().default(0),
 });
 
+export const creatureSkills = worldSchema.table("creature_skills", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  creatureId: text("creature_id")
+    .notNull()
+    .references(() => creatures.id, { onDelete: "cascade" }),
+  skillId: text("skill_id")
+    .notNull()
+    .references(() => skills.id, { onDelete: "cascade" }),
+  isDefault: boolean("is_default").notNull().default(false),
+});
+
 export const creatureLoot = worldSchema.table("creature_loot", {
   id: uuid("id").primaryKey().defaultRandom(),
   creatureId: text("creature_id")
@@ -216,6 +227,7 @@ export const classSkills = worldSchema.table("class_skills", {
   skillId: text("skill_id")
     .notNull()
     .references(() => skills.id, { onDelete: "cascade" }),
+  isDefault: boolean("is_default").notNull().default(false),
 });
 
 export const talents = worldSchema.table("talents", {
