@@ -156,6 +156,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
   /** Exit tile world position (center of last room) */
   private exitPos: { x: number; z: number } = { x: 0, z: 0 };
+  /** Dungeon rooms from generator (kept for creature respawning on level recalc) */
+  private dungeonRooms: DungeonRoomDef[] = [];
+  /** Creature spawn seed (kept for deterministic respawning on level recalc) */
+  private creatureSpawnSeed: number = 0;
   /** Whether the exit countdown is already running */
   private exitCountdownActive: boolean = false;
 
@@ -1075,7 +1079,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       chatSystem: this.chatSystem,
     });
 
-    const spawnRng = mulberry32(seed ^ 0x454e454d);
+    this.dungeonRooms = rooms;
+    this.creatureSpawnSeed = seed ^ 0x454e454d;
+    const spawnRng = mulberry32(this.creatureSpawnSeed);
     this.spawnCreatures(rooms, spawnRng, dungeonLevel);
 
     this.log.info(
@@ -1425,27 +1431,28 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     return playerCount > 0 ? Math.max(1, Math.round(levelSum / playerCount)) : 1;
   }
 
-  /** Recalculate dungeon level from current party and re-scale all creatures */
+  /** Recalculate dungeon level from current party and respawn creatures at correct count + level */
   private recalcDungeonLevel(): void {
     const newLevel = this.computeAveragePartyLevel();
     if (newLevel === this.state.dungeonLevel) return;
 
-    const oldLevel = this.state.dungeonLevel;
     this.state.dungeonLevel = newLevel;
 
-    // Re-scale all existing creatures to match the new dungeon level
-    this.state.creatures.forEach((creature: CreatureState) => {
-      const typeDef = getCreatureTypeDef(creature.creatureType);
-      if (!typeDef) return;
-      const baseDerived = computeCreatureDerivedStats(typeDef);
-      const levelOffset = creature.level - oldLevel;
-      const creatureLevel = Math.min(MAX_LEVEL, Math.max(1, newLevel + levelOffset));
-      creature.applyStats(baseDerived, creatureLevel);
-    });
+    // Clear existing creatures and respawn with correct count for the new level
+    this.allCreatures.clear();
+    this.state.creatures.clear();
+    this.aiSystem.clearAll();
+
+    const spawnRng = mulberry32(this.creatureSpawnSeed);
+    this.spawnCreatures(this.dungeonRooms, spawnRng, newLevel);
 
     this.log.info(
-      { dungeonLevel: newLevel, playerCount: this.state.players.size },
-      "Recalculated dungeon level",
+      {
+        dungeonLevel: newLevel,
+        creatures: this.state.creatures.size,
+        playerCount: this.state.players.size,
+      },
+      "Recalculated dungeon level — creatures respawned",
     );
   }
 

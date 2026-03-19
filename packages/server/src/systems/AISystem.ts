@@ -176,6 +176,12 @@ export class AISystem {
     this.entryById.delete(creatureId);
   }
 
+  /** Remove all registered creatures (used when respawning dungeon). */
+  clearAll(): void {
+    this.entries.length = 0;
+    this.entryById.clear();
+  }
+
   /** Add threat from an external source (e.g. player dealing damage). */
   addThreat(creatureId: string, sessionId: string, amount: number): void {
     const entry = this.entryById.get(creatureId);
