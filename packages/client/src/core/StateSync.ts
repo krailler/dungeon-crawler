@@ -586,6 +586,8 @@ export class StateSync {
           });
         }
 
+        // Track health to detect healing (for particle effect)
+        let prevHealth = player.health as number;
         // Track level to detect level-up (level is public, visible to all)
         let prevLevel = player.level as number;
         // Track life state changes to switch death audio loops (local player only)
@@ -605,6 +607,16 @@ export class StateSync {
           if (player.lifeState) {
             clientPlayer.setLifeState(player.lifeState);
           }
+
+          // Heal effect: green particles when health increases (skip revive/respawn full heals)
+          if (
+            player.health > prevHealth &&
+            prevHealth > 0 &&
+            player.lifeState === LifeState.ALIVE
+          ) {
+            clientPlayer.playHealEffect();
+          }
+          prevHealth = player.health;
 
           // Level-up: sound (local only) + particle aura (all players)
           if (player.level > prevLevel) {

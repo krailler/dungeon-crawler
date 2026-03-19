@@ -485,6 +485,39 @@ export class ClientPlayer {
     );
   }
 
+  /** Play a green heal particle effect around the character. */
+  playHealEffect(): void {
+    const ps = new ParticleSystem(`heal_${this.mesh.name}`, 80, this.scene);
+    ps.particleTexture = new Texture("/textures/flare.png", this.scene);
+
+    ps.emitter = this.mesh;
+    ps.minEmitBox = new Vector3(-0.4, 0, -0.4);
+    ps.maxEmitBox = new Vector3(0.4, 0.5, 0.4);
+
+    // Particles rise gently
+    ps.direction1 = new Vector3(-0.1, 1.5, -0.1);
+    ps.direction2 = new Vector3(0.1, 3, 0.1);
+    ps.gravity = new Vector3(0, -0.2, 0);
+
+    // Green color gradient
+    ps.color1 = new Color4(0.2, 1.0, 0.3, 0.9);
+    ps.color2 = new Color4(0.1, 0.8, 0.2, 0.8);
+    ps.colorDead = new Color4(0.0, 0.6, 0.1, 0.0);
+
+    ps.minSize = 0.03;
+    ps.maxSize = 0.1;
+    ps.minLifeTime = 0.4;
+    ps.maxLifeTime = 0.8;
+    ps.emitRate = 60;
+    ps.minEmitPower = 0.5;
+    ps.maxEmitPower = 1.5;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+
+    ps.start();
+    this.pendingTimers.push(setTimeout(() => ps.stop(), 600));
+    this.pendingTimers.push(setTimeout(() => ps.dispose(), 1500));
+  }
+
   /** Show or hide the selection ring below the player. */
   setSelected(selected: boolean): void {
     this.selectionRing.setSelected(selected);
