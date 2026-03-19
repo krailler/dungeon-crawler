@@ -50,6 +50,8 @@ export interface CombatHitEvent {
   targetHealth: number;
   targetMaxHealth: number;
   killed: boolean;
+  /** Skill that caused this hit (empty string for auto-attack) */
+  skillId: string;
 }
 
 /** Fired when a skill goes on cooldown (server → client feedback) */
@@ -77,6 +79,8 @@ interface PlayerCombat {
   targetCreatureId: string | null;
   /** Timestamp of last "not facing" feedback to throttle messages */
   lastNotFacingFeedback: number;
+  /** Skill ID of the pending damage hit (for reset-on-kill logic) */
+  damageSkillId: string;
 }
 
 /** Result of finding the closest alive creature in range */
@@ -102,6 +106,7 @@ export class CombatSystem {
       skillCooldowns: new Map(),
       targetCreatureId: null,
       lastNotFacingFeedback: 0,
+      damageSkillId: "",
     });
   }
 
@@ -162,6 +167,7 @@ export class CombatSystem {
     target: TargetResult,
     damage: number,
     animState: string = "punch",
+    skillId: string = "",
   ): void {
     // Face the creature
     player.rotY = Math.atan2(target.creature.x - player.x, target.creature.z - player.z);
@@ -175,6 +181,7 @@ export class CombatSystem {
     combat.damageAmount = damage;
     combat.damageAttack = player.attackDamage;
     combat.damageDefense = target.creature.defense;
+    combat.damageSkillId = skillId;
   }
 
   // ── Active skill usage ───────────────────────────────────────────────────
@@ -205,13 +212,36 @@ export class CombatSystem {
     const hasSkill = Array.from(player.skills as Iterable<string>).includes(skillId);
     if (!hasSkill) return null;
 
-    // Need a target in range (prefer player's selected target)
-    const target = this.findTarget(player, creatures, combat.targetCreatureId);
-    if (!target) return null;
-
     // Apply talent skill modifiers
     const talentMods = collectTalentSkillMods(player.talentAllocations, skillId);
     const cooldown = def.cooldown * talentMods.cooldownMul;
+
+    // ── Buff-type skill (effectId + no damage) — no enemy target needed ──
+    if (def.effectId && def.damageMultiplier <= 0) {
+      combat.skillCooldowns.set(skillId, cooldown);
+      player.animState = def.animState;
+      combat.animTimer = ATTACK_ANIM_DURATION;
+      return { sessionId, skillId, duration: cooldown, remaining: cooldown };
+    }
+
+    // ── AoE damage skill (aoeRange > 0) — no specific target needed ──
+    if (def.aoeRange > 0 && def.damageMultiplier > 0) {
+      combat.skillCooldowns.set(skillId, cooldown);
+      player.animState = def.animState;
+      combat.animTimer = ATTACK_ANIM_DURATION;
+      combat.attackCooldown = player.attackCooldown;
+      return { sessionId, skillId, duration: cooldown, remaining: cooldown };
+    }
+
+    // ── Single-target damage skill — needs enemy target ──
+    const target = this.findTarget(player, creatures, combat.targetCreatureId);
+    if (!target) return null;
+
+    // Check HP threshold (e.g. Execute can only be used on targets below 30% HP)
+    if (def.hpThreshold > 0) {
+      if (target.creature.health / target.creature.maxHealth > def.hpThreshold) return null;
+    }
+
     const dmgMul = def.damageMultiplier * talentMods.damageMul;
 
     // Put skill on cooldown
@@ -221,9 +251,9 @@ export class CombatSystem {
     const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
     const finalDamage = Math.max(1, Math.round(baseDamage * dmgMul));
 
-    this.scheduleHit(combat, player, target, finalDamage, def.animState);
+    this.scheduleHit(combat, player, target, finalDamage, def.animState, skillId);
 
-    // Reset auto-attack cooldown so heavy strike doesn't "waste" the next auto
+    // Reset auto-attack cooldown so skill doesn't "waste" the next auto
     combat.attackCooldown = player.attackCooldown;
 
     return {
@@ -237,6 +267,39 @@ export class CombatSystem {
   /** Get remaining cooldown for a skill (0 if not on cooldown) */
   getSkillCooldown(sessionId: string, skillId: string): number {
     return this.playerCooldowns.get(sessionId)?.skillCooldowns.get(skillId) ?? 0;
+  }
+
+  /** Determine why useSkill() returned null — returns the appropriate feedback i18n key. */
+  getSkillFailureReason(
+    sessionId: string,
+    skillId: string,
+    player: PlayerState,
+    creatures: Map<string, CreatureState>,
+  ): string {
+    const combat = this.playerCooldowns.get(sessionId);
+    if (!combat) return "feedback.noTarget";
+
+    const cd = combat.skillCooldowns.get(skillId) ?? 0;
+    if (cd > 0) return "feedback.onCooldown";
+
+    const def = getSkillDef(skillId);
+    if (!def) return "feedback.noTarget";
+
+    // Buff and AoE skills should never fail past cooldown check
+    if (def.effectId && def.damageMultiplier <= 0) return "feedback.onCooldown";
+    if (def.aoeRange > 0 && def.damageMultiplier > 0) return "feedback.onCooldown";
+
+    const target = this.findTarget(player, creatures, combat.targetCreatureId);
+    if (!target) return "feedback.noTarget";
+
+    if (
+      def.hpThreshold > 0 &&
+      target.creature.health / target.creature.maxHealth > def.hpThreshold
+    ) {
+      return "feedback.targetHealthTooHigh";
+    }
+
+    return "feedback.noTarget";
   }
 
   // ── Per-tick update (auto-attack + timers) ───────────────────────────────
@@ -279,6 +342,7 @@ export class CombatSystem {
           );
           const killed = combat.damageTarget.health <= 0;
           if (killed) combat.damageTarget.isDead = true;
+          const hitSkillId = combat.damageSkillId;
           if (onHit) {
             onHit({
               sessionId,
@@ -289,9 +353,18 @@ export class CombatSystem {
               targetHealth: combat.damageTarget.health,
               targetMaxHealth: combat.damageTarget.maxHealth,
               killed,
+              skillId: hitSkillId,
             });
           }
+          // Reset cooldown on kill if the skill has resetOnKill
+          if (killed && hitSkillId) {
+            const hitDef = getSkillDef(hitSkillId);
+            if (hitDef?.resetOnKill) {
+              combat.skillCooldowns.delete(hitSkillId);
+            }
+          }
           combat.damageTarget = null;
+          combat.damageSkillId = "";
         }
       }
 

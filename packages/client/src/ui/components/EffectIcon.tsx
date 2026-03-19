@@ -4,11 +4,15 @@ import { useTranslation } from "react-i18next";
 import type { EffectDefClient } from "@dungeon/shared";
 import { WeaknessIcon } from "../icons/WeaknessIcon";
 import { HamstringIcon } from "../icons/HamstringIcon";
+import { WarCryIcon } from "../icons/WarCryIcon";
+import { DazedIcon } from "../icons/DazedIcon";
 
 /** Map icon identifiers to SVG components */
 const EFFECT_ICONS: Record<string, (props: { className?: string }) => ReactNode> = {
   weakness: WeaknessIcon,
   hamstring: HamstringIcon,
+  war_cry: WarCryIcon,
+  dazed: DazedIcon,
 };
 
 const DefaultIcon = ({ className = "h-5 w-5" }: { className?: string }): ReactNode => (

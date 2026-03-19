@@ -64,6 +64,7 @@ import {
   lerpEffectValue,
   computeScalingFactor,
   isFromBehind,
+  StatModType,
 } from "@dungeon/shared";
 import type {
   TileMap,
@@ -77,6 +78,10 @@ import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 import { getCreatureLoot, getCreatureEffects } from "../creatures/CreatureTypeRegistry";
 import { getEffectDef } from "../effects/EffectRegistry";
+import { getSkillDef } from "../skills/SkillRegistry";
+import { syncAndNotifySkills } from "../classes/ClassRegistry";
+import { logger } from "../logger";
+import { ActiveEffectState } from "../state/ActiveEffectState";
 import { LootBagState } from "../state/LootBagState";
 import { InventorySlotState } from "../state/InventorySlotState";
 
@@ -149,8 +154,11 @@ export class GameLoop {
     // Tick item cooldowns
     this.tickItemCooldowns(dtSec);
 
-    // Tick active effects (debuffs/buffs)
+    // Tick active effects (debuffs/buffs) — players
     this.bridge.effectSystem.update(dtSec, this.tickPlayersMap);
+
+    // Tick active effects — creatures
+    this.tickCreatureEffects(dtSec);
 
     // Update life states (downed, dead, respawn, revive channels)
     this.updateLifeStates(dtSec);
@@ -255,6 +263,82 @@ export class GameLoop {
     if (this.debugPathClients.size > 0) {
       this.sendDebugPaths();
     }
+  }
+
+  /**
+   * Tick creature effect timers and recompute speed when effects expire.
+   * Simplified version of EffectSystem.update() — creatures only need speed recalculation.
+   */
+  private tickCreatureEffects(dt: number): void {
+    this.bridge.state.creatures.forEach((creature: CreatureState) => {
+      if (creature.isDead || creature.effects.size === 0) return;
+
+      let dirty = false;
+      const toRemove: string[] = [];
+
+      creature.effects.forEach((effect: { remaining: number }, effectId: string) => {
+        effect.remaining -= dt;
+        if (effect.remaining <= 0) {
+          toRemove.push(effectId);
+          dirty = true;
+        }
+      });
+
+      for (const id of toRemove) {
+        creature.effects.delete(id);
+      }
+
+      if (dirty) {
+        this.recomputeCreatureSpeed(creature);
+      }
+    });
+  }
+
+  /**
+   * Apply an effect to a creature (simplified — no stacking/scaling, just refresh timer).
+   * Creates or refreshes an ActiveEffectState on the creature's effects MapSchema.
+   */
+  applyCreatureEffect(creature: CreatureState, effectId: string): void {
+    const def = getEffectDef(effectId);
+    if (!def) {
+      logger.error({ effectId }, "Effect not found in EffectRegistry");
+      return;
+    }
+
+    const existing = creature.effects.get(effectId);
+    if (existing) {
+      // Refresh timer
+      existing.remaining = def.duration;
+    } else {
+      const state = new ActiveEffectState();
+      state.effectId = effectId;
+      state.duration = def.duration;
+      state.remaining = def.duration;
+      state.stacks = 1;
+      // Compute display value from first stat modifier
+      const firstMod = Object.values(def.statModifiers)[0];
+      state.modValue = firstMod ? Math.min(127, Math.round(Math.abs(firstMod.value * 100))) : 0;
+      creature.effects.set(effectId, state);
+    }
+
+    this.recomputeCreatureSpeed(creature);
+  }
+
+  /** Recompute creature speed from baseSpeed + active effect modifiers. */
+  private recomputeCreatureSpeed(creature: CreatureState): void {
+    let percentMod = 0;
+
+    creature.effects.forEach((effect: { effectId: string }) => {
+      const def = getEffectDef(effect.effectId);
+      if (!def) return;
+      for (const [stat, mod] of Object.entries(def.statModifiers)) {
+        if (stat === "moveSpeed" && mod.type === StatModType.PERCENT) {
+          percentMod += mod.value;
+        }
+      }
+    });
+
+    creature.speed = Math.max(0.5, creature.baseSpeed * (1 + percentMod));
   }
 
   /** Apply damage from a creature attack to a player and trigger downed state if dead. */
@@ -407,10 +491,19 @@ export class GameLoop {
     // Clear target for all players that had this creature selected
     if (event.killed) {
       this.bridge.combatSystem.clearTargetFor(event.creatureId);
-    }
 
-    // Remove dead creature from state after a short delay so clients see the death
-    if (event.killed) {
+      // If skill has resetOnKill, notify client that cooldown was cleared
+      if (event.skillId) {
+        const skillDef = getSkillDef(event.skillId);
+        if (skillDef?.resetOnKill) {
+          this.bridge.sendToClient(event.sessionId, MessageType.SKILL_COOLDOWN, {
+            skillId: event.skillId,
+            duration: 0,
+            remaining: 0,
+          });
+        }
+      }
+
       this.processCreatureKill(event);
     }
   }
@@ -419,6 +512,9 @@ export class GameLoop {
   private processCreatureKill(event: CombatHitEvent): void {
     const killedCreature = this.bridge.state.creatures.get(event.creatureId);
     if (killedCreature) {
+      // Clear effects on death (so TargetFrame doesn't show stale debuffs on corpse)
+      killedCreature.effects.clear();
+
       // Distribute gold to alive party members
       let aliveCount = 0;
       let levelSum = 0;
@@ -458,6 +554,9 @@ export class GameLoop {
             this.bridge.chatSystem,
             this.bridge.sendToClient.bind(this.bridge),
           );
+
+          // Grant skills that unlock at the new level(s)
+          syncAndNotifySkills(p.classId, p.level, p.skills, sessionId, this.bridge.chatSystem);
         }
       });
 
@@ -503,10 +602,13 @@ export class GameLoop {
     this.processCreatureKill({
       creatureId,
       sessionId: killerSessionId,
-      damage: 0,
       attackDamage: 0,
-      defense: 0,
+      targetDefense: 0,
+      finalDamage: 0,
+      targetHealth: 0,
+      targetMaxHealth: 0,
       killed: true,
+      skillId: "",
     });
   }
 

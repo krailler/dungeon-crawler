@@ -753,6 +753,47 @@ export class StateSync {
           this.deps.addShadowCaster(m);
         }
 
+        // Sync creature effects (buffs/debuffs) — visible to all players
+        const syncCreatureEffects = (): void => {
+          const effects: {
+            effectId: string;
+            remaining: number;
+            duration: number;
+            stacks: number;
+            modValue: number;
+          }[] = [];
+          creature.effects?.forEach((effect: any, effectId: string) => {
+            effects.push({
+              effectId,
+              remaining: effect.remaining,
+              duration: effect.duration,
+              stacks: effect.stacks,
+              modValue: effect.modValue ?? 0,
+            });
+          });
+          creatureStore.update(id, { effects });
+          if (effects.length > 0) {
+            effectDefStore.ensureLoaded(effects.map((e) => e.effectId));
+          }
+        };
+        if (creature.effects) {
+          let lastCreatureEffectSync = 0;
+          const throttledSyncCreatureEffects = (): void => {
+            const now = performance.now();
+            if (now - lastCreatureEffectSync < 100) return;
+            lastCreatureEffectSync = now;
+            syncCreatureEffects();
+          };
+
+          $(creature).effects.onAdd((effect: any) => {
+            $(effect).onChange(() => throttledSyncCreatureEffects());
+            syncCreatureEffects();
+          });
+          $(creature).effects.onRemove(() => {
+            syncCreatureEffects();
+          });
+        }
+
         // Populate creature store for UI (TargetFrame reads from here)
         creatureStore.set(id, {
           id,
@@ -761,6 +802,7 @@ export class StateSync {
           maxHealth: creature.maxHealth,
           level: creature.level,
           isDead: creature.isDead,
+          effects: [],
         });
 
         // Listen to changes on this creature

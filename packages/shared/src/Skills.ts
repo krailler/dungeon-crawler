@@ -18,6 +18,14 @@ export type SkillDef = {
   readonly damageMultiplier: number;
   /** Animation state triggered on use (e.g. "punch", "heavy_punch") */
   readonly animState: string;
+  /** Target HP fraction threshold (0–1). Skill can only be used when target HP% ≤ this value. 0 = no threshold. */
+  readonly hpThreshold: number;
+  /** If true, cooldown resets when the target dies from this skill's hit */
+  readonly resetOnKill: boolean;
+  /** Effect ID to apply when skill is used (buff/debuff skill). Empty = damage skill. */
+  readonly effectId: string;
+  /** AoE radius for the skill. 0 = single target (or self-only for buffs). */
+  readonly aoeRange: number;
 };
 
 /** Default skill IDs assigned to new characters (fallback for legacy characters without DB skills) */

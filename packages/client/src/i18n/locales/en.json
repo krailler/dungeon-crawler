@@ -182,7 +182,8 @@
     "levelUpStatPoint": "+1 attribute point! You have {{total}} to assign.",
     "levelUpTalentPoint": "+1 talent point! You have {{total}} to assign.",
     "goldReceived": "+{{amount}} gold",
-    "talentsReset": "Talents reset for {{cost}} gold. {{points}} point(s) refunded."
+    "talentsReset": "Talents reset for {{cost}} gold. {{points}} point(s) refunded.",
+    "skillUnlocked": "New skill unlocked: $t({{skill}})!"
   },
   "gate": {
     "interactHint": "Open the gate",
@@ -220,6 +221,12 @@
     "basicAttackDesc": "Automatically attacks the nearest enemy",
     "heavyStrike": "Heavy Strike",
     "heavyStrikeDesc": "A powerful blow that deals {{multiplier}}× damage",
+    "execute": "Execute",
+    "executeDesc": "Deals {{multiplier}}× damage to targets below {{threshold}}% health. Cooldown resets on kill.",
+    "warCry": "War Cry",
+    "warCryDesc": "Empowers nearby allies, increasing attack damage by 20% for 8s.",
+    "groundSlam": "Ground Slam",
+    "groundSlamDesc": "Slams the ground, dealing {{multiplier}}× damage to all enemies nearby and slowing them.",
     "golemSlam": "Golem Slam",
     "golemSlamDesc": "A devastating ground slam",
     "passive": "Passive",
@@ -323,6 +330,7 @@
     "noTarget": "No enemy in range",
     "notFacing": "Not facing the target",
     "onCooldown": "Not ready yet",
+    "targetHealthTooHigh": "Target health is too high",
     "noItem": "You don't have that item",
     "alreadyFull": "Already at full health",
     "inventoryFull": "Inventory is full"
@@ -331,7 +339,11 @@
     "weakness": "Weakness",
     "weaknessDesc": "Attack damage reduced by {{value}}%",
     "hamstring": "Hamstring",
-    "hamstringDesc": "Movement speed reduced by {{value}}%"
+    "hamstringDesc": "Movement speed reduced by {{value}}%",
+    "warCry": "War Cry",
+    "warCryDesc": "Attack damage increased by {{value}}%",
+    "dazed": "Dazed",
+    "dazedDesc": "Movement speed reduced by {{value}}%"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

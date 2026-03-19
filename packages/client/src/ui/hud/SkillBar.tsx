@@ -19,7 +19,10 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
     <>
       <div className="text-[12px] font-semibold text-slate-100">{t(skill.name)}</div>
       <div className="mt-0.5 text-[11px] text-slate-400">
-        {t(skill.description, { multiplier: skill.damageMultiplier })}
+        {t(skill.description, {
+          multiplier: skill.damageMultiplier,
+          threshold: Math.round(skill.hpThreshold * 100),
+        })}
       </div>
       {skill.passive && (
         <div

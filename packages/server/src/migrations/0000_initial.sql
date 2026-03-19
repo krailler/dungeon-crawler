@@ -98,7 +98,11 @@ CREATE TABLE "world"."skills" (
   "passive" boolean NOT NULL DEFAULT false,
   "cooldown" real NOT NULL DEFAULT 0,
   "damage_multiplier" real NOT NULL DEFAULT 1,
-  "anim_state" text NOT NULL DEFAULT 'punch'
+  "anim_state" text NOT NULL DEFAULT 'punch',
+  "hp_threshold" real NOT NULL DEFAULT 0,
+  "reset_on_kill" boolean NOT NULL DEFAULT false,
+  "effect_id" text NOT NULL DEFAULT '',
+  "aoe_range" real NOT NULL DEFAULT 0
 );
 
 CREATE TABLE "world"."creatures" (
@@ -189,6 +193,7 @@ CREATE TABLE "world"."class_skills" (
   "class_id" text NOT NULL REFERENCES "world"."classes"("id"),
   "skill_id" text NOT NULL REFERENCES "world"."skills"("id"),
   "is_default" boolean NOT NULL DEFAULT false,
+  "unlock_level" integer NOT NULL DEFAULT 1,
   PRIMARY KEY ("class_id", "skill_id")
 );
 
@@ -233,10 +238,13 @@ VALUES
   ('dungeon_key', 'items.dungeonKey', 'items.dungeonKeyDesc', 'key', 1, false, 0, 'none', '{}', '', true, 'legendary');
 
 -- Skills
-INSERT INTO "world"."skills" ("id", "name", "description", "icon", "passive", "cooldown", "damage_multiplier", "anim_state") VALUES
-  ('basic_attack', 'skills.basicAttack', 'skills.basicAttackDesc', 'sword', true,  0, 1, 'punch'),
-  ('heavy_strike', 'skills.heavyStrike', 'skills.heavyStrikeDesc', 'fist',  false, 5, 2.5, 'heavy_punch'),
-  ('golem_slam', 'skills.golemSlam', 'skills.golemSlamDesc', 'fist', true, 0, 1.5, 'punch');
+INSERT INTO "world"."skills" ("id", "name", "description", "icon", "passive", "cooldown", "damage_multiplier", "anim_state", "hp_threshold", "reset_on_kill", "effect_id", "aoe_range") VALUES
+  ('basic_attack',  'skills.basicAttack',  'skills.basicAttackDesc',  'sword',       true,  0,  1,   'punch',       0,   false, '',             0),
+  ('heavy_strike',  'skills.heavyStrike',  'skills.heavyStrikeDesc',  'fist',        false, 5,  2.5, 'heavy_punch', 0,   false, '',             0),
+  ('execute',       'skills.execute',      'skills.executeDesc',      'sword',       false, 10, 4.0, 'heavy_punch', 0.3, true,  '',             0),
+  ('war_cry',       'skills.warCry',       'skills.warCryDesc',       'war_cry',     false, 20, 0,   'war_cry',     0,   false, 'war_cry_buff', 8.0),
+  ('ground_slam',   'skills.groundSlam',   'skills.groundSlamDesc',   'ground_slam', false, 12, 1.8, 'ground_slam', 0,   false, 'dazed',        3.0),
+  ('golem_slam',    'skills.golemSlam',    'skills.golemSlamDesc',    'fist',        true,  0,  1.5, 'punch',       0,   false, '',             0);
 
 -- Creatures
 INSERT INTO "world"."creatures" (
@@ -278,7 +286,11 @@ VALUES
    '{"duration":8.0,"statModifiers":{"attackDamage":{"value":-0.45}}}'),
   ('hamstring', 'effects.hamstring', 'effects.hamstringDesc', 'hamstring', 3.0, 1, 'refresh', true,
    '{"moveSpeed":{"type":"percent","value":-0.35}}', null,
-   '{"duration":5.0,"statModifiers":{"moveSpeed":{"value":-0.50}}}');
+   '{"duration":5.0,"statModifiers":{"moveSpeed":{"value":-0.50}}}'),
+  ('war_cry_buff', 'effects.warCry', 'effects.warCryDesc', 'war_cry', 8.0, 1, 'refresh', false,
+   '{"attackDamage":{"type":"percent","value":0.20}}', null, null),
+  ('dazed', 'effects.dazed', 'effects.dazedDesc', 'dazed', 3.0, 1, 'refresh', true,
+   '{"moveSpeed":{"type":"percent","value":-0.30}}', null, null);
 
 -- Creature effects (on-hit triggers)
 INSERT INTO "world"."creature_effects" ("creature_id", "trigger", "effect_id", "chance", "stacks", "min_level", "max_level", "max_chance")
@@ -297,7 +309,12 @@ INSERT INTO "world"."classes" ("id", "name", "description", "icon", "hp_base", "
 VALUES ('warrior', 'classes.warrior.name', 'classes.warrior.desc', '⚔️', 50, 5, 5, 0.5, 0, 0.3, 4, 0.1, 1.2, 0.02, 2.5);
 
 -- Class skills
-INSERT INTO "world"."class_skills" ("class_id", "skill_id", "is_default") VALUES ('warrior', 'basic_attack', true), ('warrior', 'heavy_strike', false);
+INSERT INTO "world"."class_skills" ("class_id", "skill_id", "is_default", "unlock_level") VALUES
+  ('warrior', 'basic_attack',  true,  1),
+  ('warrior', 'heavy_strike',  false, 1),
+  ('warrior', 'war_cry',       false, 8),
+  ('warrior', 'ground_slam',   false, 15),
+  ('warrior', 'execute',       false, 22);
 
 -- ── Talents: Warrior tree ────────────────────────────────────────────────────
 

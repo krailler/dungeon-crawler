@@ -1,5 +1,13 @@
 type Listener = () => void;
 
+export type CreatureEffectData = {
+  effectId: string;
+  remaining: number;
+  duration: number;
+  stacks: number;
+  modValue: number;
+};
+
 export type CreatureData = {
   id: string;
   name: string;
@@ -7,6 +15,7 @@ export type CreatureData = {
   maxHealth: number;
   level: number;
   isDead: boolean;
+  effects?: CreatureEffectData[];
 };
 
 type CreatureMap = Map<string, CreatureData>;

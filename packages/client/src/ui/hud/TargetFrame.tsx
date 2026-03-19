@@ -55,8 +55,8 @@ export const TargetFrame = (): ReactNode => {
     return null;
   }, [targetMember, targetCreature]);
 
-  // Resolve effects for the targeted player (creatures don't have effects yet)
-  const targetEffects = targetMember?.effects;
+  // Resolve effects for the targeted entity (player or creature)
+  const targetEffects = targetMember?.effects ?? targetCreature?.effects;
 
   // Compute canRevive before hooks (entity may be null — that's fine, just false)
   const canRevive =

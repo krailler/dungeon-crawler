@@ -70,6 +70,7 @@ import {
   getTalentDefsForClient,
   getTalentRegistryVersion,
   getTalentsForClass,
+  collectTalentSkillMods,
 } from "../talents/TalentRegistry";
 import { executeEffect } from "../items/EffectHandlers";
 import {
@@ -101,6 +102,7 @@ import {
   MAX_LEVEL,
   LifeState,
   TALENT_RESET_GOLD_PER_LEVEL,
+  computeDamage,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -489,14 +491,68 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           duration: result.duration,
           remaining: result.remaining,
         });
-      } else {
-        // Determine reason for failure
-        const cd = this.combatSystem.getSkillCooldown(client.sessionId, data.skillId);
-        if (cd > 0) {
-          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.onCooldown" });
-        } else {
-          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.noTarget" });
+
+        const skillDef = getSkillDef(data.skillId);
+        if (skillDef) {
+          const rangeSq = skillDef.aoeRange * skillDef.aoeRange;
+
+          // Buff-type skill: apply effect to nearby allies
+          if (skillDef.effectId && skillDef.damageMultiplier <= 0) {
+            this.state.players.forEach((target: PlayerState) => {
+              if (target.lifeState !== LifeState.ALIVE) return;
+              const dx = target.x - player.x;
+              const dz = target.z - player.z;
+              if (dx * dx + dz * dz <= rangeSq) {
+                this.effectSystem.applyEffect(target, skillDef.effectId, 1, 0);
+              }
+            });
+          }
+
+          // AoE damage skill: hit all creatures in range
+          if (skillDef.aoeRange > 0 && skillDef.damageMultiplier > 0) {
+            const talentMods = collectTalentSkillMods(player.talentAllocations, data.skillId);
+            const dmgMul = skillDef.damageMultiplier * talentMods.damageMul;
+            const creatures = this.state.creatures as unknown as Map<string, CreatureState>;
+
+            creatures.forEach((creature: CreatureState, creatureId: string) => {
+              if (creature.isDead) return;
+              const dx = creature.x - player.x;
+              const dz = creature.z - player.z;
+              if (dx * dx + dz * dz > rangeSq) return;
+
+              const baseDamage = computeDamage(player.attackDamage, creature.defense);
+              const finalDamage = Math.max(1, Math.round(baseDamage * dmgMul));
+              creature.health = Math.max(0, creature.health - finalDamage);
+              const killed = creature.health <= 0;
+              if (killed) creature.isDead = true;
+
+              this.gameLoop.handleCombatHit({
+                sessionId: client.sessionId,
+                creatureId,
+                attackDamage: player.attackDamage,
+                targetDefense: creature.defense,
+                finalDamage,
+                targetHealth: creature.health,
+                targetMaxHealth: creature.maxHealth,
+                killed,
+                skillId: data.skillId,
+              });
+
+              // Apply creature debuff if skill has effectId (e.g. dazed)
+              if (skillDef.effectId && !killed) {
+                this.gameLoop.applyCreatureEffect(creature, skillDef.effectId);
+              }
+            });
+          }
         }
+      } else {
+        const reason = this.combatSystem.getSkillFailureReason(
+          client.sessionId,
+          data.skillId,
+          player,
+          this.state.creatures as unknown as Map<string, CreatureState>,
+        );
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: reason });
       }
     });
     // Tutorial: player dismisses a tutorial hint

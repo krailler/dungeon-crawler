@@ -49,6 +49,14 @@ The `distSq()` function was added to `@dungeon/shared/math.ts` but is not yet us
 
 Remaining: ensure no orphan SVG icon files (some like WeaknessIcon, HamstringIcon, LockIcon still used by EffectIcon).
 
+## Delay AoE damage to match animation
+
+**Files:** `DungeonRoom.ts` (SKILL_USE handler), `CombatSystem.ts`
+
+AoE skills (Ground Slam) apply damage instantly in the message handler, bypassing the `scheduleHit()`/`DAMAGE_DELAY` system that single-target skills use. Creatures take damage before the player's animation reaches the impact frame.
+
+**Proposed solution:** Use `this.bridge.clock.setTimeout()` in the AoE handler to defer the damage loop by `DAMAGE_DELAY`, same pattern as the corpse removal timer in `processCreatureKill()`.
+
 ## Native desktop client (Electron)
 
 Wrap the web client in Electron for a native desktop experience:

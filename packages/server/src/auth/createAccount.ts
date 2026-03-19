@@ -1,5 +1,5 @@
 import { Hash } from "colyseus";
-import { eq } from "drizzle-orm";
+import { eq, and, lte } from "drizzle-orm";
 import { getDb } from "../db/database.js";
 import { accounts, characters, characterSkills, classSkills } from "../db/schema.js";
 import type { RoleValue } from "@dungeon/shared";
@@ -31,11 +31,11 @@ export async function createAccount(params: CreateAccountParams) {
     .values({ accountId: account.id, name: characterName, classId })
     .returning({ id: characters.id });
 
-  // Assign skills from the class definition
+  // Assign only level-1 skills from the class definition
   const skills = await db
     .select({ skillId: classSkills.skillId })
     .from(classSkills)
-    .where(eq(classSkills.classId, classId));
+    .where(and(eq(classSkills.classId, classId), lte(classSkills.unlockLevel, 1)));
 
   if (skills.length > 0) {
     await db

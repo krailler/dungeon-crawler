@@ -1,6 +1,7 @@
-import { Schema, type } from "@colyseus/schema";
+import { Schema, type, MapSchema } from "@colyseus/schema";
 import type { DerivedStats } from "@dungeon/shared";
 import { scaleCreatureDerivedStats } from "@dungeon/shared";
+import { ActiveEffectState } from "./ActiveEffectState";
 
 export class CreatureState extends Schema {
   @type("float32") x: number = 0;
@@ -17,10 +18,12 @@ export class CreatureState extends Schema {
 
   @type("boolean") isMoving: boolean = false;
   @type("boolean") isWalking: boolean = false;
+  @type({ map: ActiveEffectState }) effects = new MapSchema<ActiveEffectState>();
 
   // Server-only (not synced)
   path: { x: number; z: number }[] = [];
   currentPathIndex: number = 0;
+  baseSpeed: number = 0;
   speed: number = 0;
   attackDamage: number = 0;
   defense: number = 0;
@@ -34,6 +37,7 @@ export class CreatureState extends Schema {
     this.level = level;
     this.maxHealth = derived.maxHealth;
     this.health = derived.maxHealth;
+    this.baseSpeed = derived.moveSpeed;
     this.speed = derived.moveSpeed;
     this.attackDamage = derived.attackDamage;
     this.defense = derived.defense;

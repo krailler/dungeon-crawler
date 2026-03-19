@@ -16,8 +16,18 @@ const registry = createRegistry<SkillRow, SkillDef>({
     cooldown: row.cooldown,
     damageMultiplier: row.damageMultiplier,
     animState: row.animState,
+    hpThreshold: row.hpThreshold,
+    resetOnKill: row.resetOnKill,
+    effectId: row.effectId,
+    aoeRange: row.aoeRange,
   }),
-  hashDef: (def) => (def.cooldown * 100 + def.damageMultiplier * 100) | 0,
+  hashDef: (def) =>
+    (def.cooldown * 100 +
+      def.damageMultiplier * 100 +
+      def.hpThreshold * 100 +
+      def.aoeRange * 10 +
+      (def.resetOnKill ? 1 : 0)) |
+    0,
 });
 
 export const loadSkillRegistry = registry.load;

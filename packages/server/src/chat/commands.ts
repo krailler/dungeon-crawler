@@ -7,6 +7,7 @@ import { getTalentsForClass } from "../talents/TalentRegistry";
 import { notifyLevelProgress } from "./notifyLevelProgress";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { getItemDef } from "../items/ItemRegistry";
+import { syncAndNotifySkills } from "../classes/ClassRegistry";
 
 /**
  * Register all built-in slash commands.
@@ -260,6 +261,15 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       target.player.setLevel(targetLevel);
       // Recompute stats with talents cleared
       bridge.recomputePlayerStats(target.player);
+
+      // Sync skills to match the target level
+      syncAndNotifySkills(
+        target.player.classId,
+        targetLevel,
+        target.player.skills,
+        target.sessionId,
+        chat,
+      );
 
       // Notify the target player about stat/talent points and tutorials (no public broadcast)
       notifyLevelProgress(

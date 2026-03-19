@@ -182,7 +182,8 @@
     "levelUpStatPoint": "+1 punto de atributo. Tienes {{total}} por asignar.",
     "levelUpTalentPoint": "+1 punto de talento. Tienes {{total}} por asignar.",
     "goldReceived": "+{{amount}} oro",
-    "talentsReset": "Talentos reiniciados por {{cost}} de oro. {{points}} punto(s) devueltos."
+    "talentsReset": "Talentos reiniciados por {{cost}} de oro. {{points}} punto(s) devueltos.",
+    "skillUnlocked": "¡Nueva habilidad desbloqueada: $t({{skill}})!"
   },
   "gate": {
     "interactHint": "Abrir la puerta",
@@ -220,6 +221,12 @@
     "basicAttackDesc": "Ataca automáticamente al enemigo más cercano",
     "heavyStrike": "Golpe Pesado",
     "heavyStrikeDesc": "Un golpe poderoso que inflige {{multiplier}}× de daño",
+    "execute": "Ejecución",
+    "executeDesc": "Inflige {{multiplier}}× de daño a objetivos por debajo del {{threshold}}% de salud. El enfriamiento se reinicia si mata.",
+    "warCry": "Grito de Guerra",
+    "warCryDesc": "Potencia a los aliados cercanos, aumentando el daño de ataque un 20% durante 8s.",
+    "groundSlam": "Golpe Sísmico",
+    "groundSlamDesc": "Golpea el suelo, infligiendo {{multiplier}}× de daño a todos los enemigos cercanos y ralentizándolos.",
     "golemSlam": "Golpe del Gólem",
     "golemSlamDesc": "Un devastador golpe contra el suelo",
     "passive": "Pasiva",
@@ -325,13 +332,18 @@
     "onCooldown": "Aún no está listo",
     "noItem": "No tienes ese objeto",
     "alreadyFull": "Ya tienes la vida llena",
-    "inventoryFull": "Inventario lleno"
+    "inventoryFull": "Inventario lleno",
+    "targetHealthTooHigh": "La salud del objetivo es demasiado alta"
   },
   "effects": {
     "weakness": "Debilidad",
     "weaknessDesc": "Daño de ataque reducido en {{value}}%",
     "hamstring": "Desgarro",
-    "hamstringDesc": "Velocidad de movimiento reducida en {{value}}%"
+    "hamstringDesc": "Velocidad de movimiento reducida en {{value}}%",
+    "warCry": "Grito de Guerra",
+    "warCryDesc": "Daño de ataque aumentado en {{value}}%",
+    "dazed": "Aturdido",
+    "dazedDesc": "Velocidad de movimiento reducida en {{value}}%"
   },
   "cmd": {
     "playerNotFound": "Jugador no encontrado: {{name}}",

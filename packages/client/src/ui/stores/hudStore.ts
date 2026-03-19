@@ -305,7 +305,11 @@ export const hudStore = {
     emit();
   },
   setSkillCooldown(skillId: string, duration: number): void {
-    skillCooldowns.set(skillId, { duration, startedAt: Date.now() });
+    if (duration <= 0) {
+      skillCooldowns.delete(skillId);
+    } else {
+      skillCooldowns.set(skillId, { duration, startedAt: Date.now() });
+    }
     rebuildSnapshot();
     emit();
   },

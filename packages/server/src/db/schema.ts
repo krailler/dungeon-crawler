@@ -145,6 +145,10 @@ export const skills = worldSchema.table("skills", {
   cooldown: real("cooldown").notNull().default(0),
   damageMultiplier: real("damage_multiplier").notNull().default(1),
   animState: text("anim_state").notNull().default("punch"),
+  hpThreshold: real("hp_threshold").notNull().default(0),
+  resetOnKill: boolean("reset_on_kill").notNull().default(false),
+  effectId: text("effect_id").notNull().default(""),
+  aoeRange: real("aoe_range").notNull().default(0),
 });
 
 export const creatures = worldSchema.table("creatures", {
@@ -231,6 +235,7 @@ export const classSkills = worldSchema.table("class_skills", {
     .notNull()
     .references(() => skills.id, { onDelete: "cascade" }),
   isDefault: boolean("is_default").notNull().default(false),
+  unlockLevel: integer("unlock_level").notNull().default(1),
 });
 
 export const talents = worldSchema.table("talents", {
