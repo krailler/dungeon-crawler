@@ -42,3 +42,15 @@ Both `attachModel()` methods perform near-identical setup:
 **Files:** `AISystem.ts`, `GameLoop.ts`, `CombatSystem.ts`
 
 The `distSq()` function was added to `@dungeon/shared/math.ts` but is not yet used in server systems that calculate inline squared distances. Replace inline calculations with the shared utility for consistency.
+
+## Native desktop client (Electron)
+
+Wrap the web client in Electron for a native desktop experience:
+
+- **Fullscreen without Escape exit** — full control over key behavior
+- **Better GPU performance** — less browser sandbox overhead
+- **Gamepad/joystick support** — native hardware access
+- **Auto-updates** — ship new versions seamlessly
+- **Distribution** — .app (macOS), .exe (Windows), .AppImage (Linux)
+
+Use Electron over Tauri to guarantee Chromium rendering (same engine as development). Tauri uses the OS WebView which could render Babylon.js differently.
