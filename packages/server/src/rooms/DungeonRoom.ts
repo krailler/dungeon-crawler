@@ -1183,6 +1183,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const player = this.state.players.get(client.sessionId);
     if (!player || player.lifeState !== LifeState.ALIVE) return;
 
+    // Store chase target if clicking on a creature
+    if (data.chaseCreatureId) {
+      const creature = this.state.creatures.get(data.chaseCreatureId);
+      if (creature && !creature.isDead) {
+        player.chaseCreatureId = data.chaseCreatureId;
+      }
+    } else {
+      player.chaseCreatureId = null;
+    }
+
     // Validate target is a floor tile
     const tx = Math.round(data.x / TILE_SIZE);
     const tz = Math.round(data.z / TILE_SIZE);

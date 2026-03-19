@@ -38,6 +38,7 @@ export const MessageType = {
   SKILL_DEFS_RESPONSE: "skill:defs:res",
   LOOT_TAKE: "loot:take",
   SET_TARGET: "target:set",
+  AUTO_TARGET: "target:auto",
   TOGGLE_AOI: "debug:aoi",
   REVIVE_START: "revive:start",
   EFFECT_DEFS_REQUEST: "effect:defs:req",
@@ -67,6 +68,8 @@ export type MessageType = (typeof MessageType)[keyof typeof MessageType];
 export interface MoveMessage {
   x: number;
   z: number;
+  /** If set, server will re-path toward this creature each tick until in range */
+  chaseCreatureId?: string;
 }
 
 /** Payload for ADMIN_RESTART message */

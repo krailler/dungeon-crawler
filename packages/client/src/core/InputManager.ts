@@ -367,6 +367,8 @@ export class InputManager {
     // Walk toward the picked entity, stopping just outside collision range.
     const pos = pick.pickedMesh.getAbsolutePosition();
     const playerPos = this.interactable?.getPlayerPosition();
+    const chaseCreatureId = meta.pickType === "creature" ? meta.pickId : undefined;
+
     if (playerPos) {
       const dx = pos.x - playerPos.x;
       const dz = pos.z - playerPos.z;
@@ -377,12 +379,13 @@ export class InputManager {
         this.room.send(MessageType.MOVE, {
           x: playerPos.x + dx * ratio,
           z: playerPos.z + dz * ratio,
+          chaseCreatureId,
         });
       }
       // If already within range, no need to move
     } else {
       // Fallback: walk to exact position (collision will resolve)
-      this.room.send(MessageType.MOVE, { x: pos.x, z: pos.z });
+      this.room.send(MessageType.MOVE, { x: pos.x, z: pos.z, chaseCreatureId });
     }
     this.lastSendTime = performance.now();
 

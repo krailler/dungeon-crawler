@@ -146,6 +146,11 @@ export class StateSync {
       adminStore.setDebugInfo(data);
     });
 
+    // Auto-target: server tells us a creature hit us and we had no target
+    room.onMessage(MessageType.AUTO_TARGET, (data: { creatureId: string }) => {
+      targetStore.selectCreature(data.creatureId);
+    });
+
     // Gate state listeners (MapSchema<GateState>)
     // NOTE: onAdd fires for initial state BEFORE the async dungeon render completes,
     // so we only track data in stores here. Mesh placement happens after render()

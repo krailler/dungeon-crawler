@@ -152,11 +152,40 @@ export class GameLoop {
     // Update life states (downed, dead, respawn, revive channels)
     this.updateLifeStates(dtSec);
 
-    // Move players along their paths
+    // Move players along their paths (with chase re-pathing)
     for (const [, player] of this.bridge.state.players) {
       if (player.lifeState !== LifeState.ALIVE) {
         player.isMoving = false;
         continue;
+      }
+      // Chase mode: re-path toward the target creature every few ticks
+      if (player.chaseCreatureId) {
+        const creature = this.bridge.state.creatures.get(player.chaseCreatureId);
+        if (!creature || creature.isDead) {
+          player.chaseCreatureId = null;
+        } else {
+          const dx = creature.x - player.x;
+          const dz = creature.z - player.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist <= player.attackRange) {
+            // In range — stop chasing
+            player.chaseCreatureId = null;
+            player.path = [];
+            player.currentPathIndex = 0;
+            player.isMoving = false;
+          } else if (this.tickCount % 4 === 0) {
+            // Re-path every 4 ticks (~8 times/s) to avoid A* spam
+            const path = this.bridge.pathfinder.findPath(
+              { x: player.x, z: player.z },
+              { x: creature.x, z: creature.z },
+            );
+            if (path.length > 0) {
+              player.path = path;
+              player.currentPathIndex = 0;
+              player.isMoving = true;
+            }
+          }
+        }
       }
       this.moveEntity(player, dtSec);
     }
@@ -246,6 +275,18 @@ export class GameLoop {
       kill: player.lifeState !== LifeState.ALIVE,
     };
     this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
+
+    // Auto-target: if player has no target, auto-select the creature that hit them
+    if (player.lifeState === LifeState.ALIVE) {
+      const currentTarget = this.bridge.combatSystem.getTarget(event.sessionId);
+      if (!currentTarget) {
+        this.bridge.combatSystem.setTarget(event.sessionId, event.creatureId);
+        // Notify client to update its targetStore
+        this.bridge.sendToClient(event.sessionId, MessageType.AUTO_TARGET, {
+          creatureId: event.creatureId,
+        });
+      }
+    }
 
     // Apply creature on-hit effects (e.g. zombie applies Weakness)
     if (creature && player.lifeState === LifeState.ALIVE) {
@@ -706,6 +747,7 @@ export class GameLoop {
     player.isMoving = false;
     player.isSprinting = false;
     player.sprintRequested = false;
+    player.chaseCreatureId = null;
     player.path = [];
     this.bridge.effectSystem.clearEffects(player);
 

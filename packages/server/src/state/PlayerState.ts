@@ -56,6 +56,8 @@ export class PlayerState extends Schema {
   sprintRequested: boolean = false;
   /** Countdown before stamina regen begins after sprinting stops */
   staminaRegenDelay: number = 0;
+  /** Creature being chased — server re-paths toward it each tick */
+  chaseCreatureId: string | null = null;
   /** Per-item cooldown timers (seconds remaining) — server-only */
   itemCooldowns: Map<string, number> = new Map();
   /** Talent allocations (talentId → current rank) — server-only, not synced */

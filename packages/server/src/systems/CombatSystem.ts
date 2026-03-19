@@ -65,7 +65,7 @@ interface PlayerCombat {
   damageDefense: number;
   /** Active skill cooldowns (seconds remaining), keyed by skill ID */
   skillCooldowns: Map<string, number>;
-  /** Player's manually-selected target creature (null = auto-target closest) */
+  /** Player's selected target creature (null = no target, no auto-attack) */
   targetCreatureId: string | null;
 }
 
@@ -121,42 +121,27 @@ export class CombatSystem {
 
   // ── Shared helpers ───────────────────────────────────────────────────────
 
-  /** Find an alive creature to attack. Prefers the player's selected target if in range. */
+  /** Find the player's selected target if alive and in range. Returns null if no target set. */
   private findTarget(
     player: PlayerState,
     creatures: Map<string, CreatureState>,
-    preferredId: string | null = null,
+    targetId: string | null = null,
   ): TargetResult | null {
-    // Prefer manually-selected target if alive and in range
-    if (preferredId) {
-      const preferred = creatures.get(preferredId);
-      if (preferred && !preferred.isDead) {
-        const dx = preferred.x - player.x;
-        const dz = preferred.z - player.z;
-        if (Math.sqrt(dx * dx + dz * dz) <= player.attackRange) {
-          return { creature: preferred, creatureId: preferredId };
-        }
-      }
-    }
+    if (!targetId) return null;
 
-    // Fallback: closest alive creature in range
-    let closest: CreatureState | null = null;
-    let closestId = "";
-    let closestDist = Infinity;
+    const target = creatures.get(targetId);
+    if (!target || target.isDead) return null;
 
-    for (const [creatureId, creature] of creatures) {
-      if (creature.isDead) continue;
-      const dx = creature.x - player.x;
-      const dz = creature.z - player.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist <= player.attackRange && dist < closestDist) {
-        closest = creature;
-        closestId = creatureId;
-        closestDist = dist;
-      }
-    }
+    const dx = target.x - player.x;
+    const dz = target.z - player.z;
+    if (Math.sqrt(dx * dx + dz * dz) > player.attackRange) return null;
 
-    return closest ? { creature: closest, creatureId: closestId } : null;
+    return { creature: target, creatureId: targetId };
+  }
+
+  /** Get the current target creature ID for a player. */
+  getTarget(sessionId: string): string | null {
+    return this.playerCooldowns.get(sessionId)?.targetCreatureId ?? null;
   }
 
   /** Schedule a delayed hit: face creature, play punch anim, damage after delay. */
