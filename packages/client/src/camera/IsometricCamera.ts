@@ -51,6 +51,7 @@ export class IsometricCamera {
   }
 
   setFreeCamera(on: boolean): void {
+    if (on === this.freeMode) return;
     this.freeMode = on;
     if (on) {
       this.camera.lowerAlphaLimit = null;

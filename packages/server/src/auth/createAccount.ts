@@ -18,6 +18,9 @@ interface CreateAccountParams {
  */
 export async function createAccount(params: CreateAccountParams) {
   const { email, password, characterName, role = "user", classId = "warrior" } = params;
+  if (process.env.NODE_ENV === "production" && password.length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
   const db = getDb();
   const hashedPassword = await Hash.make(password);
 

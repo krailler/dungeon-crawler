@@ -89,6 +89,8 @@ export class ClientPlayer {
 
   /** Pending timers (e.g. particle effect cleanup) — cleared on dispose */
   private pendingTimers: ReturnType<typeof setTimeout>[] = [];
+  /** Active particle systems — disposed on cleanup to prevent orphaned scene references */
+  private activeParticles: Set<ParticleSystem> = new Set();
 
   // Target state from server
   private targetX: number = 0;
@@ -468,6 +470,7 @@ export class ClientPlayer {
     ps.blendMode = ParticleSystem.BLENDMODE_ADD;
 
     ps.start();
+    this.activeParticles.add(ps);
 
     // Stop emitting after a short burst, then dispose after particles die
     this.pendingTimers.push(
@@ -478,6 +481,7 @@ export class ClientPlayer {
     this.pendingTimers.push(
       setTimeout(
         () => {
+          this.activeParticles.delete(ps);
           ps.dispose();
         },
         (LEVEL_UP_DURATION + 1.5) * 1000,
@@ -514,8 +518,14 @@ export class ClientPlayer {
     ps.blendMode = ParticleSystem.BLENDMODE_ADD;
 
     ps.start();
+    this.activeParticles.add(ps);
     this.pendingTimers.push(setTimeout(() => ps.stop(), 600));
-    this.pendingTimers.push(setTimeout(() => ps.dispose(), 1500));
+    this.pendingTimers.push(
+      setTimeout(() => {
+        this.activeParticles.delete(ps);
+        ps.dispose();
+      }, 1500),
+    );
   }
 
   /** Show or hide the selection ring below the player. */
@@ -545,6 +555,8 @@ export class ClientPlayer {
     this.selectionRing.dispose();
     for (const t of this.pendingTimers) clearTimeout(t);
     this.pendingTimers = [];
+    for (const ps of this.activeParticles) ps.dispose();
+    this.activeParticles.clear();
     this.animController.dispose();
     if (this.nameLabel) {
       this.guiTexture?.removeControl(this.nameLabel);

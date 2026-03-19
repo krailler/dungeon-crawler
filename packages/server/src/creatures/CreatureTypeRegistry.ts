@@ -10,6 +10,7 @@ import { getSkillDef } from "../skills/SkillRegistry.js";
 import type { SkillDef } from "@dungeon/shared";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
+import { logger } from "../logger.js";
 
 export type CreatureEffectEntry = {
   trigger: CreatureEffectTriggerValue;
@@ -107,7 +108,13 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
   skillsByCreature = new Map<string, CreatureSkillEntry[]>();
   for (const row of skillRows) {
     const def = getSkillDef(row.skillId);
-    if (!def) continue;
+    if (!def) {
+      logger.warn(
+        { creatureId: row.creatureId, skillId: row.skillId },
+        "Creature references unknown skill — skipping",
+      );
+      continue;
+    }
     const entries = skillsByCreature.get(row.creatureId) ?? [];
     entries.push({ skillId: row.skillId, isDefault: row.isDefault, def });
     skillsByCreature.set(row.creatureId, entries);

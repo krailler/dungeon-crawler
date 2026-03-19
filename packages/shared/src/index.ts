@@ -87,7 +87,7 @@ export { computeGoldDrop, computeLevelModifier } from "./Economy.js";
 
 export { xpToNextLevel, computeXpDrop } from "./Leveling.js";
 
-export { MAX_SKILL_SLOTS, DEFAULT_SKILL_IDS } from "./Skills.js";
+export { MAX_SKILL_SLOTS } from "./Skills.js";
 export type { SkillDef } from "./Skills.js";
 
 export { Role } from "./Roles.js";

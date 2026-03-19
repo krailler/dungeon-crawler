@@ -20,6 +20,7 @@ import {
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import { getClassDef } from "../classes/ClassRegistry";
 import { getTalentsForClass } from "../talents/TalentRegistry";
+import { getSkillDef } from "../skills/SkillRegistry";
 import {
   registerSession,
   unregisterSession,
@@ -666,11 +667,17 @@ export class PlayerSessionManager {
       .from(characterSkills)
       .where(eq(characterSkills.characterId, characterId));
 
+    let skipped = 0;
     for (const row of rows) {
-      player.skills.push(row.skillId);
+      if (getSkillDef(row.skillId)) {
+        player.skills.push(row.skillId);
+      } else {
+        skipped++;
+        this.log.warn({ characterId, skillId: row.skillId }, "Skipping unknown skill from DB");
+      }
     }
     if (rows.length > 0) {
-      this.log.debug({ characterId, skills: rows.length }, "Skills loaded");
+      this.log.debug({ characterId, skills: rows.length - skipped, skipped }, "Skills loaded");
     }
   }
 

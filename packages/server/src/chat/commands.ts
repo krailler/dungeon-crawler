@@ -156,13 +156,12 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
     description: "Teleport to world coordinates",
     adminOnly: true,
     handler: (ctx: CommandContext) => {
-      const parts = ctx.args.trim().split(/\s+/);
-      if (parts.length < 2) {
+      if (ctx.args.length < 2) {
         ctx.replyError("Usage: /tpxy <x> <z>", "cmd.usageTpxy");
         return;
       }
-      const x = parseFloat(parts[0]);
-      const z = parseFloat(parts[1]);
+      const x = parseFloat(ctx.args[0]);
+      const z = parseFloat(ctx.args[1]);
       if (isNaN(x) || isNaN(z)) {
         ctx.replyError("Invalid coordinates.", "cmd.invalidCoords");
         return;
@@ -306,13 +305,17 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         return;
       }
       const targetClient = findClient(bridge, target.sessionId);
-      if (targetClient) {
-        const name = target.player.characterName;
-        // Clean up player state BEFORE disconnecting
-        bridge.kickPlayer(target.sessionId);
-        chat.broadcastSystemI18n("chat.kicked", { name }, `${name} has been kicked.`);
-        targetClient.leave(4101);
+      if (!targetClient) {
+        ctx.replyError(`${target.player.characterName} is not connected.`, "cmd.notConnected", {
+          name: target.player.characterName,
+        });
+        return;
       }
+      const name = target.player.characterName;
+      // Clean up player state BEFORE disconnecting
+      bridge.kickPlayer(target.sessionId);
+      chat.broadcastSystemI18n("chat.kicked", { name }, `${name} has been kicked.`);
+      targetClient.leave(4101);
     },
   });
 

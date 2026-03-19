@@ -10,6 +10,7 @@ import { toTalentDefClient, TalentEffectType } from "@dungeon/shared";
 import { talents, talentEffects } from "../db/schema.js";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
+import { logger } from "../logger.js";
 
 type TalentRow = typeof talents.$inferSelect;
 
@@ -97,7 +98,10 @@ export function collectTalentStatMods(allocations: Map<string, number>): TalentS
   const mods: TalentStatModifier[] = [];
   for (const [talentId, rank] of allocations) {
     const def = registry.get(talentId);
-    if (!def) continue;
+    if (!def) {
+      logger.warn({ talentId }, "Player has allocated unknown talent — skipping");
+      continue;
+    }
     for (const effect of def.effects) {
       if (effect.rank > rank) continue;
       if (effect.effectType !== TalentEffectType.STAT_MOD || !effect.statModifier) continue;
@@ -119,7 +123,10 @@ export function collectTalentSkillMods(
   let damageMul = 1;
   for (const [talentId, rank] of allocations) {
     const def = registry.get(talentId);
-    if (!def) continue;
+    if (!def) {
+      logger.warn({ talentId }, "Player has allocated unknown talent — skipping");
+      continue;
+    }
     for (const effect of def.effects) {
       if (effect.rank > rank) continue;
       if (effect.effectType !== TalentEffectType.MODIFY_SKILL) continue;

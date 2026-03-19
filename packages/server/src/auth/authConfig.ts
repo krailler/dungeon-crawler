@@ -4,7 +4,10 @@ import { getDb } from "../db/database";
 import { accounts } from "../db/schema";
 import { createAccount } from "./createAccount";
 
-// JWT secret — use env var in production, dev fallback for local development
+// JWT secret — required in production, dev fallback for local development
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required in production");
+}
 JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-prod";
 
 auth.settings.onFindUserByEmail = async (email: string) => {

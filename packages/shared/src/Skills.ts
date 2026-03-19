@@ -27,6 +27,3 @@ export type SkillDef = {
   /** AoE radius for the skill. 0 = single target (or self-only for buffs). */
   readonly aoeRange: number;
 };
-
-/** Default skill IDs assigned to new characters (fallback for legacy characters without DB skills) */
-export const DEFAULT_SKILL_IDS = ["basic_attack", "heavy_strike"] as const;
