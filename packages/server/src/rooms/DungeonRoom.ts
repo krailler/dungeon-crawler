@@ -1335,6 +1335,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.path = path;
       player.currentPathIndex = 0;
       player.isMoving = true;
+      // Cancel attack animation follow-through so movement starts immediately
+      this.combatSystem.cancelAnimation(client.sessionId, player);
     }
   }
 

@@ -137,6 +137,14 @@ export class CombatSystem {
     if (combat) combat.skillCooldowns.clear();
   }
 
+  /** Cancel any in-progress attack animation for a player (e.g. on move). */
+  cancelAnimation(sessionId: string, player: PlayerState): void {
+    const combat = this.playerCooldowns.get(sessionId);
+    if (!combat || combat.animTimer <= 0) return;
+    combat.animTimer = 0;
+    player.animState = "";
+  }
+
   // ── Shared helpers ───────────────────────────────────────────────────────
 
   /** Find the player's selected target if alive and in range. Returns null if no target set. */
@@ -364,6 +372,11 @@ export class CombatSystem {
             if (hitDef?.resetOnKill) {
               combat.skillCooldowns.delete(hitSkillId);
             }
+          }
+          // Cancel remaining animation follow-through on kill
+          if (killed && combat.animTimer > 0 && player) {
+            combat.animTimer = 0;
+            player.animState = "";
           }
           combat.damageTarget = null;
           combat.damageSkillId = "";

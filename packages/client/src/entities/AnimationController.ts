@@ -134,6 +134,20 @@ export class AnimationController {
     }
   }
 
+  /** Cancel a playing one-shot animation so looping (idle/run) can resume. */
+  cancelOneShot(): void {
+    if (!this.isPlayingOneShot) return;
+    if (this.activeOneShot) {
+      this.activeOneShot.onAnimationGroupEndObservable.clear();
+      this.activeOneShot.stop();
+      this.activeOneShot = null;
+    }
+    this.isPlayingOneShot = false;
+    this.currentAnim = null;
+    this.pendingSoundName = null;
+    this.pendingSoundTimer = 0;
+  }
+
   /** Whether a one-shot animation is currently playing. */
   get isOneShotPlaying(): boolean {
     return this.isPlayingOneShot;

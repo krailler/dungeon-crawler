@@ -209,6 +209,8 @@ export class ClientCreature {
     // Trigger one-shot animation if server says so (interrupts current one-shot)
     if (animState && animState !== this.lastAnimState && !isDead) {
       this.animController.playOneShot(animState as AnimName);
+    } else if (!animState && this.lastAnimState && !isDead) {
+      this.animController.cancelOneShot();
     }
     this.lastAnimState = animState;
 

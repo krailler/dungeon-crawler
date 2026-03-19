@@ -247,6 +247,9 @@ export class ClientPlayer {
     // Trigger one-shot animation if server says so (interrupts current one-shot)
     if (animState && animState !== this.lastAnimState) {
       this.animController.playOneShot(animState as AnimName);
+    } else if (!animState && this.lastAnimState) {
+      // Server cleared animState early (target died, player moved) — cancel animation
+      this.animController.cancelOneShot();
     }
     this.lastAnimState = animState;
   }
