@@ -241,7 +241,7 @@ VALUES
 INSERT INTO "world"."skills" ("id", "name", "description", "icon", "passive", "cooldown", "damage_multiplier", "anim_state", "hp_threshold", "reset_on_kill", "effect_id", "aoe_range") VALUES
   ('basic_attack',  'skills.basicAttack',  'skills.basicAttackDesc',  'sword',       true,  0,  1,   'punch',       0,   false, '',             0),
   ('heavy_strike',  'skills.heavyStrike',  'skills.heavyStrikeDesc',  'fist',        false, 5,  2.5, 'heavy_punch', 0,   false, '',             0),
-  ('execute',       'skills.execute',      'skills.executeDesc',      'execute',     false, 10, 4.0, 'heavy_punch', 0.3, true,  '',             0),
+  ('execute',       'skills.execute',      'skills.executeDesc',      'execute',     false, 10, 4.0, 'execute',     0.3, true,  '',             0),
   ('war_cry',       'skills.warCry',       'skills.warCryDesc',       'war_cry',     false, 20, 0,   'war_cry',     0,   false, 'war_cry_buff', 8.0),
   ('ground_slam',   'skills.groundSlam',   'skills.groundSlamDesc',   'ground_slam', false, 12, 1.8, 'ground_slam', 0,   false, 'dazed',        3.0),
   ('golem_slam',    'skills.golemSlam',    'skills.golemSlamDesc',    'fist',        true,  0,  1.5, 'punch',       0,   false, '',             0);

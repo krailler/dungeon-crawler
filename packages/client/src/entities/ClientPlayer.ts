@@ -20,6 +20,7 @@ import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTe
 import type { CharacterInstance } from "./CharacterAssetLoader";
 import { AnimationController } from "./AnimationController";
 import type { SoundManager } from "../audio/SoundManager";
+import { playSkillVfx } from "../vfx";
 
 // Side-effect: shadow map support
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
@@ -247,6 +248,12 @@ export class ClientPlayer {
     // Trigger one-shot animation if server says so (interrupts current one-shot)
     if (animState && animState !== this.lastAnimState) {
       this.animController.playOneShot(animState as AnimName);
+      playSkillVfx(animState, {
+        scene: this.scene,
+        emitter: this.mesh,
+        addParticle: (ps) => this.activeParticles.add(ps),
+        addTimer: (t) => this.pendingTimers.push(t),
+      });
     } else if (!animState && this.lastAnimState) {
       // Server cleared animState early (target died, player moved) — cancel animation
       this.animController.cancelOneShot();
