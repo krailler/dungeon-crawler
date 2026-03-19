@@ -5,19 +5,11 @@ import { hudStore } from "../stores/hudStore";
 import { skillDefStore } from "../stores/skillDefStore";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import type { BindableActionValue } from "../stores/settingsStore";
-import { SwordIcon } from "../icons/SwordIcon";
-import { FistIcon } from "../icons/FistIcon";
 import { LockIcon } from "../icons/LockIcon";
 import { ActionSlot } from "../components/ActionSlot";
+import { ItemIcon } from "../components/ItemIcon";
 import { MAX_SKILL_SLOTS } from "@dungeon/shared";
 import type { SkillDef } from "@dungeon/shared";
-
-// ── Icon map (skill icon name → component) ───────────────────────────────────
-
-const ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
-  sword: SwordIcon,
-  fist: FistIcon,
-};
 
 // ── Skill tooltip content ────────────────────────────────────────────────────
 
@@ -129,7 +121,6 @@ export const SkillBar = (): ReactNode => {
       <div className="flex items-center gap-1.5">
         {slots.map((skill, i) => {
           const active = isSlotActive(skill);
-          const IconComponent = skill ? ICON_MAP[skill.icon] : null;
 
           return (
             <ActionSlot
@@ -139,7 +130,7 @@ export const SkillBar = (): ReactNode => {
               active={!!skill}
               disabled={skill ? !active : false}
               disabledSlash={!!skill?.passive && !active}
-              icon={IconComponent ? <IconComponent /> : <LockIcon className="h-4 w-4" />}
+              icon={skill ? <ItemIcon iconId={skill.icon} /> : <LockIcon className="h-4 w-4" />}
               onClick={skill ? () => activateSlot(i) : undefined}
               keybind={displayKeyName(skillBindKeys[i])}
               cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}

@@ -20,16 +20,7 @@ import { hudStore } from "../stores/hudStore";
 import { skillDefStore } from "../stores/skillDefStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { playUiSfx } from "../../audio/uiSfx";
-import { ShieldIcon } from "../icons/ShieldIcon";
-import { SwordIcon } from "../icons/SwordIcon";
-import { AgilityIcon } from "../icons/AgilityIcon";
-
-/** Map talent icon names to SVG components */
-const TALENT_ICON_MAP: Record<string, (props: { className?: string }) => ReactNode> = {
-  shield: ShieldIcon,
-  sword: SwordIcon,
-  agility: AgilityIcon,
-};
+import { ItemIcon } from "../components/ItemIcon";
 
 /** Map internal stat names to i18n keys */
 const STAT_I18N: Record<string, string> = {
@@ -128,11 +119,7 @@ const TalentNode = ({
             }
           }}
         >
-          {TALENT_ICON_MAP[def.icon] ? (
-            TALENT_ICON_MAP[def.icon]({ className: "h-6 w-6" })
-          ) : (
-            <span className="text-lg">{def.icon}</span>
-          )}
+          <ItemIcon iconId={def.icon} className="h-full w-full rounded-md" />
           <span className="absolute -bottom-1 -right-1 rounded-full bg-zinc-900 px-1 text-[9px] font-bold text-zinc-300">
             {currentRank}/{def.maxRank}
           </span>

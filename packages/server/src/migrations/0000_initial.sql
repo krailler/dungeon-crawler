@@ -304,21 +304,21 @@ INSERT INTO "world"."class_skills" ("class_id", "skill_id", "is_default") VALUES
 -- Row 0: base talents (no prerequisites)
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_toughness',  'warrior', 'talents.warriorToughness.name',  'talents.warriorToughness.desc',  'shield',  3, NULL, 0, 1, 0, 0),
-  ('warrior_might',      'warrior', 'talents.warriorMight.name',      'talents.warriorMight.desc',      'sword',   3, NULL, 0, 1, 0, 1),
-  ('warrior_swiftness',  'warrior', 'talents.warriorSwiftness.name',  'talents.warriorSwiftness.desc',  'agility', 2, NULL, 0, 1, 0, 2);
+  ('warrior_toughness',  'warrior', 'talents.warriorToughness.name',  'talents.warriorToughness.desc',  'shield',    3, NULL, 0, 1, 0, 0),
+  ('warrior_might',      'warrior', 'talents.warriorMight.name',      'talents.warriorMight.desc',      'strength', 3, NULL, 0, 1, 0, 1),
+  ('warrior_swiftness',  'warrior', 'talents.warriorSwiftness.name',  'talents.warriorSwiftness.desc',  'agility',  2, NULL, 0, 1, 0, 2);
 
 -- Row 1: requires row 0 talents at rank 2, level 5
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_thick_skin', 'warrior', 'talents.warriorThickSkin.name', 'talents.warriorThickSkin.desc', 'shield',  3, 'warrior_toughness', 2, 5, 1, 0),
-  ('warrior_cleave',     'warrior', 'talents.warriorCleave.name',    'talents.warriorCleave.desc',    'sword',   1, 'warrior_might',     2, 5, 1, 1),
-  ('warrior_rush',       'warrior', 'talents.warriorRush.name',      'talents.warriorRush.desc',      'agility', 1, 'warrior_swiftness', 2, 5, 1, 2);
+  ('warrior_thick_skin', 'warrior', 'talents.warriorThickSkin.name', 'talents.warriorThickSkin.desc', 'thick_skin', 3, 'warrior_toughness', 2, 5, 1, 0),
+  ('warrior_cleave',     'warrior', 'talents.warriorCleave.name',    'talents.warriorCleave.desc',    'slash',      1, 'warrior_might',     2, 5, 1, 1),
+  ('warrior_rush',       'warrior', 'talents.warriorRush.name',      'talents.warriorRush.desc',      'charge',     1, 'warrior_swiftness', 2, 5, 1, 2);
 
 -- Row 2: capstone, requires row 1 talent at rank 2, level 10
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_last_stand', 'warrior', 'talents.warriorLastStand.name', 'talents.warriorLastStand.desc', 'shield', 1, 'warrior_thick_skin', 2, 10, 2, 1);
+  ('warrior_last_stand', 'warrior', 'talents.warriorLastStand.name', 'talents.warriorLastStand.desc', 'last_stand', 1, 'warrior_thick_skin', 2, 10, 2, 1);
 
 -- ── Talent effects ───────────────────────────────────────────────────────────
 
