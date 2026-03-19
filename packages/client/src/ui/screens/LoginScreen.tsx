@@ -1,8 +1,58 @@
-import { useState, useSyncExternalStore, type FormEvent } from "react";
+import { useState, useSyncExternalStore, useMemo, type FormEvent } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { PROTOCOL_VERSION } from "@dungeon/shared";
+
+const PARTICLE_COUNT = 40;
+
+/** Floating golden particles background */
+const ParticleBackground = (): ReactNode => {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 20,
+        duration: 12 + Math.random() * 18,
+        size: 1.5 + Math.random() * 3,
+        opacity: 0.15 + Math.random() * 0.35,
+        drift: -30 + Math.random() * 60,
+      })),
+    [],
+  );
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Subtle radial gradient overlay */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(120,80,20,0.08)_0%,transparent_70%)]" />
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.left}%`,
+            bottom: "-5%",
+            width: p.size,
+            height: p.size,
+            background: `radial-gradient(circle, rgba(255,200,80,${p.opacity}) 0%, rgba(255,150,30,0) 70%)`,
+            boxShadow: `0 0 ${p.size * 2}px rgba(255,180,50,${p.opacity * 0.5})`,
+            "--drift": `${p.drift}px`,
+            animation: `loginParticleRise ${p.duration}s ${p.delay}s linear infinite`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes loginParticleRise {
+          0% { transform: translateY(0) translateX(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-110vh) translateX(var(--drift, 0px)); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 export const LoginScreen = (): ReactNode => {
   const { t } = useTranslation();
@@ -22,9 +72,17 @@ export const LoginScreen = (): ReactNode => {
   if (auth.canReconnect) {
     return (
       <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
-        <h1 className="mb-4 text-4xl font-bold tracking-widest text-slate-200">
-          {t("reconnect.title")}
-        </h1>
+        <div
+          className="absolute inset-0 bg-contain bg-center bg-no-repeat"
+          style={{ backgroundImage: "url(/textures/login-bg.png)" }}
+        />
+        <div className="absolute inset-0 bg-[#05070d]/75" />
+        <ParticleBackground />
+        <img
+          src="/textures/logo.png"
+          alt="KrawlHero"
+          className="relative z-10 mb-4 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
+        />
         <p className="mb-8 max-w-sm text-center text-sm text-slate-400">{t("reconnect.message")}</p>
         {auth.characterName && (
           <p className="mb-6 text-xs text-slate-500">
@@ -51,20 +109,30 @@ export const LoginScreen = (): ReactNode => {
   // ── Login screen ──────────────────────────────────────────────────────────
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
-      {/* Title */}
-      <h1 className="mb-10 text-4xl font-bold tracking-widest text-slate-200">
-        {t("login.title")}
-      </h1>
+      {/* Background image with dark overlay */}
+      <img
+        src="/textures/login-bg.png"
+        alt=""
+        className="pointer-events-none absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2"
+      />
+      <div className="absolute inset-0 bg-[#05070d]/75" />
+      <ParticleBackground />
+      {/* Logo */}
+      <img
+        src="/textures/logo.png"
+        alt="KrawlHero"
+        className="relative z-10 mb-10 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
+      />
 
       {/* Login form */}
-      <form onSubmit={handleSubmit} className="flex w-80 flex-col gap-4">
+      <form onSubmit={handleSubmit} className="relative z-10 flex w-80 flex-col gap-4">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t("login.email")}
           autoComplete="email"
-          className="rounded-lg border border-slate-600/40 bg-slate-900/80 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition-colors focus:border-amber-500/60"
+          className="rounded-lg border border-slate-600/40 bg-slate-900/40 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none backdrop-blur-sm transition-colors focus:border-amber-500/60"
         />
         <input
           type="password"
@@ -72,7 +140,7 @@ export const LoginScreen = (): ReactNode => {
           onChange={(e) => setPassword(e.target.value)}
           placeholder={t("login.password")}
           autoComplete="current-password"
-          className="rounded-lg border border-slate-600/40 bg-slate-900/80 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition-colors focus:border-amber-500/60"
+          className="rounded-lg border border-slate-600/40 bg-slate-900/40 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none backdrop-blur-sm transition-colors focus:border-amber-500/60"
         />
 
         <button
@@ -88,7 +156,7 @@ export const LoginScreen = (): ReactNode => {
 
       {/* Dev quick-login */}
       {import.meta.env.DEV && (
-        <div className="mt-10 w-80 rounded-lg border-2 border-dashed border-yellow-500/30 bg-yellow-950/10 p-4">
+        <div className="relative z-10 mt-10 w-80 rounded-lg border-2 border-dashed border-yellow-500/30 bg-yellow-950/10 p-4">
           <div className="mb-3 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-500/70">
             {t("login.devMode")}
           </div>
