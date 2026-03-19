@@ -121,6 +121,9 @@
   },
   "character": {
     "title": "Character",
+    "tabCharacter": "Character",
+    "tabTalents": "Talents",
+    "tabSkills": "Spellbook",
     "level": "Lv.{{level}}",
     "strength": "Strength",
     "strengthTip": "Increases attack damage",
@@ -235,12 +238,14 @@
     "clickToToggle": "Click or press key to toggle",
     "clickToUse": "Click or press key to use",
     "cooldown": "Cooldown: {{seconds}}s",
-    "damage": "Damage: {{multiplier}}×"
+    "damage": "Damage: {{multiplier}}×",
+    "passiveAlwaysActive": "Passive",
+    "unlocksAtLevel": "Unlocks at level {{level}}"
   },
   "tutorial": {
     "startDungeon": "You are the party leader! Right-click the gate or press F nearby to start the dungeon.",
-    "allocateStats": "You have attribute points! Press C to open the character panel and assign them.",
-    "allocateTalents": "You unlocked talents! Click the star button to open the talent tree and spend your points.",
+    "allocateStats": "You have attribute points! Press C to open the character sheet and assign them.",
+    "allocateTalents": "You unlocked talents! Press N to open the talent tree and spend your points.",
     "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!",
     "youDowned": "You've been downed! A teammate can revive you before you bleed out. You can still use the chat.",
     "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them.",

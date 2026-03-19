@@ -10,7 +10,8 @@ import { minimapStore } from "../stores/minimapStore";
 import { DebugPanel } from "./DebugPanel";
 import { MinimapOverlay } from "./MinimapOverlay";
 import { PauseMenu } from "./PauseMenu";
-import { CharacterPanel } from "./CharacterPanel";
+import { CharacterSheet } from "./CharacterSheet";
+import type { SheetTab } from "./CharacterSheet";
 import { ChatPanel } from "./ChatPanel";
 import { GateHint } from "./GatePrompt";
 import { PromptOverlay } from "./PromptOverlay";
@@ -40,11 +41,10 @@ import { BackpackIcon } from "../icons/BackpackIcon";
 import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { classDefStore } from "../stores/classDefStore";
-import { TalentPanel } from "./TalentPanel";
 
 import { healthColor } from "../components/healthColor";
 import { isEntityDead } from "../components/lifeState";
-import { LifeState, BLEEDOUT_DURATION, TALENT_UNLOCK_LEVEL } from "@dungeon/shared";
+import { LifeState, BLEEDOUT_DURATION } from "@dungeon/shared";
 
 type FloatEntry = { id: number; amount: number };
 let floatIdCounter = 0;
@@ -212,15 +212,31 @@ export const HudRoot = (): ReactNode => {
   const targetSnap = useSyncExternalStore(targetStore.subscribe, targetStore.getSnapshot);
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
   const isAdmin = authSnapshot.role === "admin";
-  const [characterOpen, setCharacterOpen] = useState(false);
-  const toggleCharacter = useCallback(() => setCharacterOpen((v) => !v), []);
-  const closeCharacter = useCallback(() => setCharacterOpen(false), []);
+  // Unified character sheet (character + talents + spellbook)
+  const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
+  const toggleSheet = useCallback(
+    (tab: SheetTab = "character") => setSheetTab((prev) => (prev === tab ? null : tab)),
+    [],
+  );
+  const closeSheet = useCallback(() => setSheetTab(null), []);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const toggleInventory = useCallback(() => setInventoryOpen((v) => !v), []);
   const closeInventory = useCallback(() => setInventoryOpen(false), []);
-  const [talentOpen, setTalentOpen] = useState(false);
-  const toggleTalent = useCallback(() => setTalentOpen((v) => !v), []);
-  const closeTalent = useCallback(() => setTalentOpen(false), []);
+
+  // Talents keybind opens the sheet on the talents tab
+  useEffect(() => {
+    const talentKey = settings.keybindings.talents?.toLowerCase();
+    if (!talentKey) return;
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === talentKey) {
+        playUiSfx("ui_click");
+        toggleSheet("talents");
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [settings.keybindings.talents, toggleSheet]);
 
   // Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -306,9 +322,8 @@ export const HudRoot = (): ReactNode => {
       <TargetFrame />
       <TutorialHint />
       <MinimapOverlay />
-      {characterOpen && <CharacterPanel onClose={closeCharacter} />}
+      {sheetTab && <CharacterSheet initialTab={sheetTab} onClose={closeSheet} />}
       {inventoryOpen && <InventoryPanel onClose={closeInventory} />}
-      {talentOpen && <TalentPanel onClose={closeTalent} />}
       <LootBagPanel />
       <LowHealthVignette />
       <LevelUpOverlay />
@@ -485,26 +500,6 @@ export const HudRoot = (): ReactNode => {
       <XpBar />
       {/* HUD buttons — bottom right */}
       <div className="absolute bottom-5 right-5 flex items-center gap-2">
-        <div className="relative">
-          <HudButton
-            onClick={toggleTalent}
-            isOpen={talentOpen}
-            icon={<StarIcon />}
-            label={t("talents.title")}
-            shortcut={displayKeyName(settings.keybindings.talents)}
-            disabled={(localMember?.level ?? 1) < TALENT_UNLOCK_LEVEL}
-            tooltip={
-              (localMember?.level ?? 1) < TALENT_UNLOCK_LEVEL
-                ? t("talents.lockedTooltip", { level: TALENT_UNLOCK_LEVEL })
-                : undefined
-            }
-          />
-          {(localMember?.talentPoints ?? 0) > 0 && (
-            <Badge variant="notification" color="amber" pulse>
-              {localMember?.talentPoints}
-            </Badge>
-          )}
-        </div>
         <HudButton
           onClick={toggleInventory}
           isOpen={inventoryOpen}
@@ -521,15 +516,19 @@ export const HudRoot = (): ReactNode => {
         />
         <div className="relative">
           <HudButton
-            onClick={toggleCharacter}
-            isOpen={characterOpen}
+            onClick={() => toggleSheet("character")}
+            isOpen={sheetTab !== null}
             icon={<CharacterIcon />}
             label={t("character.title")}
             shortcut={displayKeyName(settings.keybindings.character)}
           />
-          {(localMember?.statPoints ?? 0) > 0 && (
-            <Badge variant="notification" color="sky" pulse>
-              {localMember?.statPoints}
+          {((localMember?.statPoints ?? 0) > 0 || (localMember?.talentPoints ?? 0) > 0) && (
+            <Badge
+              variant="notification"
+              color={(localMember?.statPoints ?? 0) > 0 ? "sky" : "amber"}
+              pulse
+            >
+              {(localMember?.statPoints ?? 0) + (localMember?.talentPoints ?? 0)}
             </Badge>
           )}
         </div>

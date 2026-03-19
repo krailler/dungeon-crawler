@@ -13,7 +13,7 @@ import type { SkillDef } from "@dungeon/shared";
 
 // ── Skill tooltip content ────────────────────────────────────────────────────
 
-const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): ReactNode => {
+const SkillTooltip = ({ skill }: { skill: SkillDef }): ReactNode => {
   const { t } = useTranslation();
   return (
     <>
@@ -24,21 +24,12 @@ const SkillTooltip = ({ skill, active }: { skill: SkillDef; active: boolean }): 
           threshold: Math.round(skill.hpThreshold * 100),
         })}
       </div>
-      {skill.passive && (
-        <div
-          className={`mt-1 text-[10px] font-medium uppercase tracking-wider ${active ? "text-emerald-400/80" : "text-red-400/80"}`}
-        >
-          {active ? t("skills.passive") : t("skills.disabled")}
-        </div>
-      )}
-      {!skill.passive && skill.cooldown > 0 && (
+      {skill.cooldown > 0 && (
         <div className="mt-1 text-[10px] text-amber-400/80">
           {t("skills.cooldown", { seconds: skill.cooldown })}
         </div>
       )}
-      <div className="mt-1 text-[10px] text-slate-500">
-        {skill.passive ? t("skills.clickToToggle") : t("skills.clickToUse")}
-      </div>
+      <div className="mt-1 text-[10px] text-slate-500">{t("skills.clickToUse")}</div>
     </>
   );
 };
@@ -50,7 +41,6 @@ export const SkillBar = (): ReactNode => {
   const skillDefs = useSyncExternalStore(skillDefStore.subscribe, skillDefStore.getSnapshot);
   const localMember = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const skills = localMember?.skills ?? [];
-  const autoAttackEnabled = localMember?.autoAttackEnabled ?? true;
 
   // Per-slot activation counter — drives click pulse in ActionSlot
   const [activations, setActivations] = useState<number[]>(() =>
@@ -58,42 +48,33 @@ export const SkillBar = (): ReactNode => {
   );
 
   // Build array of MAX_SKILL_SLOTS: resolved SkillDef or null for empty/locked slots
+  // Filter out passive skills (auto-attack) — they don't need a hotbar slot
   const slots = useMemo(() => {
-    const result: (SkillDef | null)[] = [];
-    for (let i = 0; i < MAX_SKILL_SLOTS; i++) {
-      const skillId = skills[i];
-      result.push(skillId ? (skillDefs.get(skillId) ?? null) : null);
+    const active: (SkillDef | null)[] = [];
+    for (const skillId of skills) {
+      if (!skillId) continue;
+      const def = skillDefs.get(skillId);
+      if (def?.passive) continue;
+      active.push(def ?? null);
     }
-    return result;
+    // Pad to MAX_SKILL_SLOTS with nulls
+    while (active.length < MAX_SKILL_SLOTS) {
+      active.push(null);
+    }
+    return active.slice(0, MAX_SKILL_SLOTS);
   }, [skills, skillDefs]);
-
-  // Check if a skill slot is active
-  const isSlotActive = useCallback(
-    (skill: SkillDef | null): boolean => {
-      if (!skill) return false;
-      if (skill.passive) return autoAttackEnabled;
-      return true;
-    },
-    [autoAttackEnabled],
-  );
 
   // Activate a skill at a given slot index (fires action + bumps activation counter)
   const activateSlot = useCallback(
     (index: number) => {
       const skill = slots[index];
       if (!skill) return;
-      // Bump activation counter for this slot → triggers click pulse
       setActivations((prev) => {
         const next = [...prev];
         next[index] = prev[index] + 1;
         return next;
       });
-      // Fire the actual action
-      if (skill.passive) {
-        hudStore.toggleSkill(skill.id);
-      } else {
-        hudStore.useSkill(skill.id);
-      }
+      hudStore.useSkill(skill.id);
     },
     [slots],
   );
@@ -122,28 +103,20 @@ export const SkillBar = (): ReactNode => {
   return (
     <div>
       <div className="flex items-center gap-1.5">
-        {slots.map((skill, i) => {
-          const active = isSlotActive(skill);
-
-          return (
-            <ActionSlot
-              key={skill?.id ?? `empty_${i}`}
-              variant="default"
-              size="md"
-              active={!!skill}
-              disabled={skill ? !active : false}
-              disabledSlash={!!skill?.passive && !active}
-              icon={
-                skill ? <ItemIcon iconId={skill.icon} fill /> : <LockIcon className="h-4 w-4" />
-              }
-              onClick={skill ? () => activateSlot(i) : undefined}
-              keybind={displayKeyName(skillBindKeys[i])}
-              cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}
-              activationCount={activations[i]}
-              tooltip={skill ? <SkillTooltip skill={skill} active={active} /> : undefined}
-            />
-          );
-        })}
+        {slots.map((skill, i) => (
+          <ActionSlot
+            key={skill?.id ?? `empty_${i}`}
+            variant="default"
+            size="md"
+            active={!!skill}
+            icon={skill ? <ItemIcon iconId={skill.icon} fill /> : <LockIcon className="h-4 w-4" />}
+            onClick={skill ? () => activateSlot(i) : undefined}
+            keybind={displayKeyName(skillBindKeys[i])}
+            cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}
+            activationCount={activations[i]}
+            tooltip={skill ? <SkillTooltip skill={skill} /> : undefined}
+          />
+        ))}
       </div>
     </div>
   );

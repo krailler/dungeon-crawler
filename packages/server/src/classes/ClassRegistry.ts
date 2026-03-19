@@ -1,4 +1,10 @@
-import type { ClassDef, ClassDefClient, StatScaling, SkillDef } from "@dungeon/shared";
+import type {
+  ClassDef,
+  ClassDefClient,
+  ClassSkillEntry,
+  StatScaling,
+  SkillDef,
+} from "@dungeon/shared";
 import { toClassDefClient } from "@dungeon/shared";
 import { classes, classSkills } from "../db/schema.js";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
@@ -90,9 +96,21 @@ export const getClassDefs = registry.getMany;
 export const getAllClassDefs = registry.getAll;
 export const getClassRegistryVersion = registry.getVersion;
 
+/** Build skill entries for client spellbook */
+function buildSkillEntries(classId: string): ClassSkillEntry[] {
+  const skillIds = skillsByClass.get(classId) ?? [];
+  const lvlMap = skillUnlockLevels.get(classId);
+  const defaultSkill = defaultSkillByClass.get(classId);
+  return skillIds.map((skillId) => ({
+    skillId,
+    unlockLevel: lvlMap?.get(skillId) ?? 1,
+    isDefault: defaultSkill?.id === skillId,
+  }));
+}
+
 /** Return only presentation fields for client consumption */
 export function getClassDefsForClient(ids: string[]): ClassDefClient[] {
-  return registry.getMany(ids).map(toClassDefClient);
+  return registry.getMany(ids).map((def) => toClassDefClient(def, buildSkillEntries(def.id)));
 }
 
 /** Get the default auto-attack skill for a class (fallback: "punch" anim, 1x damage) */

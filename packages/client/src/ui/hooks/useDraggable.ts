@@ -127,5 +127,24 @@ export function useDraggable(
     };
   }, [enabled, onPointerDown, onPointerMove, onPointerUp]);
 
-  return { position, handleRef, panelRef, isDragging, enabled };
+  /** Re-clamp so the entire panel fits within the viewport (with margin). */
+  const fitToViewport = useCallback(
+    (margin = 16) => {
+      if (!enabled) return;
+      setPosition((prev) => {
+        const el = panelRef.current;
+        if (!el) return prev;
+        const rect = el.getBoundingClientRect();
+        let { x, y } = prev;
+        const maxY = window.innerHeight - rect.height - margin;
+        if (y > maxY) y = Math.max(0, maxY);
+        const maxX = window.innerWidth - rect.width - margin;
+        if (x > maxX) x = Math.max(0, maxX);
+        return x === prev.x && y === prev.y ? prev : { x, y };
+      });
+    },
+    [enabled],
+  );
+
+  return { position, handleRef, panelRef, isDragging, enabled, fitToViewport };
 }

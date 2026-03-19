@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { playUiSfx } from "../../audio/uiSfx";
 import { useDraggable } from "../hooks/useDraggable";
@@ -50,6 +50,8 @@ type HudPanelProps = {
   defaultPosition?: { x: number; y: number };
   /** Whether to persist the dragged position in localStorage (default true) */
   persistPosition?: boolean;
+  /** When this value changes, re-fit the panel within the viewport */
+  fitKey?: string | number;
 };
 
 export const HudPanel = ({
@@ -60,11 +62,21 @@ export const HudPanel = ({
   panelId,
   defaultPosition,
   persistPosition,
+  fitKey,
 }: HudPanelProps): ReactNode => {
   const drag = useDraggable(panelId, defaultPosition ?? { x: 0, y: 0 }, persistPosition);
   const [zIndex, setZIndex] = useState(() => ++zCounter);
   const bringToFront = useCallback(() => setZIndex(++zCounter), []);
   const idRef = useRef(Symbol());
+
+  // Re-fit when fitKey changes (e.g. tab switch that changes panel height)
+  useLayoutEffect(() => {
+    if (fitKey !== undefined) {
+      // Wait one frame so the new content has rendered and the panel has its final height
+      const raf = requestAnimationFrame(() => drag.fitToViewport());
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [fitKey, drag.fitToViewport]);
 
   // Register in panel stack (update z + close ref on every render)
   useEffect(() => {

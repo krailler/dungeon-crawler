@@ -11,7 +11,6 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TalentDefClient } from "@dungeon/shared";
 import { TutorialStep, TALENT_RESET_GOLD_PER_LEVEL } from "@dungeon/shared";
-import { HudPanel } from "../components/HudPanel";
 import { Tooltip } from "../components/Tooltip";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { talentStore } from "../stores/talentStore";
@@ -30,11 +29,6 @@ const STAT_I18N: Record<string, string> = {
   moveSpeed: "talents.statMoveSpeed",
 };
 
-/** Props for the panel */
-interface TalentPanelProps {
-  onClose: () => void;
-}
-
 /** A single talent node in the tree */
 const TalentNode = ({
   def,
@@ -51,13 +45,11 @@ const TalentNode = ({
   const isMaxed = currentRank >= def.maxRank;
   const isLocked = currentRank === 0 && !canAllocate;
 
-  // Determine border color based on state
-  let borderColor = "border-zinc-600"; // locked
+  let borderColor = "border-zinc-600";
   if (isMaxed) borderColor = "border-amber-400";
   else if (currentRank > 0) borderColor = "border-emerald-400";
   else if (canAllocate) borderColor = "border-sky-400";
 
-  // Build tooltip description showing all ranks
   const rankLines = def.effects.map((e) => {
     let desc = "";
     if (e.statModifier) {
@@ -150,7 +142,6 @@ const TalentTree = ({
     { x1: number; y1: number; x2: number; y2: number; fulfilled: boolean }[]
   >([]);
 
-  // Measure node positions after render
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -180,7 +171,6 @@ const TalentTree = ({
 
   return (
     <div ref={containerRef} className="relative flex flex-col items-center gap-4">
-      {/* SVG connector lines */}
       {lines.length > 0 && (
         <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
           {lines.map((l, i) => (
@@ -220,7 +210,7 @@ const TalentTree = ({
   );
 };
 
-export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
+export const TalentTab = (): ReactNode => {
   const { t } = useTranslation();
   const talentSnap = useSyncExternalStore(talentStore.subscribe, talentStore.getSnapshot);
   const defsSnap = useSyncExternalStore(talentDefStore.subscribe, talentDefStore.getSnapshot);
@@ -230,14 +220,12 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
   const playerLevel = localMember?.level ?? 1;
   const talentPoints = localMember?.talentPoints ?? 0;
 
-  // Ensure defs are loaded when panel opens
   useEffect(() => {
     if (talentSnap.classTalentIds.length > 0) {
       talentDefStore.ensureLoaded(talentSnap.classTalentIds);
     }
   }, [talentSnap.classTalentIds]);
 
-  // Build the tree layout from known class talent ids
   const talents = useMemo(() => {
     const result: TalentDefClient[] = [];
     for (const id of talentSnap.classTalentIds) {
@@ -247,7 +235,6 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
     return result.sort((a, b) => a.row * 100 + a.col - (b.row * 100 + b.col));
   }, [talentSnap.classTalentIds, defsSnap]);
 
-  // Group by row
   const rows = useMemo(() => {
     const map = new Map<number, TalentDefClient[]>();
     for (const t of talents) {
@@ -286,7 +273,6 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
     tutorialStore.dismiss(TutorialStep.ALLOCATE_TALENTS);
   }, []);
 
-  // Reset talents with gold
   const resetCost = playerLevel * TALENT_RESET_GOLD_PER_LEVEL;
   const canReset = talentSnap.allocations.size > 0 && (localMember?.gold ?? 0) >= resetCost;
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -298,14 +284,8 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
   }, []);
 
   return (
-    <HudPanel
-      header={<span className="text-sm font-semibold text-slate-200">{t("talents.title")}</span>}
-      onClose={onClose}
-      className="absolute right-72 top-5 w-72"
-      panelId="talent"
-      defaultPosition={{ x: window.innerWidth - 600, y: 80 }}
-    >
-      {/* Header with points */}
+    <>
+      {/* Points available */}
       {talentPoints > 0 && (
         <div className="mb-2 flex items-center justify-center gap-1 rounded bg-sky-500/20 px-2 py-1 text-xs text-sky-300">
           <span className="font-bold">{talentPoints}</span>
@@ -358,6 +338,6 @@ export const TalentPanel = ({ onClose }: TalentPanelProps): ReactNode => {
           onCancel={() => setShowResetConfirm(false)}
         />
       )}
-    </HudPanel>
+    </>
   );
 };

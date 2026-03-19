@@ -5,10 +5,8 @@ import { AllocatableStat, TutorialStep } from "@dungeon/shared";
 import type { AllocatableStatValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { CharacterStats } from "../stores/hudStore";
-import { classDefStore } from "../stores/classDefStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { CoinIcon } from "../icons/CoinIcon";
-import { HudPanel } from "../components/HudPanel";
 import { Tooltip } from "../components/Tooltip";
 import { ProgressBar } from "../components/ProgressBar";
 import { playUiSfx } from "../../audio/uiSfx";
@@ -56,17 +54,15 @@ const StatRow = ({
   return row;
 };
 
-export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode => {
+export const CharacterTab = (): ReactNode => {
   const { t } = useTranslation();
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
-  const classDefs = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
   const local = snapshot.members.find((m) => m.isLocal);
 
   if (!local?.stats) return null;
 
   const stats: CharacterStats = local.stats;
   const statPoints = local.statPoints ?? 0;
-  const classDef = local.classId ? classDefs.get(local.classId) : undefined;
 
   const handleAllocate = (stat: AllocatableStatValue): void => {
     playUiSfx("ui_click");
@@ -75,21 +71,7 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
   };
 
   return (
-    <HudPanel
-      onClose={onClose}
-      header={
-        <div>
-          <h3 className="text-sm font-bold text-slate-100">{local.name}</h3>
-          <span className="text-[11px] text-sky-400">
-            {t("character.level", { level: local.level })}
-            {classDef && ` — ${t(classDef.name)}`}
-          </span>
-        </div>
-      }
-      panelId="character"
-      defaultPosition={{ x: window.innerWidth - 244, y: 56 }}
-      className="w-56"
-    >
+    <>
       {/* Health bar */}
       <div className="mb-4">
         <div className="mb-1 flex items-center justify-between">
@@ -178,6 +160,6 @@ export const CharacterPanel = ({ onClose }: { onClose: () => void }): ReactNode 
           tooltip={t("character.defenseTip")}
         />
       </div>
-    </HudPanel>
+    </>
   );
 };

@@ -121,6 +121,9 @@
   },
   "character": {
     "title": "Personaje",
+    "tabCharacter": "Personaje",
+    "tabTalents": "Talentos",
+    "tabSkills": "Habilidades",
     "level": "Nv.{{level}}",
     "strength": "Fuerza",
     "strengthTip": "Aumenta el daño de ataque",
@@ -235,12 +238,14 @@
     "clickToToggle": "Clic o tecla para activar/desactivar",
     "clickToUse": "Clic o tecla para usar",
     "cooldown": "Enfriamiento: {{seconds}}s",
-    "damage": "Daño: {{multiplier}}×"
+    "damage": "Daño: {{multiplier}}×",
+    "passiveAlwaysActive": "Pasiva",
+    "unlocksAtLevel": "Se desbloquea en el nivel {{level}}"
   },
   "tutorial": {
     "startDungeon": "¡Eres el líder del grupo! Haz clic derecho en la puerta o pulsa F cerca para iniciar la mazmorra.",
-    "allocateStats": "¡Tienes puntos de atributo! Pulsa C para abrir el panel de personaje y asignarlos.",
-    "allocateTalents": "¡Has desbloqueado talentos! Pulsa el botón de estrella para abrir el árbol de talentos y gastar tus puntos.",
+    "allocateStats": "¡Tienes puntos de atributo! Pulsa C para abrir la ficha de personaje y asignarlos.",
+    "allocateTalents": "¡Has desbloqueado talentos! Pulsa N para abrir el árbol de talentos y gastar tus puntos.",
     "sprint": "¡Mantén Shift mientras te mueves para esprintar más rápido — pero vigila tu energía!",
     "youDowned": "¡Has caído! Un compañero puede revivirte antes de que te desangres. Puedes seguir usando el chat.",
     "teammateDowned": "¡Un compañero ha caído! Acércate y pulsa R (o haz clic en Revivir) para salvarlo.",
