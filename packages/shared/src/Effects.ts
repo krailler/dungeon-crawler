@@ -28,11 +28,16 @@
  *              ▼
  *            ActiveEffectState (Colyseus Schema)
  *              ├─ synced: effectId, remaining, duration, stacks, modValue
- *              └─ server-only: scalingFactor, scalingOverride
+ *              └─ server-only: scalingFactor, scalingOverride, tickAccum
+ *                       │
+ *                       ▼
+ *            EffectSystem.update() per tick:
+ *              ├─ decrement remaining → remove if expired
+ *              └─ if tickEffect: accumulate dt, apply heal/damage per interval
  *                       │
  *                       ▼
  *            Client receives pre-computed values
- *              ├─ EffectDefClient (name, icon, isDebuff) via lazy request
+ *              ├─ EffectDefClient (name, icon, isDebuff, tickInterval) via lazy request
  *              └─ modValue (int8) via Schema sync — NO client-side scaling
  *
  * Scaling formula:
@@ -104,6 +109,8 @@ export type EffectDefClient = {
   readonly description: string;
   readonly icon: string;
   readonly isDebuff: boolean;
+  /** Tick interval in seconds (for HoT/DoT tooltip display), or null */
+  readonly tickInterval: number | null;
 };
 
 /** Effect definition loaded from the database at server startup */
@@ -139,6 +146,7 @@ export function toEffectDefClient(def: EffectDef): EffectDefClient {
     description: def.description,
     icon: def.icon,
     isDebuff: def.isDebuff,
+    tickInterval: def.tickEffect?.interval ?? null,
   };
 }
 

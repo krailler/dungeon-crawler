@@ -4,6 +4,8 @@ export const ItemEffectType = {
   NONE: "none",
   /** Restores health by effectParams.amount */
   HEAL: "heal",
+  /** Applies a buff/debuff effect by effectParams.effectId */
+  APPLY_EFFECT: "apply_effect",
 } as const;
 export type ItemEffectTypeValue = (typeof ItemEffectType)[keyof typeof ItemEffectType];
 

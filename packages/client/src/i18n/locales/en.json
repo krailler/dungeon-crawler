@@ -289,7 +289,9 @@
     "healthPotion": "Health Potion",
     "healthPotionDesc": "Restores {{amount}} health",
     "dungeonKey": "Dungeon Key",
-    "dungeonKeyDesc": "Opens the exit portal. Lost when leaving the dungeon."
+    "dungeonKeyDesc": "Opens the exit portal. Lost when leaving the dungeon.",
+    "regenPotion": "Regeneration Potion",
+    "regenPotionDesc": "Restores {{healAmount}} HP every {{interval}}s for {{duration}}s"
   },
   "inventory": {
     "title": "Inventory",
@@ -428,7 +430,9 @@
     "warCry": "War Cry",
     "warCryDesc": "Attack damage increased by {{value}}%",
     "dazed": "Dazed",
-    "dazedDesc": "Movement speed reduced by {{value}}%"
+    "dazedDesc": "Movement speed reduced by {{value}}%",
+    "regeneration": "Regeneration",
+    "regenerationDesc": "Restoring {{value}} health every {{interval}}s"
   },
   "cmd": {
     "playerNotFound": "Player not found: {{name}}",

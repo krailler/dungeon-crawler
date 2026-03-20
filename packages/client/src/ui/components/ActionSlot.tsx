@@ -94,7 +94,7 @@ const VARIANT_COLORS: Record<
     active:
       "cursor-pointer border-rose-500/40 bg-slate-900/70 hover:border-rose-400/60 hover:bg-slate-800/60 shadow-[0_0_8px_rgba(244,63,94,0.15)]",
     empty: "cursor-default border-slate-700/30 bg-slate-900/40",
-    disabled: "",
+    disabled: "border-slate-700/30 bg-slate-900/50 cursor-pointer opacity-40",
     readyBorder: "border-rose-400/80",
     readyBg: "bg-rose-400/20",
     keybindActive: "bg-slate-800/80 text-slate-400",

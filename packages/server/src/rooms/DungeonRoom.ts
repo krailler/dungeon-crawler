@@ -674,7 +674,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
 
       // Execute effect
-      const success = executeEffect(def.effectType, player, def.effectParams);
+      const success = executeEffect(def.effectType, player, def.effectParams, this.effectSystem);
       if (!success) {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.alreadyFull" });
         // Set a short cooldown even on failure to prevent spam

@@ -28,4 +28,6 @@ export class ActiveEffectState extends Schema {
   scalingFactor: number = 0;
   /** Scaling override from creature_effects, or null to use effect's default */
   scalingOverride: EffectScaling | null = null;
+  /** Accumulated time for tick effects (heal/damage over time) */
+  tickAccum: number = 0;
 }

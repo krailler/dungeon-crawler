@@ -289,7 +289,9 @@
     "healthPotion": "Poción de Vida",
     "healthPotionDesc": "Restaura {{amount}} de vida",
     "dungeonKey": "Llave de Mazmorra",
-    "dungeonKeyDesc": "Abre el portal de salida. Se pierde al salir de la mazmorra."
+    "dungeonKeyDesc": "Abre el portal de salida. Se pierde al salir de la mazmorra.",
+    "regenPotion": "Poción de Regeneración",
+    "regenPotionDesc": "Restaura {{healAmount}} HP cada {{interval}}s durante {{duration}}s"
   },
   "inventory": {
     "title": "Inventario",
@@ -428,7 +430,9 @@
     "warCry": "Grito de Guerra",
     "warCryDesc": "Daño de ataque aumentado en {{value}}%",
     "dazed": "Aturdido",
-    "dazedDesc": "Velocidad de movimiento reducida en {{value}}%"
+    "dazedDesc": "Velocidad de movimiento reducida en {{value}}%",
+    "regeneration": "Regeneración",
+    "regenerationDesc": "Restaurando {{value}} de vida cada {{interval}}s"
   },
   "cmd": {
     "playerNotFound": "Jugador no encontrado: {{name}}",

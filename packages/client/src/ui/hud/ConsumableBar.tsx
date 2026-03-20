@@ -28,6 +28,12 @@ export const ConsumableBar = (): ReactNode => {
   const consumableBar = localMember?.consumableBar ?? [];
   const inventory = localMember?.inventory;
 
+  // Ensure item defs are loaded for all assigned consumable bar items
+  const assignedItemIds = useMemo(() => consumableBar.filter((id) => id !== ""), [consumableBar]);
+  useEffect(() => {
+    if (assignedItemIds.length > 0) itemDefStore.ensureLoaded(assignedItemIds);
+  }, [assignedItemIds]);
+
   // Compute total quantity per itemId from inventory
   const qtyByItem = useMemo(() => {
     const map = new Map<string, number>();
@@ -217,7 +223,7 @@ export const ConsumableBar = (): ReactNode => {
                 active={hasItem}
                 disabled={hasItem && isEmpty}
                 icon={def ? <ItemIcon iconId={def.icon} /> : <></>}
-                onClick={hasItem && !isEmpty ? () => handleUse(i) : undefined}
+                onClick={hasItem ? () => handleUse(i) : undefined}
                 keybind={displayKeyName(bindKeys[i])}
                 quantity={hasItem ? qty : undefined}
                 quantityPosition="top-right"

@@ -43,7 +43,7 @@ packages/
       CreatureTypes.ts # Creature type definitions + computeCreatureDerivedStats() + scaleCreatureDerivedStats()
       Economy.ts      # computeGoldDrop(), computeLevelModifier() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
-      Items.ts        # ItemDef, ItemRarity, InventorySlot types
+      Items.ts        # ItemDef, ItemRarity, ItemEffectType (heal, apply_effect), InventorySlot types
       Skills.ts       # SkillDef type (hpThreshold, resetOnKill, effectId, aoeRange)
       Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType, CreatureEffectTrigger
       Classes.ts      # ClassDef, ClassDefClient types
@@ -61,7 +61,7 @@ packages/
       rooms/          # DungeonRoom + PlayerSessionManager (lifecycle, persistence)
       systems/        # AISystem, CombatSystem, EffectSystem, GameLoop, GateSystem
       chat/           # ChatSystem, CommandRegistry, commands, notifyLevelProgress
-      items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, etc.)
+      items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, apply_effect)
       effects/        # EffectRegistry (DB-loaded effect defs)
       creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables + effect triggers + skills)
       classes/        # ClassRegistry (DB-loaded class defs + default skills)
@@ -85,9 +85,10 @@ packages/
       audio/          # SoundManager (ambient + spatial audio), uiSfx
       i18n/           # i18next config + locales (en.json, es.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, skillDef, classDefStore, talentDefStore, talentStore, creature, target, death, lootBag, settings, tutorial, feedback, levelUp)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableSlots, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay)
-        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog, healthColor, lifeState)
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, skillDef, classDefStore, talentDefStore, talentStore, creature, target, death, lootBag, settings, tutorial, feedback, levelUp, welcome)
+        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableBar, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay, WelcomeOverlay)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog)
+        utils/        # UI utilities (healthColor, lifeState, rarityColors, itemLinkUtils, dragGhost)
         hooks/        # useDraggable
         icons/        # SVG icon components (CharacterIcon, MapIcon, BackpackIcon, WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon, LockIcon, etc.)
         screens/      # LoginScreen, LoadingScreen
@@ -97,7 +98,7 @@ packages/
         characters/   # warrior/, zombie/, golem/ (multi-file GLBs per animation)
         props/        # chest.glb, portal.glb
       textures/
-        icons/        # PNG item/skill/talent icons (potion_red, key, sword, fist, shield, etc.)
+        icons/        # PNG item/skill/talent icons (potion_red, potion_regen, key, sword, fist, shield, etc.)
         logo.png      # KrawlHero logo
         login-bg.png  # Login screen background
       audio/          # SFX, ambient, UI sounds
@@ -167,7 +168,8 @@ packages/
 
 - Server-authoritative: AISystem (creature AI + threat), CombatSystem (player auto-attack)
 - Auto-attack requires: active target + facing within 120° arc + target in range
-- Auto-target: when hit with no target, automatically select the attacker
+- Auto-target: when hit with no target, automatically select the attacker (skipped if player has a player target, e.g. reviving)
+- Tab-targeting: cycles through nearby creatures and players sorted by distance
 - Chase mode: clicking a creature makes server re-path toward it every 4 ticks until in range
 - Creature skills from DB: `world.creature_skills` with `is_default` flag → animState + damageMultiplier
 - Player auto-attack uses class default skill from DB: `world.class_skills` with `is_default` flag
@@ -182,7 +184,7 @@ packages/
 - `is_boss` flag on creature types in DB — bosses spawn alone in dedicated rooms
 - Boss room placed in last 30% of dungeon rooms (far from spawn)
 - Current boss: Stone Golem (golem_slam skill, 1.5x damage, 100HP, scale 1.5x)
-- Boss drops Dungeon Key (transient, legendary rarity) required to use exit portal
+- Boss drops: Dungeon Key (transient, legendary), Health Potion (2-3), Regeneration Potion (1-2, uncommon)
 
 ### Dungeon Key & Exit
 
@@ -190,12 +192,13 @@ packages/
 - Exit portal requires key to activate (checked before combat validation)
 - Key consumed on portal use → countdown for all players
 - Items with `transient=true` filtered from inventory save in `PlayerSessionManager`
+- Transient items dropped as loot bag when player leaves/kicked/expires (notified in chat)
 
 ### Item Rarity
 
 - Rarity field on items: common, uncommon, rare, epic, legendary
-- UI: colored borders on ActionSlot (green/blue/purple/gold)
-- Health potion = common, Dungeon Key = legendary
+- UI: colored borders on ActionSlot (green/blue/purple/gold), centralized in `rarityColors.ts`
+- Health potion = common, Regeneration Potion = uncommon, Dungeon Key = legendary
 
 ### Reconnection
 
@@ -207,12 +210,14 @@ packages/
 - Slash commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
+- Item links: `[item:id]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips
+- Shift+click item in inventory to insert item link in chat
 - Messages fade after 10s, hover to reveal all
 
 ### Death & Revive
 
 - Life states: ALIVE → DOWNED (bleedout 30s) → DEAD (respawn timer)
-- Revive: other players can channel (R key, 3.5s) within range 3.0 to revive downed allies at 30% HP
+- Revive: other players can channel (R key, 3.5s) within range 3.0 to revive downed allies at 30% HP; cancelled if reviver takes damage
 - Respawn: base 5s + 5s per death (max 30s), full heal at spawn point
 - Creature death: freeze animation on last frame, corpse visible 5s, hitbox disabled
 - Client: DeathOverlay with timers, downed/dead audio loops, tutorial hints
@@ -265,11 +270,13 @@ packages/
 
 - Data-driven: effect definitions in DB (`world.effects`), loaded by EffectRegistry at startup
 - Creature effect triggers in DB (`world.creature_effects`): on_hit, on_hit_behind with level-scaled chance
-- **Player effects**: EffectSystem ticks timers, recomputes derived stats with modifiers, cleared on death/respawn/revive
+- **Player effects**: EffectSystem ticks timers, processes tick effects (HoT/DoT), recomputes derived stats with modifiers, cleared on death/respawn/revive
+- **Tick effects**: `tickEffect` field on EffectDef (type, value, interval) — EffectSystem accumulates dt per effect and applies heal/damage per interval (e.g. Regeneration: 8 HP every 2s)
+- **Item-triggered effects**: `ItemEffectType.APPLY_EFFECT` handler applies a buff via EffectSystem (e.g. Regen Potion → Regeneration buff)
 - **Creature effects**: GameLoop.tickCreatureEffects() ticks timers, recomputeCreatureSpeed() applies speed modifiers; GameLoop.applyCreatureEffect() creates/refreshes effects (simplified, no stacking/scaling)
 - CreatureState has `MapSchema<ActiveEffectState>` for synced creature debuffs (visible in TargetFrame)
-- Current effects: Weakness (zombie on_hit, -25% attack, 5s), Hamstring (zombie on_hit_behind, -35% speed, 3s), War Cry buff (+25% attack, 10s), Dazed (ground_slam AoE, -40% speed, 3s)
-- Client: effectDefStore (lazy-loaded), BuffBar (player), EffectIcon with tooltip, TargetFrame shows effects for both players and creatures
+- Current effects: Weakness (zombie on_hit, -25% attack, 5s), Hamstring (zombie on_hit_behind, -35% speed, 3s), War Cry buff (+25% attack, 10s), Dazed (ground_slam AoE, -40% speed, 3s), Regeneration (potion, 8 HP/2s, 10s, scales to 15 HP/2s over 12s)
+- Client: effectDefStore (lazy-loaded, includes tickInterval for tooltip), BuffBar (player), EffectIcon with tooltip, TargetFrame shows effects for both players and creatures
 
 ### Graphics Settings
 
@@ -280,8 +287,9 @@ packages/
 ### Tutorial System
 
 - LIFO hint stack — multiple hints queue up and display sequentially
-- Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents
+- Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents, dungeon_key, portal_no_key, welcome
 - Server sends hints contextually; client dismisses on action
+- Welcome overlay: dedicated modal for first-time players with tips (routed to welcomeStore instead of tutorialStore)
 - Admin: /reset-tutorials command re-sends applicable hints
 
 ### Admin & Debug Tools

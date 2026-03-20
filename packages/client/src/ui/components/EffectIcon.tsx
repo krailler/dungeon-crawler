@@ -33,9 +33,13 @@ export const EffectIcon = ({
   const remainingSec = Math.max(0, remaining).toFixed(1);
   const displayName = def ? t(def.name, { defaultValue: def.name }) : effectId;
 
-  // Server sends pre-computed modValue (e.g. 25 for -25%)
+  // Server sends pre-computed modValue (e.g. 25 for -25%, or 8 for 8 HP/tick)
   const description = def
-    ? t(def.description, { value: serverModValue ?? 0, defaultValue: "" })
+    ? t(def.description, {
+        value: serverModValue ?? 0,
+        interval: def.tickInterval ?? 0,
+        defaultValue: "",
+      })
     : "";
 
   const tooltipPosition =

@@ -104,15 +104,15 @@
 
 - **DB schemas**: `characters` schema (accounts, characters, character_inventory) and `world` schema (items) in same PostgreSQL DB
 - **Item definitions**: loaded from `world.items` table at server startup into `ItemRegistry` (in-memory `Map<string, ItemDef>`)
-- **Effect system**: `EffectHandlers` maps `effectType` string (e.g. "heal") to hardcoded functions; params from `effectParams` JSONB column
+- **Effect system**: `EffectHandlers` maps `effectType` string (e.g. "heal", "apply_effect") to functions; "apply_effect" applies a buff/debuff via EffectSystem; params from `effectParams` JSONB column
 - **Inventory state**: `MapSchema<InventorySlotState>` on `PlayerSecretState` (synced via `@view()` to owning client only)
 - **Persistence**: `character_inventory` table with upsert+transaction on save (not DELETE+INSERT); load on join with hash computed after async load
 - **Item drops**: on creature kill, each alive player rolls `POTION_DROP_CHANCE` (25%) → `addItem()` stacks or fills empty slots (max `INVENTORY_MAX_SLOTS = 12`)
 - **Consumable use**: client sends `ITEM_USE`, server validates (alive, has item, no cooldown), executes effect, removes 1 qty, starts cooldown
 - **Cooldowns**: `itemCooldowns: Map<string, number>` on PlayerState (server-only), ticked down in GameLoop, client receives `ITEM_COOLDOWN` message
 - **Lazy item defs**: client requests defs on demand via `ITEM_DEFS_REQUEST`/`ITEM_DEFS_RESPONSE` with microtick batching (`queueMicrotask`), in-memory cache, version-based invalidation
-- **Client UI**: `ConsumableSlots` (Q hotkey, first consumable), `InventoryPanel` (B hotkey, grid of 12 slots), both use `ActionSlot` component
-- **Balance**: health potion heals 50 HP, 10s cooldown, max stack 10, drop weight 1.0
+- **Client UI**: `ConsumableBar` (4 slots, hotkeys 1-4, drag-to-assign from inventory, persisted to DB), `InventoryPanel` (B hotkey, grid of 12 slots), both use `ActionSlot` component
+- **Balance**: health potion heals 50 HP, 10s cooldown, max stack 10; regen potion applies Regeneration buff (8 HP/2s for 10s), 30s cooldown, max stack 5, uncommon rarity
 - **Admin**: `/give <player> <itemId> [qty]` command
 
 ### Death & Revive System
@@ -120,8 +120,8 @@
 - **Life states**: `LifeState` = "alive" | "downed" | "dead" — transitions managed server-side in GameLoop
 - **Downed**: player reaches 0 HP → enters DOWNED state, starts BLEEDOUT_DURATION (30s) countdown. Can be revived by allies.
 - **Dead**: bleedout timer expires → DEAD state, respawn timer starts (base 5s + 5s per death, max 30s). Player respawns at spawn point with full HP.
-- **Revive**: nearby alive player channels R key within REVIVE_RANGE (3.0 units) for REVIVE_CHANNEL_DURATION (3.5s) → target revived at 30% HP
-- **Combat integration**: AISystem drops threat on dead targets, CombatSystem stops auto-attacking dead players
+- **Revive**: nearby alive player channels R key within REVIVE_RANGE (3.0 units) for REVIVE_CHANNEL_DURATION (3.5s) → target revived at 30% HP; cancelled if reviver takes damage
+- **Combat integration**: AISystem drops threat on dead targets, CombatSystem stops auto-attacking dead players; auto-target skips when player has a player target (revive protection)
 - **Audio**: SoundManager plays downed_loop/dead_loop, ducking ambient music during death states
 - **Client**: DeathOverlay shows bleed/respawn timers, revive progress bar; TargetFrame shows revive button for downed allies; ActionFeedback shows "dead"/"out of range" errors
 - **Shared**: `constants/death.ts` (all timing constants), `LifeState` type
@@ -177,14 +177,15 @@
 - **EffectDef type**: id, name (i18n key), description (i18n key with `{{value}}` interpolation), icon, duration, maxStacks, stackBehavior, isDebuff, statModifiers, tickEffect
 - **Stat modifiers**: `Record<string, StatModifier>` where StatModifier = `{type: "flat"|"percent", value: number}`. Applied as `(base + flatSum) * (1 + percentSum)`
 - **Stack behaviors**: `StackBehavior.REFRESH` resets timer only; `StackBehavior.INTENSITY` adds stacks (up to maxStacks) and multiplies modifier values
-- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, remove expired), `recomputeStats()` (**single source of truth** for all derived stats: base × scaling + talent mods + effect mods; integer stats rounded, float stats like speed/attackCooldown keep precision), `clearEffects()`, `removeEffect()`
-- **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks, modValue) stored in `MapSchema<ActiveEffectState>` on both `PlayerState` and `CreatureState` (public, visible to all)
+- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, process tick effects for HoT/DoT, remove expired), `recomputeStats()` (**single source of truth** for all derived stats: base × scaling + talent mods + effect mods; integer stats rounded, float stats like speed/attackCooldown keep precision), `clearEffects()`, `removeEffect()`
+- **Tick effects**: `tickEffect` field (type, value, interval) on EffectDef — EffectSystem accumulates dt per effect via `tickAccum` server-only field, applies heal/damage when interval reached; value scales with `scalingFactor`
+- **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks, modValue; server-only: scalingFactor, scalingOverride, tickAccum) stored in `MapSchema<ActiveEffectState>` on both `PlayerState` and `CreatureState` (public, visible to all)
 - **Lifecycle**: effects cleared on downed, respawn, and revive (via `clearEffects()` in GameLoop)
 - **Client**: `effectDefStore` (lazy-loaded via `createDefStore`, batched requests, version-based cache invalidation)
 - **Creature effects**: `GameLoop.applyCreatureEffect()` creates/refreshes ActiveEffectState on creature's MapSchema (simplified, no stacking/scaling), `tickCreatureEffects()` ticks timers and removes expired, `recomputeCreatureSpeed()` applies moveSpeed percent modifiers. Creature effects cleared on death.
 - **Client UI**: `BuffBar` (positioned below player center, normal-size EffectIcons with timers), `TargetFrame` (small EffectIcons below frame for both players and creatures), `EffectIcon` (reusable component with timer sweep overlay, stacks badge, styled tooltip with name + description + remaining time)
 - **Protocol**: `EFFECT_DEFS_REQUEST` / `EFFECT_DEFS_RESPONSE` messages (same pattern as items/skills)
-- **Current effects**: Weakness (zombie on_hit 30%, -25% attack, 5s, refresh), Hamstring (zombie on_hit_behind 50%, -35% speed, 3s, refresh), War Cry buff (+25% attack, 10s, self-buff via skill), Dazed (ground_slam AoE, -40% speed, 3s, applied to creatures)
+- **Current effects**: Weakness (zombie on_hit 30%, -25% attack, 5s, refresh), Hamstring (zombie on_hit_behind 50%, -35% speed, 3s, refresh), War Cry buff (+25% attack, 10s, self-buff via skill), Dazed (ground_slam AoE, -40% speed, 3s, applied to creatures), Regeneration (potion, 8 HP/2s for 10s, scales to 15 HP/2s over 12s)
 - **DB validation**: EffectRegistry validates `stackBehavior` values from DB, falls back to REFRESH for invalid entries
 - **Registry hash**: includes duration, maxStacks, statModifiers (JSON), isDebuff, and stackBehavior for full version detection
 - **Shared**: `Effects.ts` (EffectDef, StatModifier, StackBehavior, StatModType, TickEffect types)
@@ -192,10 +193,11 @@
 
 ### Tutorial System
 
-- **Steps**: `TutorialStep` = "start_dungeon" | "allocate_stats" | "sprint" | "you_downed" | "teammate_downed" | "first_debuff" | "allocate_talents"
-- **Server-driven**: server sends `TUTORIAL_HINT` messages contextually (e.g. on gate open, level-up, death)
+- **Steps**: `TutorialStep` = "start_dungeon" | "allocate_stats" | "sprint" | "you_downed" | "teammate_downed" | "first_debuff" | "allocate_talents" | "dungeon_key" | "portal_no_key" | "welcome"
+- **Server-driven**: server sends `TUTORIAL_HINT` messages contextually (e.g. on gate open, level-up, death, boss key pickup, portal without key)
 - **Tracking**: `PlayerState.tutorials` (server-only Set) tracks completed steps; persisted in DB save hash
 - **Client**: `tutorialStore` uses LIFO stack — multiple hints queue up instead of replacing each other
+- **Welcome overlay**: `WELCOME` step routed to dedicated `welcomeStore` → `WelcomeOverlay` modal with game tips (separate from hint stack)
 - **Display**: `TutorialHint` component (bottom-left), click to dismiss
 - **Admin**: `/reset-tutorials` command clears all steps and re-sends applicable hints based on current state
 
@@ -216,6 +218,7 @@
 - Slash commands registered via CommandRegistry with admin-only flag
 - Admin commands: /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - Client ChatPanel: Enter to open/send, Escape to close, message fade after 10s, hover to reveal
+- Item links: `[item:id]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips; Shift+click item in inventory to insert link; atomic deletion (delete any char → delete entire link)
 - Command help overlay appears when input starts with `/`, Tab to autocomplete
 - Chat input history: arrow up/down navigates sent messages (max 50, draft preserved on ArrowUp, restored past end on ArrowDown)
 - Player name autocomplete for commands that expect `<player>` argument
@@ -259,13 +262,13 @@
 - `CreatureTypes.ts` — Creature type definitions with baseStats + overrides, `computeCreatureDerivedStats()`, `scaleCreatureDerivedStats(derived, level)`
 - `Economy.ts` — `computeGoldDrop(creatureLevel, avgPartyLevel, aliveCount)` with anti-farming modifiers
 - `Leveling.ts` — `xpToNextLevel(level)`, `computeXpDrop(creatureLevel, playerLevel)` with level diff modifier
-- `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight)
+- `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight), `ItemEffectType` (none, heal, apply_effect), `ItemRarity`
 - `Skills.ts` — `SkillDef` type (id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange), `MAX_SKILL_SLOTS`, `DEFAULT_SKILL_IDS`
 - `Effects.ts` — `EffectDef`, `EffectDefClient`, `StatModifier`, `StackBehavior`, `StatModType`, `TickEffect`, `EffectScaling`, `CreatureEffectTrigger` types + `lerpEffectValue()`, `computeScalingFactor()`, `toEffectDefClient()` for buff/debuff system
 - `Talents.ts` — `TalentDef`, `TalentDefClient`, `TalentRankEffect`, `TalentStatModifier`, `TalentSkillModifier` types + `toTalentDefClient()`, `computeTalentSkillMods()` (pure function shared by server and client for skill cooldown/damage modifiers)
 - `Roles.ts` — `Role` type ("admin", "user")
 - `GateTypes.ts` — `GateType` ("lobby")
-- `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents)
+- `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents, dungeon_key, portal_no_key, welcome)
 - `RoomNames.ts` — `generateRoomName(seed)` — procedural dungeon names (adjective + noun, mulberry32 RNG)
 - `constants/economy.ts` — Economy + XP tuning constants (BASE_GOLD_PER_KILL, BASE_XP_PER_KILL, XP_CURVE_BASE, MAX_LEVEL, CREATURE_STAT_SCALE_PER_LEVEL, save interval)
 - `constants/items.ts` — Item balance constants (INVENTORY_MAX_SLOTS, POTION_DROP_CHANCE)
@@ -297,7 +300,7 @@
 - `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - `chat/notifyLevelProgress.ts` — Level-up notification: public announcement + private stat-point message + tutorial hints
 - `items/ItemRegistry.ts` — Loads item definitions from DB at startup, provides `getItemDef()`, `getDroppableItems()`, versioned cache
-- `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP)
+- `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP, apply_effect → apply buff/debuff via EffectSystem)
 - `effects/EffectRegistry.ts` — Loads effect definitions from DB using `createRegistry` factory, with stackBehavior validation and comprehensive hash for version detection
 - `skills/SkillRegistry.ts` — Loads skill definitions from DB using `createRegistry` factory, provides `getSkillDef()`, versioned cache
 - `classes/ClassRegistry.ts` — Loads class definitions + class→skill mappings from DB, `getClassDefaultSkill()`, `getSkillsForLevel()`, `syncAndNotifySkills()` (grants level-gated skills + sends i18n chat notifications)
@@ -310,8 +313,8 @@
 - `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level, animation, aggro, isMoving, isWalking, MapSchema effects) + server-only (path, baseSpeed, speed, AI/combat data)
 - `state/GateState.ts` — Gate Schema (position, type, N/S vs E/W orientation, open state)
 - `state/LootBagState.ts` — Loot bag Schema (position, MapSchema\<InventorySlotState\>)
-- `state/ActiveEffectState.ts` — Active effect Schema class (effectId, remaining, duration, stacks, modValue) synced via MapSchema on PlayerState and CreatureState
-- `systems/EffectSystem.ts` — Buff/debuff system: apply/refresh/stack effects, tick timers, recompute derived stats with flat+percent modifiers, clear on death/respawn
+- `state/ActiveEffectState.ts` — Active effect Schema class (effectId, remaining, duration, stacks, modValue; server-only: scalingFactor, scalingOverride, tickAccum) synced via MapSchema on PlayerState and CreatureState
+- `systems/EffectSystem.ts` — Buff/debuff system: apply/refresh/stack effects, tick timers + tick effects (HoT/DoT via tickAccum), recompute derived stats with flat+percent modifiers, clear on death/respawn
 - `systems/GameLoop.ts` — 32-tick simulation: movement, sprint/stamina, player effect ticking (via EffectSystem), creature effect ticking (tickCreatureEffects + recomputeCreatureSpeed), item drops on kill, item cooldown ticking, life state transitions (ALIVE→DOWNED→DEAD→respawn), revive channel management, loot bag creation, creature effect application on hit (applyCreatureEffects with level-scaled chance), creature effect application from skills (applyCreatureEffect), level-up skill unlock (syncAndNotifySkills), entity collision, wall margin enforcement
 - `systems/AISystem.ts` — Creature AI: IDLE/CHASE/ATTACK/LEASH/ROAM, multi-player targeting (threat table with decay), A\* repath, proximity threat, stuck detection, leash range
 - `systems/CombatSystem.ts` — Player auto-attack: per-player cooldowns, three skill paths (buff/AoE/single-target), HP threshold gating, resetOnKill, talent skill modifiers, facing check with throttled feedback, combat event callbacks, `getSkillFailureReason()` for i18n feedback
@@ -322,14 +325,14 @@
 - `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
 - `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory, character_talents, character_skills), `world` schema (items, skills, creatures, creature_skills, creature_loot, effects, creature_effects, classes, class_skills, talents, talent_effects)
 - `db/database.ts` — PostgreSQL connection pool (max 10) + auto-migration
-- `db/seed.ts` — Seed data: health_potion item definition
+- `db/seed.ts` — Seed data: account/character defaults
 
 ### Client (`packages/client/src/`)
 
 - `main.ts` — Entry point: loads CSS, inits i18n, creates ClientGame, auth state watcher
 - `core/ClientGame.ts` — Colyseus client, render loop, reconnection, combat log, chat, debug paths, itemDefStore connect, audio listener on camera target, throttled render on blur
 - `core/StateSync.ts` — State listener setup: players (gold, xp, level-up detection + particle effect, inventory sync, life state, effects), creatures (level, effects with throttled sync at 10Hz), loot bags, minimap sync, item/effect def preloading, gate/target changes
-- `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms), entity picking via raycast, generic interactable system (gates, loot bags), revive keybind (R), sprint (Shift), Tab target cycling
+- `core/InputManager.ts` — Diablo-style click-and-hold: pointerdown/pointerup + throttled MOVE sends (150ms), entity picking via raycast, generic interactable system (gates, loot bags), revive keybind (R), sprint (Shift), Tab target cycling (creatures + players)
 - `core/ClientUpdateLoop.ts` — Frame-by-frame entity interpolation (lerp position/rotation) + animation updates + fog of war updates
 - `camera/IsometricCamera.ts` — ArcRotateCamera with locked Diablo-style angles, radius 15, smooth follow
 - `entities/CharacterAssetLoader.ts` — Loads GLB character models per skin (basePath), instantiates with retargeted animations
@@ -367,13 +370,13 @@
 - `ui/stores/settingsStore.ts` — Game settings (volume sliders, keybindings persistence)
 - `ui/stores/tutorialStore.ts` — Tutorial hint LIFO stack (push/pop/dismiss)
 - `ui/stores/feedbackStore.ts` — Transient error/feedback messages (1.5s auto-dismiss)
-- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap/inventory buttons, SkillBar + ConsumableSlots
+- `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap/inventory buttons, SkillBar + ConsumableBar, WelcomeOverlay
 - `ui/hud/XpBar.tsx` — WoW-style XP bar (bottom center, 60% width): purple gradient, level label, XP numbers, floating "+XP" animated text on gain
 - `ui/hud/StaminaBar.tsx` — Sprint stamina indicator above XP bar (visible when not full)
 - `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab, arrow up/down history navigation
 - `ui/hud/CharacterPanel.tsx` — Character sheet: name, level, health bar, gold display, base stats, derived stats (uses HudPanel)
 - `ui/hud/SkillBar.tsx` — Skill slots (1-5 hotkeys) using ActionSlot component
-- `ui/hud/ConsumableSlots.tsx` — Quick consumable slot (Q hotkey), first consumable from inventory
+- `ui/hud/ConsumableBar.tsx` — 4 assignable consumable slots (hotkeys 1-4), drag-to-assign from inventory, drag-to-reorder, server-persisted
 - `ui/hud/InventoryPanel.tsx` — 4x3 inventory grid (B hotkey) with item tooltips, click-to-use (uses HudPanel + ActionSlot)
 - `ui/hud/BuffBar.tsx` — Active effects display below player center (normal-size EffectIcons with timers)
 - `ui/hud/TargetFrame.tsx` — Selected target health/stats + revive button for downed allies + effect icons below frame (for both players and creatures)
@@ -388,15 +391,20 @@
 - `ui/hud/GatePrompt.tsx` — Gate interaction hint + confirmation dialog
 - `ui/hud/PromptOverlay.tsx` — Generic confirmation overlay
 - `ui/hud/AnnouncementOverlay.tsx` — Center-screen announcements with auto-dismiss
+- `ui/hud/WelcomeOverlay.tsx` — First-time player welcome modal with game tips (logo, subtitle, tips with icons, dismiss button)
 - `ui/components/ActionSlot.tsx` — Unified slot component for skills/consumables/inventory (variants: primary/consumable/empty, cooldown overlay, quantity badge, tooltip, keybind)
-- `ui/components/EffectIcon.tsx` — Reusable effect icon with timer sweep overlay, stacks badge, styled tooltip (name + description + remaining), supports normal (32px) and small (20px) sizes
+- `ui/components/EffectIcon.tsx` — Reusable effect icon with timer sweep overlay, stacks badge, styled tooltip (name + description with value/interval interpolation + remaining), supports normal (32px) and small (20px) sizes
 - `ui/components/HudButton.tsx` — Reusable HUD button with icon + label + shortcut
 - `ui/components/HudPill.tsx` — Reusable HUD pill (default/amber variants)
 - `ui/components/HudPanel.tsx` — Reusable panel with header + close button (used by CharacterPanel, InventoryPanel)
 - `ui/components/MenuButton.tsx` — Menu-specific button styling
 - `ui/components/ConfirmDialog.tsx` — Yes/No confirmation popup
-- `ui/components/healthColor.ts` — Health bar color utility (green → red gradient)
-- `ui/components/lifeState.ts` — Life state CSS class mapping (alive/downed/dead)
+- `ui/utils/healthColor.ts` — Health bar color utility (green → red gradient)
+- `ui/utils/lifeState.ts` — Life state CSS class mapping (alive/downed/dead)
+- `ui/utils/rarityColors.ts` — Centralized rarity styling (text, border, shadow) with `getRarityStyle()`
+- `ui/utils/itemLinkUtils.ts` — Chat item link utilities: `[item:id]` parsing, insertion, resolution
+- `ui/utils/dragGhost.ts` — Empty drag image for custom drag ghosts
+- `ui/stores/welcomeStore.ts` — Welcome overlay state (show/dismiss/reset)
 - `ui/hooks/useDraggable.ts` — Draggable panel handle logic
 - `ui/icons/` — SVG icon components (CharacterIcon, MapIcon, StarIcon, CoinIcon, BackpackIcon, FullscreenIcon, LockIcon, WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon)
 - `ui/screens/LoginScreen.tsx` — Login form + dev quick-login

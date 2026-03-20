@@ -3,15 +3,23 @@ import { ActiveEffectState } from "../state/ActiveEffectState.js";
 import { getEffectDef } from "../effects/EffectRegistry.js";
 import { collectTalentStatMods } from "../talents/TalentRegistry.js";
 import { computeDerivedStats, StackBehavior, StatModType, lerpEffectValue } from "@dungeon/shared";
-import type { StatModifier, EffectScaling } from "@dungeon/shared";
+import type { StatModifier, EffectScaling, TickEffect } from "@dungeon/shared";
 
 /**
  * Manages active effects (buffs/debuffs) on players.
  *
  * Lifecycle:
  *   applyEffect()  ──▶  update() ticks remaining  ──▶  effect expires → recomputeStats()
- *       │                                                     or
- *       │                                              clearEffects() on death/respawn
+ *       │                    │                                or
+ *       │                    │                         clearEffects() on death/respawn
+ *       │                    ▼
+ *       │               tickEffect? (HoT/DoT)
+ *       │               ┌────────────────────────────────┐
+ *       │               │ accumulate dt per effect       │
+ *       │               │ when accum ≥ interval:         │
+ *       │               │   applyTickEffect(type, value) │
+ *       │               │   (heal → restore HP)          │
+ *       │               └────────────────────────────────┘
  *       ▼
  *   New effect:         Re-application:
  *   ┌──────────┐        ┌────────────────────────────────────┐
@@ -96,24 +104,40 @@ export class EffectSystem {
   }
 
   /**
-   * Compute the primary modifier display value (absolute percentage as integer).
-   * e.g. -25% → 25, -45% → 45
+   * Compute the primary modifier display value (absolute, clamped to int8).
+   * For stat modifiers: percentage (e.g. -25% → 25).
+   * For tick effects with no stat modifiers: tick value (e.g. 8 HP/tick → 8).
    */
   private computeModValue(
-    def: { statModifiers: Record<string, StatModifier>; scaling: EffectScaling | null },
+    def: {
+      statModifiers: Record<string, StatModifier>;
+      tickEffect: TickEffect | null;
+      scaling: EffectScaling | null;
+    },
     effectiveScaling: EffectScaling | null,
     t: number,
   ): number {
     const firstMod = Object.entries(def.statModifiers)[0];
-    if (!firstMod) return 0;
-    const [statKey, mod] = firstMod;
-    const scaledValue = lerpEffectValue(
-      mod.value,
-      effectiveScaling?.statModifiers?.[statKey]?.value,
-      t,
-    );
-    // Clamp to int8 range (0–127) for Colyseus @type("int8")
-    return Math.min(127, Math.round(Math.abs(scaledValue * 100)));
+    if (firstMod) {
+      const [statKey, mod] = firstMod;
+      const scaledValue = lerpEffectValue(
+        mod.value,
+        effectiveScaling?.statModifiers?.[statKey]?.value,
+        t,
+      );
+      // Clamp to int8 range (0–127) for Colyseus @type("int8")
+      return Math.min(127, Math.round(Math.abs(scaledValue * 100)));
+    }
+    // Fallback: use tick effect value for display (e.g. 8 HP/tick)
+    if (def.tickEffect) {
+      const scaledTick = lerpEffectValue(
+        def.tickEffect.value,
+        effectiveScaling?.tickEffect?.value,
+        t,
+      );
+      return Math.min(127, Math.round(Math.abs(scaledTick)));
+    }
+    return 0;
   }
 
   /**
@@ -131,6 +155,23 @@ export class EffectSystem {
         if (effect.remaining <= 0) {
           toRemove.push(effectId);
           dirty = true;
+          return;
+        }
+
+        // Process tick effects (heal/damage over time)
+        const def = getEffectDef(effectId);
+        if (def?.tickEffect) {
+          effect.tickAccum += dt;
+          const scaling = effect.scalingOverride ?? def.scaling ?? null;
+          const scaledValue = lerpEffectValue(
+            def.tickEffect.value,
+            scaling?.tickEffect?.value,
+            effect.scalingFactor,
+          );
+          while (effect.tickAccum >= def.tickEffect.interval) {
+            effect.tickAccum -= def.tickEffect.interval;
+            this.applyTickEffect(player, def.tickEffect.type, scaledValue);
+          }
         }
       });
 
@@ -140,6 +181,21 @@ export class EffectSystem {
 
       if (dirty) {
         this.recomputeStats(player);
+      }
+    }
+  }
+
+  /**
+   * Apply a single tick of a periodic effect (heal, damage, etc.)
+   */
+  private applyTickEffect(player: PlayerState, type: string, value: number): void {
+    switch (type) {
+      case "heal": {
+        const amount = Math.round(value);
+        if (amount > 0 && player.health < player.maxHealth) {
+          player.health = Math.min(player.health + amount, player.maxHealth);
+        }
+        break;
       }
     }
   }
