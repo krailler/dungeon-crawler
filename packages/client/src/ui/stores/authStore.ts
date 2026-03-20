@@ -222,6 +222,25 @@ export const authStore = {
     update({ canReconnect: false });
   },
 
+  /** Re-fetch character data from server (e.g. after returning to lobby) */
+  async refreshUserData(): Promise<void> {
+    try {
+      const c = this.getClient();
+      const { user } = await c.auth.getUserData();
+      if (user) {
+        const u = user as UserData;
+        update({
+          characterName: u.characterName ?? null,
+          characterClass: u.characterClass ?? null,
+          characterLevel: u.characterLevel ?? null,
+          role: u.role ?? null,
+        });
+      }
+    } catch {
+      // Silently ignore — keep stale data
+    }
+  },
+
   setCharacterName(name: string): void {
     update({ characterName: name });
   },

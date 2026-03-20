@@ -1,6 +1,7 @@
-import { Server, auth, JWT, LobbyRoom } from "colyseus";
+import { Server, auth, JWT, LobbyRoom, matchMaker } from "colyseus";
 import { Encoder } from "@colyseus/schema";
 import { DungeonRoom } from "./rooms/DungeonRoom";
+import { MatchmakingRoom, MATCHMAKING_SECRET } from "./rooms/MatchmakingRoom";
 import { initDatabase } from "./db/database";
 import { loadItemRegistry } from "./items/ItemRegistry";
 import { loadCreatureTypeRegistry } from "./creatures/CreatureTypeRegistry";
@@ -59,8 +60,12 @@ const server = new Server({
 
 server.define("lobby", LobbyRoom);
 server.define("dungeon", DungeonRoom).enableRealtimeListing();
+server.define("matchmaking", MatchmakingRoom);
 
-server.listen(port).then(() => {
+server.listen(port).then(async () => {
+  // Create the single matchmaking room (secret prevents client-side creation)
+  await matchMaker.createRoom("matchmaking", { secret: MATCHMAKING_SECRET });
+
   logger.info(
     {
       port,

@@ -510,6 +510,72 @@ textarea {
   display: none;
 }
 
+/* ── Quick Play CTA ── */
+.lobby-quick-play-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #92400e 0%, #b45309 30%, #d97706 60%, #f59e0b 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.15s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Shine sweep — always animating */
+.lobby-quick-play-btn::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  transform: skewX(-20deg);
+  animation: quick-play-shine 4s ease-in-out infinite;
+}
+
+.lobby-quick-play-btn:hover {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 30%, #f59e0b 60%, #fbbf24 100%);
+  box-shadow:
+    0 0 25px rgba(251, 191, 36, 0.4),
+    0 0 50px rgba(217, 119, 6, 0.2),
+    0 0 80px rgba(217, 119, 6, 0.1);
+  border-color: rgba(251, 191, 36, 0.5);
+  transform: scale(1.02);
+}
+
+.lobby-quick-play-btn:active {
+  transform: scale(0.98);
+}
+
+.lobby-quick-play-btn:disabled {
+  animation: none;
+}
+
+.lobby-quick-play-btn:disabled::after {
+  display: none;
+}
+
+@keyframes quick-play-shine {
+  0%,
+  70%,
+  100% {
+    left: -75%;
+  }
+  85% {
+    left: 125%;
+  }
+}
+
 /* Decorative corner ornaments */
 .lobby-ornament {
   position: absolute;

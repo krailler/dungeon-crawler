@@ -26,7 +26,12 @@
     "roomFull": "Esta sala está llena.",
     "changeCharacter": "Cambiar",
     "changeCharacterSoon": "Próximamente",
-    "settings": "Opciones"
+    "settings": "Opciones",
+    "quickPlay": "Partida Rápida",
+    "searching": "Buscando jugadores...",
+    "queueStatus": "{{count}} jugador(es) en cola",
+    "cancelQueue": "Cancelar",
+    "customGame": "Partida Personalizada"
   },
   "loading": {
     "title": "Dungeon Crawler",

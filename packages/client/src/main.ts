@@ -10,7 +10,12 @@ import { LoginScreen } from "./ui/screens/LoginScreen";
 import { LobbyScreen } from "./ui/screens/LobbyScreen";
 import { authStore } from "./ui/stores/authStore";
 import { lobbyStore } from "./ui/stores/lobbyStore";
+import { matchmakingStore } from "./ui/stores/matchmakingStore";
 import { ClientGame } from "./core/ClientGame";
+import { preloadUiSounds } from "./audio/uiSfx";
+
+// Preload UI sounds early so they work in login/lobby screens
+preloadUiSounds();
 
 const loginRoot = createRoot(document.getElementById("login-root")!);
 loginRoot.render(createElement(LoginScreen));
@@ -59,10 +64,17 @@ function teardownGame(): void {
 
 // Register callbacks
 lobbyStore.setOnRoomJoined(startGame);
+
+// When matchmaking finds a match, join the dungeon room
+matchmakingStore.setOnMatched((roomId) => {
+  const client = authStore.getClient();
+  lobbyStore.joinRoom(client, roomId);
+});
 lobbyStore.setOnReturnToLobby(() => {
   teardownGame();
   showScreen("lobby");
   lobbyStore.connect(authStore.getClient());
+  authStore.refreshUserData();
 });
 
 // Watch auth state — manage transitions between login, lobby, and game
@@ -87,6 +99,7 @@ authStore.subscribe(() => {
     // Logged out, kicked, or connection lost — return to login
     // (LoginScreen handles the reconnect UI when canReconnect is true)
     teardownGame();
+    matchmakingStore.reset();
     lobbyStore.disconnect();
     showScreen("login");
   }

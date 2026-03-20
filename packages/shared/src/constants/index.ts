@@ -11,3 +11,4 @@ export * from "./stamina.js";
 export * from "./items.js";
 export * from "./death.js";
 export * from "./talents.js";
+export * from "./matchmaking.js";
