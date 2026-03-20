@@ -33,7 +33,6 @@ const registry = createRegistry<EffectRow, EffectDef>({
 export const loadEffectRegistry = registry.load;
 export const getEffectDef = registry.get;
 export const getEffectDefs = registry.getMany;
-export const getAllEffectDefs = registry.getAll;
 export const getEffectRegistryVersion = registry.getVersion;
 
 /** Return only presentation fields for client consumption */

@@ -4,6 +4,7 @@ import type { RoleValue } from "@dungeon/shared";
 import { initDatabase, getDb } from "./database";
 import { accounts } from "./schema";
 import { createAccount } from "../auth/createAccount";
+import { logger } from "../logger";
 
 interface SeedAccount {
   email: string;
@@ -28,7 +29,7 @@ async function seed() {
       .where(eq(accounts.email, entry.email))
       .limit(1);
     if (existing.length > 0) {
-      console.log(`Account "${entry.email}" already exists — skipping.`);
+      logger.info({ email: entry.email }, "Account already exists — skipping");
       continue;
     }
 
@@ -39,14 +40,14 @@ async function seed() {
       role: entry.role,
     });
 
-    console.log(`Created account "${entry.email}" with character "${entry.characterName}"`);
+    logger.info({ email: entry.email, character: entry.characterName }, "Created account");
   }
 
-  console.log("Seed complete.");
+  logger.info("Seed complete");
   process.exit(0);
 }
 
 seed().catch((err) => {
-  console.error("Seed failed:", err);
+  logger.error(err, "Seed failed");
   process.exit(1);
 });

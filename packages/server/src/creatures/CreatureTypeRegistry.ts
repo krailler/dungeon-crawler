@@ -140,7 +140,6 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
 }
 
 export const getCreatureTypeDef = registry.get;
-export const getAllCreatureTypeDefs = registry.getAll;
 export const getCreatureTypeRegistryVersion = registry.getVersion;
 
 export function getCreatureTypesForLevel(level: number): CreatureTypeDefinition[] {

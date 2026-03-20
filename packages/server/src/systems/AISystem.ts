@@ -186,9 +186,14 @@ export class AISystem {
   addThreat(creatureId: string, sessionId: string, amount: number): void {
     const entry = this.entryById.get(creatureId);
     if (!entry || entry.creature.isDead) return;
-    // If leashing, interrupt and re-engage
-    if (entry.state === AIState.LEASH) {
+    // If idle/roaming/leashing, interrupt and re-engage — reset OOC regen accumulator
+    if (
+      entry.state === AIState.LEASH ||
+      entry.state === AIState.IDLE ||
+      entry.state === AIState.ROAM
+    ) {
       entry.state = AIState.CHASE;
+      entry.regenAccum = 0;
     }
     const current = entry.threatTable.get(sessionId) ?? 0;
     entry.threatTable.set(sessionId, current + amount);

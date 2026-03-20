@@ -1,7 +1,7 @@
 import type { ItemDef, ItemDefClient, ItemRarityValue } from "@dungeon/shared";
 import { toItemDefClient } from "@dungeon/shared";
 import { items } from "../db/schema.js";
-import { createRegistry } from "../db/createRegistry.js";
+import { createRegistry, simpleHash } from "../db/createRegistry.js";
 
 type ItemRow = typeof items.$inferSelect;
 
@@ -22,13 +22,12 @@ const registry = createRegistry<ItemRow, ItemDef>({
     transient: row.transient,
     rarity: row.rarity as ItemRarityValue,
   }),
-  hashDef: (def) => ((def.maxStack << 16) + def.cooldown * 100) | 0,
+  hashDef: (def) => simpleHash(JSON.stringify(def)),
 });
 
 export const loadItemRegistry = registry.load;
 export const getItemDef = registry.get;
 export const getItemDefs = registry.getMany;
-export const getAllItemDefs = registry.getAll;
 export const getItemRegistryVersion = registry.getVersion;
 
 /** Return only presentation fields for client consumption */

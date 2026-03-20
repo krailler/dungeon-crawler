@@ -11,7 +11,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AnimName } from "./CharacterAssetLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { TORCH_INTENSITY, TORCH_RANGE, TORCH_ANGLE } from "@dungeon/shared";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { fixGlbMaterials, createHitboxMesh } from "./entityUtils";
 import { SelectionRing } from "./SelectionRing";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
@@ -195,33 +195,13 @@ export class ClientPlayer {
     this.modelRoot.scaling.setAll(scale);
 
     // Fix GLB material: force opaque + tame emissive for dungeon lighting
-    for (const m of this.modelMeshes) {
-      const mat = m.material;
-      if (mat instanceof PBRMaterial) {
-        mat.alpha = 1;
-        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-        mat.backFaceCulling = true;
-        // Meshy exports bake lighting into emissive — scale it down so the
-        // glow layer doesn't blow it out, but keep enough for visibility
-        mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
-      }
-      m.isPickable = false;
-    }
+    fixGlbMaterials(this.modelMeshes);
 
     // Invisible hitbox cylinder for easier click targeting
-    const hitbox = MeshBuilder.CreateCylinder(
-      `playerHitbox_${this.sessionId}`,
-      {
-        diameter: 1.2,
-        height: 2.0,
-      },
-      this.scene,
-    );
-    hitbox.parent = this.mesh;
-    hitbox.position.y = 1.0;
-    hitbox.visibility = 0;
-    hitbox.isPickable = true;
-    hitbox.metadata = { pickType: "player", pickId: this.sessionId };
+    createHitboxMesh(`playerHitbox_${this.sessionId}`, this.mesh, this.scene, {
+      pickType: "player",
+      pickId: this.sessionId,
+    });
 
     // Add model meshes as shadow casters
     if (this.shadowGenerator) {

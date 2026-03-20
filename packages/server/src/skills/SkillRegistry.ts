@@ -1,6 +1,6 @@
 import type { SkillDef } from "@dungeon/shared";
 import { skills } from "../db/schema.js";
-import { createRegistry } from "../db/createRegistry.js";
+import { createRegistry, simpleHash } from "../db/createRegistry.js";
 
 type SkillRow = typeof skills.$inferSelect;
 
@@ -21,17 +21,10 @@ const registry = createRegistry<SkillRow, SkillDef>({
     effectId: row.effectId,
     aoeRange: row.aoeRange,
   }),
-  hashDef: (def) =>
-    (def.cooldown * 100 +
-      def.damageMultiplier * 100 +
-      def.hpThreshold * 100 +
-      def.aoeRange * 10 +
-      (def.resetOnKill ? 1 : 0)) |
-    0,
+  hashDef: (def) => simpleHash(JSON.stringify(def)),
 });
 
 export const loadSkillRegistry = registry.load;
 export const getSkillDef = registry.get;
 export const getSkillDefs = registry.getMany;
-export const getAllSkillDefs = registry.getAll;
 export const getSkillRegistryVersion = registry.getVersion;

@@ -7,6 +7,7 @@ import { getTalentsForClass } from "../talents/TalentRegistry";
 import { notifyLevelProgress } from "./notifyLevelProgress";
 import { resetTutorials } from "../tutorials/resetTutorials";
 import { getItemDef } from "../items/ItemRegistry";
+import { getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import { syncAndNotifySkills } from "../classes/ClassRegistry";
 
 /**
@@ -546,6 +547,10 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
       const count = ctx.args[2] ? Math.min(20, Math.max(1, parseInt(ctx.args[2], 10))) : 1;
       if (isNaN(level) || isNaN(count)) {
         ctx.replyError("Level and count must be numbers.", "cmd.invalidNumber");
+        return;
+      }
+      if (!getCreatureTypeDef(typeId)) {
+        ctx.replyError(`Unknown creature type: ${typeId}`, "cmd.unknownCreature");
         return;
       }
 

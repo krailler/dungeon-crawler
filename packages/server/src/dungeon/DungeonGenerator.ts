@@ -68,6 +68,12 @@ export class DungeonGenerator {
       }
     }
 
+    if (this.rooms.length < roomCount) {
+      console.warn(
+        `[DungeonGenerator] Only placed ${this.rooms.length}/${roomCount} rooms after ${maxAttempts} attempts`,
+      );
+    }
+
     // Connect rooms with L-shaped corridors
     for (let i = 1; i < this.rooms.length; i++) {
       this.carveCorridor(map, this.rooms[i - 1], this.rooms[i], i - 1);

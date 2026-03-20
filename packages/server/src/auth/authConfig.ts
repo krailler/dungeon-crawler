@@ -13,7 +13,8 @@ JWT.settings.secret = process.env.JWT_SECRET ?? "dungeon-dev-secret-change-in-pr
 auth.settings.onFindUserByEmail = async (email: string) => {
   const db = getDb();
   const [account] = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
-  if (!account) return null as unknown as { password: string };
+  // Colyseus auth expects null when user is not found
+  if (!account) return null!;
   return account;
 };
 

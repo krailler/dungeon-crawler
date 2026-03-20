@@ -1,9 +1,8 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { fixGlbMaterials } from "./entityUtils";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -46,18 +45,7 @@ export class ClientLootBag {
       root.scaling.setAll(CHEST_SCALE);
 
       this.modelMeshes = root.getChildMeshes(false);
-      for (const m of this.modelMeshes) {
-        const mat = m.material;
-        if (mat instanceof PBRMaterial) {
-          mat.alpha = 1;
-          mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-          mat.backFaceCulling = true;
-          mat.metallic = 0;
-          mat.roughness = 0.8;
-          mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
-        }
-        m.isPickable = false;
-      }
+      fixGlbMaterials(this.modelMeshes, { metallic: 0, roughness: 0.8 });
     }
 
     // Invisible hitbox for click targeting

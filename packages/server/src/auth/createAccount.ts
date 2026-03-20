@@ -21,30 +21,35 @@ export async function createAccount(params: CreateAccountParams) {
   if (process.env.NODE_ENV === "production" && password.length < 6) {
     throw new Error("Password must be at least 6 characters");
   }
+  if (password.length > 128) {
+    throw new Error("Password must be at most 128 characters");
+  }
   const db = getDb();
   const hashedPassword = await Hash.make(password);
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ email, password: hashedPassword, role })
-    .returning();
+  return db.transaction(async (tx) => {
+    const [account] = await tx
+      .insert(accounts)
+      .values({ email, password: hashedPassword, role })
+      .returning();
 
-  const [character] = await db
-    .insert(characters)
-    .values({ accountId: account.id, name: characterName, classId })
-    .returning({ id: characters.id });
+    const [character] = await tx
+      .insert(characters)
+      .values({ accountId: account.id, name: characterName, classId })
+      .returning({ id: characters.id });
 
-  // Assign only level-1 skills from the class definition
-  const skills = await db
-    .select({ skillId: classSkills.skillId })
-    .from(classSkills)
-    .where(and(eq(classSkills.classId, classId), lte(classSkills.unlockLevel, 1)));
+    // Assign only level-1 skills from the class definition
+    const skills = await tx
+      .select({ skillId: classSkills.skillId })
+      .from(classSkills)
+      .where(and(eq(classSkills.classId, classId), lte(classSkills.unlockLevel, 1)));
 
-  if (skills.length > 0) {
-    await db
-      .insert(characterSkills)
-      .values(skills.map((s) => ({ characterId: character.id, skillId: s.skillId })));
-  }
+    if (skills.length > 0) {
+      await tx
+        .insert(characterSkills)
+        .values(skills.map((s) => ({ characterId: character.id, skillId: s.skillId })));
+    }
 
-  return account;
+    return account;
+  });
 }

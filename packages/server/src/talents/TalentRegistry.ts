@@ -77,7 +77,6 @@ export async function loadTalentRegistry(): Promise<void> {
 
 export const getTalentDef = registry.get;
 export const getTalentDefs = registry.getMany;
-export const getAllTalentDefs = registry.getAll;
 export const getTalentRegistryVersion = registry.getVersion;
 
 /** Get all talents for a specific class */

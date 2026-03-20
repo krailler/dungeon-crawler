@@ -16,7 +16,7 @@ const handlers = new Map<string, EffectHandler>();
 // ── Built-in effects ─────────────────────────────────────────────────────────
 
 handlers.set(ItemEffectType.HEAL, ({ player, params }) => {
-  const amount = (params.amount as number) ?? 0;
+  const amount = typeof params.amount === "number" ? params.amount : 0;
   if (amount <= 0) return false;
   if (player.health >= player.maxHealth) return false;
 
@@ -25,7 +25,7 @@ handlers.set(ItemEffectType.HEAL, ({ player, params }) => {
 });
 
 handlers.set(ItemEffectType.APPLY_EFFECT, ({ player, params, effectSystem }) => {
-  const effectId = params.effectId as string;
+  const effectId = typeof params.effectId === "string" ? params.effectId : "";
   if (!effectId || !effectSystem) return false;
 
   effectSystem.applyEffect(player, effectId);

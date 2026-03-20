@@ -101,7 +101,6 @@ export async function loadClassRegistry(): Promise<void> {
 
 export const getClassDef = registry.get;
 export const getClassDefs = registry.getMany;
-export const getAllClassDefs = registry.getAll;
 export const getClassRegistryVersion = registry.getVersion;
 
 /** Build skill entries for client spellbook */

@@ -4,7 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { fixGlbMaterials, createHitboxMesh } from "./entityUtils";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
@@ -146,32 +146,13 @@ export class ClientCreature {
     this.modelRoot.scaling.setAll(scale);
 
     // Fix GLB material: exported with alpha=0 — force opaque
-    for (const m of this.modelMeshes) {
-      const mat = m.material;
-      if (mat instanceof PBRMaterial) {
-        mat.alpha = 1;
-        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-        mat.backFaceCulling = true;
-        // Meshy exports bake lighting into emissive — scale it down
-        mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.4);
-      }
-      m.isPickable = false;
-    }
+    fixGlbMaterials(this.modelMeshes);
 
     // Invisible hitbox cylinder for easier click targeting
-    const hitbox = MeshBuilder.CreateCylinder(
-      `creatureHitbox_${this.id}`,
-      {
-        diameter: 1.2,
-        height: 2.0,
-      },
-      this.mesh.getScene(),
-    );
-    hitbox.parent = this.mesh;
-    hitbox.position.y = 1.0;
-    hitbox.visibility = 0;
-    hitbox.isPickable = true;
-    hitbox.metadata = { pickType: "creature", pickId: this.id };
+    createHitboxMesh(`creatureHitbox_${this.id}`, this.mesh, this.mesh.getScene(), {
+      pickType: "creature",
+      pickId: this.id,
+    });
 
     // Start idle animation
     this.animController.startIdle();
