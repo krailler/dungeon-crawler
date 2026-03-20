@@ -338,6 +338,13 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
     };
     const onDrop = (e: globalThis.DragEvent): void => {
       e.preventDefault();
+      // If dropped on another component's drop zone (e.g. consumable bar), skip destroy
+      const target = e.target as HTMLElement;
+      if (target?.closest?.("[data-drop-zone]")) {
+        setDragSourceIndex(null);
+        setDragOverIndex(null);
+        return;
+      }
       // If no slot handled the drop, ask to destroy (skip transient items)
       if (!dropHandledRef.current && dragSourceRef.current !== null) {
         const srcSlot = slots[dragSourceRef.current];

@@ -195,6 +195,7 @@ export const ConsumableBar = (): ReactNode => {
           return (
             <div
               key={i}
+              data-drop-zone
               draggable={hasItem}
               onDragStart={(e) => handleSlotDragStart(i, e)}
               onDragOver={(e) => handleSlotDragOver(i, e)}
