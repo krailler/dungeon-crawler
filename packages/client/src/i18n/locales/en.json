@@ -115,6 +115,7 @@
     "characterPanel": "Character",
     "inventoryPanel": "Inventory",
     "talentsPanel": "Talents",
+    "spellbookPanel": "Abilities",
     "minimapPanel": "Minimap",
     "fullscreen": "Fullscreen",
     "tabTarget": "Cycle Target",

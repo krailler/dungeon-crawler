@@ -112,6 +112,7 @@
     "characterPanel": "Personaje",
     "inventoryPanel": "Inventario",
     "talentsPanel": "Talentos",
+    "spellbookPanel": "Habilidades",
     "minimapPanel": "Minimapa",
     "fullscreen": "Pantalla Completa",
     "tabTarget": "Cambiar Objetivo",

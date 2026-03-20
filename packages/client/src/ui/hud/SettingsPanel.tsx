@@ -165,6 +165,7 @@ const KEYBINDING_CATEGORIES: KeybindingCategory[] = [
       { action: BindableAction.CHARACTER, i18nKey: "settings.characterPanel" },
       { action: BindableAction.INVENTORY, i18nKey: "settings.inventoryPanel" },
       { action: BindableAction.TALENTS, i18nKey: "settings.talentsPanel" },
+      { action: BindableAction.SPELLBOOK, i18nKey: "settings.spellbookPanel" },
       { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
     ],
   },

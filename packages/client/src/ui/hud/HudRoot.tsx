@@ -238,6 +238,21 @@ export const HudRoot = (): ReactNode => {
     return () => window.removeEventListener("keydown", handleKey);
   }, [settings.keybindings.talents, toggleSheet]);
 
+  // Spellbook keybind opens the sheet on the skills tab
+  useEffect(() => {
+    const spellbookKey = settings.keybindings.spellbook?.toLowerCase();
+    if (!spellbookKey) return;
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === spellbookKey) {
+        playUiSfx("ui_click");
+        toggleSheet("skills");
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [settings.keybindings.spellbook, toggleSheet]);
+
   // Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   useEffect(() => {
