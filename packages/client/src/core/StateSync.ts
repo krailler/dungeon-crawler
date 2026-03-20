@@ -329,48 +329,49 @@ export class StateSync {
                   const local = this.players.get(room.sessionId);
                   if (!local) return;
                   const pPos = local.getWorldPosition();
-                  const currentId = targetStore.getSnapshot().targetId;
+                  const { targetId: currentId, targetType: currentType } =
+                    targetStore.getSnapshot();
 
-                  // Collect alive creatures sorted by distance
-                  const creatures: { id: string; dist: number }[] = [];
+                  // Collect all targetable entities (creatures + players) sorted by distance
+                  const targets: {
+                    id: string;
+                    type: "creature" | "player";
+                    dist: number;
+                  }[] = [];
+
                   for (const [id, creature] of this.creatures) {
                     if (creature.isDead) continue;
                     const cPos = creature.getWorldPosition();
                     const dx = cPos.x - pPos.x;
                     const dz = cPos.z - pPos.z;
-                    creatures.push({ id, dist: dx * dx + dz * dz });
+                    targets.push({ id, type: "creature", dist: dx * dx + dz * dz });
                   }
 
-                  if (creatures.length > 0) {
-                    // Cycle through creatures
-                    creatures.sort((a, b) => a.dist - b.dist);
-                    let nextIdx = 0;
-                    if (currentId) {
-                      const curIdx = creatures.findIndex((e) => e.id === currentId);
-                      if (curIdx >= 0) nextIdx = (curIdx + 1) % creatures.length;
-                    }
-                    const nextId = creatures[nextIdx].id;
-                    targetStore.selectCreature(nextId);
-                    return;
-                  }
-
-                  // No alive creatures — cycle through all players (including self)
-                  const players: { id: string; dist: number }[] = [];
                   for (const [id, player] of this.players) {
+                    if (id === room.sessionId) continue; // skip self
                     const oPos = player.getWorldPosition();
                     const dx = oPos.x - pPos.x;
                     const dz = oPos.z - pPos.z;
-                    players.push({ id, dist: dx * dx + dz * dz });
+                    targets.push({ id, type: "player", dist: dx * dx + dz * dz });
                   }
-                  if (players.length === 0) return;
-                  players.sort((a, b) => a.dist - b.dist);
+
+                  if (targets.length === 0) return;
+                  targets.sort((a, b) => a.dist - b.dist);
+
                   let nextIdx = 0;
                   if (currentId) {
-                    const curIdx = players.findIndex((e) => e.id === currentId);
-                    if (curIdx >= 0) nextIdx = (curIdx + 1) % players.length;
+                    const curIdx = targets.findIndex(
+                      (e) => e.id === currentId && e.type === (currentType ?? "creature"),
+                    );
+                    if (curIdx >= 0) nextIdx = (curIdx + 1) % targets.length;
                   }
-                  const nextPlayerId = players[nextIdx].id;
-                  targetStore.selectPlayer(nextPlayerId);
+
+                  const next = targets[nextIdx];
+                  if (next.type === "creature") {
+                    targetStore.selectCreature(next.id);
+                  } else {
+                    targetStore.selectPlayer(next.id);
+                  }
                 },
               });
 

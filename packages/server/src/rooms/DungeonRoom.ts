@@ -343,6 +343,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         self.allCreatures.delete(creatureId);
       },
       getSpawnPoint: () => self.sessionManager.findSpawnPosition(),
+      hasPlayerTarget: (sessionId: string) => self.playerTargets.has(sessionId),
     });
 
     // Register message handlers

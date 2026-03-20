@@ -104,6 +104,8 @@ export interface GameLoopBridge {
   onCreatureRemoved?: (creatureId: string) => void;
   /** Get the dungeon entrance position for respawning. */
   getSpawnPoint(): { x: number; z: number } | null;
+  /** Check if a player has a player-type target (e.g. revive target). */
+  hasPlayerTarget(sessionId: string): boolean;
 }
 
 export class GameLoop {
@@ -376,10 +378,16 @@ export class GameLoop {
     };
     this.bridge.broadcastToAdmins(MessageType.COMBAT_LOG, msg);
 
+    // Cancel any active revive channel if the reviver takes damage
+    if (player.lifeState === LifeState.ALIVE) {
+      this.cancelReviveByReviver(event.sessionId);
+    }
+
     // Auto-target: if player has no target, auto-select the creature that hit them
+    // Skip if the player has a player target (e.g. reviving a teammate)
     if (player.lifeState === LifeState.ALIVE) {
       const currentTarget = this.bridge.combatSystem.getTarget(event.sessionId);
-      if (!currentTarget) {
+      if (!currentTarget && !this.bridge.hasPlayerTarget(event.sessionId)) {
         this.bridge.combatSystem.setTarget(event.sessionId, event.creatureId);
         // Notify client to update its targetStore
         this.bridge.sendToClient(event.sessionId, MessageType.AUTO_TARGET, {
@@ -1053,6 +1061,15 @@ export class GameLoop {
   private cancelReviveOn(player: PlayerState): void {
     player.reviveProgress = 0;
     player.reviverSessionId = "";
+  }
+
+  /** Cancel any revive channel where the given session is the reviver. */
+  private cancelReviveByReviver(reviverSessionId: string): void {
+    this.bridge.state.players.forEach((p) => {
+      if (p.reviverSessionId === reviverSessionId) {
+        this.cancelReviveOn(p);
+      }
+    });
   }
 
   /** Start a revive channel on a downed player. Returns true on success. */
