@@ -16,6 +16,7 @@ export const PauseMenu = (): ReactNode => {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("menu");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -29,6 +30,7 @@ export const PauseMenu = (): ReactNode => {
         setOpen((prev) => {
           if (prev) {
             setConfirmReset(false);
+            setConfirmLeave(false);
             setView("menu");
           }
           return !prev;
@@ -44,6 +46,7 @@ export const PauseMenu = (): ReactNode => {
   const close = (): void => {
     setOpen(false);
     setConfirmReset(false);
+    setConfirmLeave(false);
     setView("menu");
   };
 
@@ -74,13 +77,7 @@ export const PauseMenu = (): ReactNode => {
               <MenuButton onClick={() => setConfirmReset(true)} className="w-full">
                 {t("pause.resetTutorials")}
               </MenuButton>
-              <MenuButton
-                variant="danger"
-                onClick={() => {
-                  lobbyStore.returnToLobby();
-                }}
-                className="w-full"
-              >
+              <MenuButton variant="danger" onClick={() => setConfirmLeave(true)} className="w-full">
                 {t("pause.leaveRoom")}
               </MenuButton>
               <MenuButton
@@ -111,6 +108,20 @@ export const PauseMenu = (): ReactNode => {
             setConfirmReset(false);
           }}
           onCancel={() => setConfirmReset(false)}
+        />
+      )}
+
+      {confirmLeave && (
+        <ConfirmDialog
+          title={t("pause.leaveRoomTitle")}
+          message={t("pause.leaveRoomMessage")}
+          confirmLabel={t("pause.leaveRoomConfirm")}
+          cancelLabel={t("pause.leaveRoomCancel")}
+          onConfirm={() => {
+            setConfirmLeave(false);
+            lobbyStore.returnToLobby();
+          }}
+          onCancel={() => setConfirmLeave(false)}
         />
       )}
     </div>

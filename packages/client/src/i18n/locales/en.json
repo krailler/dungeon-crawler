@@ -85,6 +85,10 @@
     "resetTutorialsCancel": "Cancel",
     "settings": "Settings",
     "leaveRoom": "Leave Room",
+    "leaveRoomTitle": "Leave Room?",
+    "leaveRoomMessage": "You will be permanently removed from this dungeon and will not be able to rejoin.",
+    "leaveRoomConfirm": "Leave",
+    "leaveRoomCancel": "Cancel",
     "logout": "Logout"
   },
   "settings": {

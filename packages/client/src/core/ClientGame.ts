@@ -542,6 +542,10 @@ export class ClientGame {
       localStorage.removeItem("reconnectionToken");
       localStorage.removeItem("reconnectionRoomId");
     }
+    // Notify server of permanent leave so it removes the player immediately
+    if (lobbyStore.isLeavingIntentionally()) {
+      this.room?.send(MessageType.LEAVE_ROOM);
+    }
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("resize", this.onResize);

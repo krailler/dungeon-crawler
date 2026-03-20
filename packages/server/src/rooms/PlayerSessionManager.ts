@@ -64,6 +64,8 @@ export class PlayerSessionManager {
   private bridge: SessionRoomBridge;
   private log: Logger;
   private kickedSessions: Set<string> = new Set();
+  /** Sessions that explicitly chose "Leave Room" — should be permanently removed, not kept for reconnection. */
+  private permanentLeaveSessions: Set<string> = new Set();
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
   private accountToSession: Map<string, string> = new Map();
   private lastSavedHash: Map<string, string> = new Map();
@@ -449,6 +451,20 @@ export class PlayerSessionManager {
 
   markKicked(sessionId: string): void {
     this.kickedSessions.add(sessionId);
+  }
+
+  /** Mark a session as permanently leaving (player clicked "Leave Room"). */
+  markPermanentLeave(sessionId: string): void {
+    this.permanentLeaveSessions.add(sessionId);
+  }
+
+  /** Check and consume the permanent leave flag for a session. */
+  isPermanentLeave(sessionId: string): boolean {
+    if (this.permanentLeaveSessions.has(sessionId)) {
+      this.permanentLeaveSessions.delete(sessionId);
+      return true;
+    }
+    return false;
   }
 
   /**

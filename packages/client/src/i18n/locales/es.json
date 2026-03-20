@@ -85,6 +85,10 @@
     "resetTutorialsCancel": "Cancelar",
     "settings": "Ajustes",
     "leaveRoom": "Salir de la Sala",
+    "leaveRoomTitle": "¿Salir de la Sala?",
+    "leaveRoomMessage": "Serás eliminado permanentemente de esta mazmorra y no podrás volver a entrar.",
+    "leaveRoomConfirm": "Salir",
+    "leaveRoomCancel": "Cancelar",
     "logout": "Cerrar Sesión"
   },
   "settings": {

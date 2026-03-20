@@ -58,6 +58,7 @@ export const MessageType = {
   CONSUMABLE_BAR_ASSIGN: "cbar:assign",
   CONSUMABLE_BAR_UNASSIGN: "cbar:unassign",
   CONSUMABLE_BAR_SWAP: "cbar:swap",
+  LEAVE_ROOM: "room:leave",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */

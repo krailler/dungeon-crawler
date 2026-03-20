@@ -796,6 +796,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
     );
 
+    // Permanent leave: player explicitly chose "Leave Room" (not tab close)
+    this.onMessage(MessageType.LEAVE_ROOM, (client: Client) => {
+      this.sessionManager.markPermanentLeave(client.sessionId);
+    });
+
     // Target selection: player selects or clears their attack target
     this.onMessage(MessageType.SET_TARGET, (client: Client, data: SetTargetMessage) => {
       if (data.targetId === null) {
@@ -1454,6 +1459,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   async onLeave(client: Client): Promise<void> {
+    // If the player explicitly chose "Leave Room", remove them permanently
+    if (this.sessionManager.isPermanentLeave(client.sessionId)) {
+      await this.sessionManager.handleLeave(client);
+      this.updateMetadata();
+      return;
+    }
     // During an active dungeon, treat a consented leave (tab close / page reload)
     // as a soft disconnect: keep the player offline so the same account can
     // rejoin via session migration in onAuth/handleJoin.
