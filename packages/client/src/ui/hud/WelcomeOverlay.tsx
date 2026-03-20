@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { welcomeStore } from "../stores/welcomeStore";
 import { playUiSfx } from "../../audio/uiSfx";
+import { GameLogo } from "../components/GameLogo";
 
 export const WelcomeOverlay = (): ReactNode => {
   const { t } = useTranslation();
@@ -38,11 +39,7 @@ export const WelcomeOverlay = (): ReactNode => {
         {/* Content */}
         <div className="relative flex flex-col items-center px-8 pb-8 pt-6">
           {/* Logo */}
-          <img
-            src="/textures/logo.png"
-            alt="KrawlHero"
-            className="mb-2 h-16 object-contain drop-shadow-[0_0_12px_rgba(56,189,248,0.3)]"
-          />
+          <GameLogo className="mb-2" />
 
           {/* Subtitle */}
           <p className="mb-6 text-center text-sm text-slate-400">{t("welcome.subtitle")}</p>

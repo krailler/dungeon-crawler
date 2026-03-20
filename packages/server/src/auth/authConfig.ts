@@ -1,7 +1,7 @@
 import { auth, JWT } from "colyseus";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/database";
-import { accounts } from "../db/schema";
+import { accounts, characters } from "../db/schema";
 import { createAccount } from "./createAccount";
 
 // JWT secret — required in production, dev fallback for local development
@@ -42,10 +42,18 @@ auth.settings.onParseToken = async (token) => {
   const { accountId } = token as Record<string, string>;
   if (!accountId) return null;
   const db = getDb();
-  const [account] = await db
-    .select({ id: accounts.id, email: accounts.email })
+  const [row] = await db
+    .select({
+      id: accounts.id,
+      email: accounts.email,
+      role: accounts.role,
+      characterName: characters.name,
+      characterClass: characters.classId,
+      characterLevel: characters.level,
+    })
     .from(accounts)
+    .leftJoin(characters, eq(characters.accountId, accounts.id))
     .where(eq(accounts.id, accountId))
     .limit(1);
-  return account ?? null;
+  return row ?? null;
 };

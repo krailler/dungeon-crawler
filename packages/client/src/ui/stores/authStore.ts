@@ -18,10 +18,22 @@ export type AuthSnapshot = {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+  email: string | null;
   characterName: string | null;
+  characterClass: string | null;
+  characterLevel: number | null;
   role: string | null;
   /** True when connection was lost but session may still be alive on the server */
   canReconnect: boolean;
+};
+
+/** Shape returned by onParseToken (server) via getUserData */
+type UserData = {
+  email?: string;
+  role?: string;
+  characterName?: string;
+  characterClass?: string;
+  characterLevel?: number;
 };
 
 const listeners = new Set<Listener>();
@@ -30,7 +42,10 @@ let snapshot: AuthSnapshot = {
   isAuthenticated: false,
   loading: false,
   error: null,
+  email: null,
   characterName: null,
+  characterClass: null,
+  characterLevel: null,
   role: null,
   canReconnect: false,
 };
@@ -73,7 +88,16 @@ export const authStore = {
       c.auth.token = saved;
       const { user } = await c.auth.getUserData();
       if (user) {
-        update({ isAuthenticated: true, loading: false });
+        const u = user as UserData;
+        update({
+          isAuthenticated: true,
+          loading: false,
+          email: u.email ?? null,
+          role: u.role ?? null,
+          characterName: u.characterName ?? null,
+          characterClass: u.characterClass ?? null,
+          characterLevel: u.characterLevel ?? null,
+        });
         return true;
       }
       // Token invalid — clear it
@@ -108,7 +132,22 @@ export const authStore = {
         }
       }
       localStorage.setItem(AUTH_TOKEN_KEY, token);
-      update({ isAuthenticated: true, loading: false });
+      // Fetch full user data (character info, role) after login
+      try {
+        const { user } = await c.auth.getUserData();
+        const u = (user ?? {}) as UserData;
+        update({
+          isAuthenticated: true,
+          loading: false,
+          email,
+          role: u.role ?? null,
+          characterName: u.characterName ?? null,
+          characterClass: u.characterClass ?? null,
+          characterLevel: u.characterLevel ?? null,
+        });
+      } catch {
+        update({ isAuthenticated: true, loading: false, email });
+      }
       return true;
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
@@ -133,7 +172,10 @@ export const authStore = {
     c.auth.signOut().catch(() => {});
     update({
       isAuthenticated: false,
+      email: null,
       characterName: null,
+      characterClass: null,
+      characterLevel: null,
       role: null,
       error: null,
       canReconnect: false,
@@ -147,7 +189,10 @@ export const authStore = {
     localStorage.removeItem("reconnectionRoomId");
     update({
       isAuthenticated: false,
+      email: null,
       characterName: null,
+      characterClass: null,
+      characterLevel: null,
       role: null,
       error: reason,
       canReconnect: false,

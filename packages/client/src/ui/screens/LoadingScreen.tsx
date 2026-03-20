@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { loadingStore, LoadingPhase } from "../stores/loadingStore";
+import { GameLogo } from "../components/GameLogo";
 
 export const LoadingScreen = (): ReactNode => {
   const { t } = useTranslation();
@@ -19,11 +20,7 @@ export const LoadingScreen = (): ReactNode => {
       }`}
     >
       {/* Logo */}
-      <img
-        src="/textures/logo.png"
-        alt="KrawlHero"
-        className="mb-12 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
-      />
+      <GameLogo className="mb-12" />
 
       {/* Progress bar */}
       <div className="w-80 overflow-hidden rounded-full border border-slate-600/40 bg-slate-900/80 p-0.5">

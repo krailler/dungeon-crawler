@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { PROTOCOL_VERSION } from "@dungeon/shared";
 import { ParticleBackground } from "../components/ParticleBackground";
+import { GoldButton } from "../components/GoldButton";
+import { GameLogo } from "../components/GameLogo";
 
 export const LoginScreen = (): ReactNode => {
   const { t } = useTranslation();
@@ -23,23 +25,16 @@ export const LoginScreen = (): ReactNode => {
   if (auth.canReconnect) {
     return (
       <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070d]">
-        <img
-          src="/textures/logo.png"
-          alt="KrawlHero"
-          className="mb-4 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
-        />
+        <GameLogo className="mb-4" />
         <p className="mb-8 max-w-sm text-center text-sm text-slate-400">{t("reconnect.message")}</p>
         {auth.characterName && (
           <p className="mb-6 text-xs text-slate-500">
             {t("reconnect.asCharacter", { name: auth.characterName })}
           </p>
         )}
-        <button
-          onClick={() => authStore.attemptReconnect()}
-          className="rounded-lg bg-amber-600/90 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-500/90"
-        >
+        <GoldButton onClick={() => authStore.attemptReconnect()}>
           {t("reconnect.button")}
-        </button>
+        </GoldButton>
         <button
           onClick={() => authStore.kick("")}
           className="mt-4 text-xs text-slate-500 transition-colors hover:text-slate-300"
@@ -63,11 +58,7 @@ export const LoginScreen = (): ReactNode => {
       <div className="absolute inset-0 bg-[#05070d]/75" />
       <ParticleBackground />
       {/* Logo */}
-      <img
-        src="/textures/logo.png"
-        alt="KrawlHero"
-        className="relative z-10 mb-10 h-16 w-auto drop-shadow-[0_0_20px_rgba(255,180,50,0.3)]"
-      />
+      <GameLogo className="relative z-10 mb-10" />
 
       {/* Login form */}
       <form onSubmit={handleSubmit} className="relative z-10 flex w-80 flex-col gap-4">
@@ -88,13 +79,14 @@ export const LoginScreen = (): ReactNode => {
           className="rounded-lg border border-slate-600/40 bg-slate-900/40 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none backdrop-blur-sm transition-colors focus:border-amber-500/60"
         />
 
-        <button
+        <GoldButton
           type="submit"
-          disabled={auth.loading || !email || !password}
-          className="mt-2 rounded-lg bg-amber-600/90 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-500/90 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!email || !password}
+          loading={auth.loading}
+          className="mt-2"
         >
           {auth.loading ? t("login.loading") : t("login.submit")}
-        </button>
+        </GoldButton>
 
         {auth.error && <p className="text-center text-xs text-red-400">{t(auth.error)}</p>}
       </form>

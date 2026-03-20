@@ -1,5 +1,8 @@
 import "./ui/index.css";
 import "./i18n/i18n";
+
+// Disable native browser context menu globally (game uses pointer events for right-click)
+document.addEventListener("contextmenu", (e) => e.preventDefault());
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import type { Room } from "@colyseus/sdk";

@@ -23,7 +23,10 @@
     "logout": "Cerrar sesión",
     "level": "Nv.{{level}}",
     "roomStarted": "Esta sala ya ha comenzado.",
-    "roomFull": "Esta sala está llena."
+    "roomFull": "Esta sala está llena.",
+    "changeCharacter": "Cambiar",
+    "changeCharacterSoon": "Próximamente",
+    "settings": "Opciones"
   },
   "loading": {
     "title": "Dungeon Crawler",

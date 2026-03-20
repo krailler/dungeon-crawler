@@ -23,7 +23,10 @@
     "logout": "Log out",
     "level": "Lv.{{level}}",
     "roomStarted": "This room has already started.",
-    "roomFull": "This room is full."
+    "roomFull": "This room is full.",
+    "changeCharacter": "Change",
+    "changeCharacterSoon": "Coming soon",
+    "settings": "Settings"
   },
   "loading": {
     "title": "Dungeon Crawler",
