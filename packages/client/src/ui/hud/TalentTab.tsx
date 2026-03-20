@@ -27,6 +27,7 @@ const STAT_I18N: Record<string, string> = {
   attackDamage: "character.attackDamage",
   defense: "character.defense",
   moveSpeed: "talents.statMoveSpeed",
+  attackCooldown: "character.attackSpeed",
 };
 
 /** A single talent node in the tree */

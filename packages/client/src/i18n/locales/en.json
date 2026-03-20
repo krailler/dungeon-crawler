@@ -135,6 +135,10 @@
     "attackDamageTip": "Damage dealt per hit (based on Strength)",
     "defense": "Defense",
     "defenseTip": "Damage reduced per hit (based on Vitality)",
+    "speed": "Speed",
+    "speedTip": "Movement speed (based on Agility)",
+    "attackSpeed": "Attack CD",
+    "attackSpeedTip": "Seconds between attacks (based on Agility, lower is faster)",
     "health": "Health",
     "baseStats": "Attributes",
     "derivedStats": "Combat",
@@ -247,7 +251,9 @@
     "cooldown": "Cooldown: {{seconds}}s",
     "damage": "Damage: {{multiplier}}×",
     "passiveAlwaysActive": "Passive",
-    "unlocksAtLevel": "Unlocks at level {{level}}"
+    "unlocksAtLevel": "Unlocks at level {{level}}",
+    "cdReduced": "{{percent}}% reduced",
+    "dmgBoosted": "+{{percent}}% damage from talents"
   },
   "tutorial": {
     "startDungeon": "You are the party leader! Right-click the gate or press F nearby to start the dungeon.",
@@ -307,19 +313,63 @@
     },
     "warriorThickSkin": {
       "name": "Thick Skin",
-      "desc": "Increases defense."
+      "desc": "Your skin becomes as tough as leather armor."
     },
-    "warriorCleave": {
-      "name": "Cleave",
-      "desc": "Enhances Heavy Strike: faster cooldown and more damage."
+    "warriorBrutalStrikes": {
+      "name": "Brutal Strikes",
+      "desc": "Your Heavy Strike becomes faster and more devastating."
     },
-    "warriorRush": {
-      "name": "Rush",
-      "desc": "Greatly increases movement speed."
+    "warriorAgileFighter": {
+      "name": "Agile Fighter",
+      "desc": "You attack with increasing tempo."
+    },
+    "warriorResilience": {
+      "name": "Resilience",
+      "desc": "What doesn't kill you makes you stronger."
+    },
+    "warriorRendingBlow": {
+      "name": "Rending Blow",
+      "desc": "Your Ground Slam tears through groups of enemies."
+    },
+    "warriorBattleTempo": {
+      "name": "Battle Tempo",
+      "desc": "War Cry invigorates you, shortening its downtime."
+    },
+    "warriorUnbreakable": {
+      "name": "Unbreakable",
+      "desc": "Your determination to survive is absolute."
+    },
+    "warriorExecutioner": {
+      "name": "Executioner",
+      "desc": "You sense weakness and strike without mercy."
+    },
+    "warriorWarRhythm": {
+      "name": "War Rhythm",
+      "desc": "The cadence of battle quickens around you."
+    },
+    "warriorFortify": {
+      "name": "Fortify",
+      "desc": "You become an immovable object."
+    },
+    "warriorRampage": {
+      "name": "Rampage",
+      "desc": "Every kill fuels your bloodlust."
+    },
+    "warriorQuickHands": {
+      "name": "Quick Hands",
+      "desc": "Your reflexes become supernaturally fast."
     },
     "warriorLastStand": {
       "name": "Last Stand",
-      "desc": "Massively increases maximum health."
+      "desc": "When all seems lost, you refuse to fall."
+    },
+    "warriorBerserker": {
+      "name": "Berserker",
+      "desc": "You abandon restraint and fight with reckless fury."
+    },
+    "warriorBattleMaster": {
+      "name": "Battle Master",
+      "desc": "You have mastered the art of war."
     }
   },
   "loot": {

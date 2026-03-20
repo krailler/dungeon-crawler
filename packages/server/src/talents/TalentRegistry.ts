@@ -6,7 +6,7 @@ import type {
   TalentStatModifier,
   StatModTypeValue,
 } from "@dungeon/shared";
-import { toTalentDefClient, TalentEffectType } from "@dungeon/shared";
+import { toTalentDefClient, TalentEffectType, computeTalentSkillMods } from "@dungeon/shared";
 import { talents, talentEffects } from "../db/schema.js";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
@@ -114,26 +114,21 @@ export function collectTalentStatMods(allocations: Map<string, number>): TalentS
 /**
  * Collect all skill modifiers for a specific skill from the player's allocated talents.
  * Returns aggregated cooldownMul and damageMul (multiplicative).
+ * Resolves talent defs from the registry, then delegates to the shared pure function.
  */
 export function collectTalentSkillMods(
   allocations: Map<string, number>,
   skillId: string,
 ): { cooldownMul: number; damageMul: number } {
-  let cooldownMul = 1;
-  let damageMul = 1;
-  for (const [talentId, rank] of allocations) {
+  // Resolve allocated talent defs from registry
+  const defs: TalentDef[] = [];
+  for (const talentId of allocations.keys()) {
     const def = registry.get(talentId);
     if (!def) {
       logger.warn({ talentId }, "Player has allocated unknown talent — skipping");
       continue;
     }
-    for (const effect of def.effects) {
-      if (effect.rank > rank) continue;
-      if (effect.effectType !== TalentEffectType.MODIFY_SKILL) continue;
-      if (effect.skillModifier?.skillId !== skillId) continue;
-      if (effect.skillModifier.cooldownMul) cooldownMul *= effect.skillModifier.cooldownMul;
-      if (effect.skillModifier.damageMul) damageMul *= effect.skillModifier.damageMul;
-    }
+    defs.push(def);
   }
-  return { cooldownMul, damageMul };
+  return computeTalentSkillMods(defs, allocations, skillId);
 }

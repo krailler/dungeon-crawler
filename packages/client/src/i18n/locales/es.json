@@ -135,6 +135,10 @@
     "attackDamageTip": "Daño por golpe (basado en Fuerza)",
     "defense": "Defensa",
     "defenseTip": "Daño reducido por golpe (basado en Vitalidad)",
+    "speed": "Velocidad",
+    "speedTip": "Velocidad de movimiento (basado en Agilidad)",
+    "attackSpeed": "CD Ataque",
+    "attackSpeedTip": "Segundos entre ataques (basado en Agilidad, menor es más rápido)",
     "health": "Vida",
     "baseStats": "Atributos",
     "derivedStats": "Combate",
@@ -247,7 +251,9 @@
     "cooldown": "Enfriamiento: {{seconds}}s",
     "damage": "Daño: {{multiplier}}×",
     "passiveAlwaysActive": "Pasiva",
-    "unlocksAtLevel": "Se desbloquea en el nivel {{level}}"
+    "unlocksAtLevel": "Se desbloquea en el nivel {{level}}",
+    "cdReduced": "{{percent}}% reducido",
+    "dmgBoosted": "+{{percent}}% daño por talentos"
   },
   "tutorial": {
     "startDungeon": "¡Eres el líder del grupo! Haz clic derecho en la puerta o pulsa F cerca para iniciar la mazmorra.",
@@ -307,19 +313,63 @@
     },
     "warriorThickSkin": {
       "name": "Piel Gruesa",
-      "desc": "Aumenta la defensa."
+      "desc": "Tu piel se endurece como una armadura de cuero."
     },
-    "warriorCleave": {
-      "name": "Tajo",
-      "desc": "Mejora Golpe Pesado: enfriamiento más rápido y más daño."
+    "warriorBrutalStrikes": {
+      "name": "Golpes Brutales",
+      "desc": "Tu Golpe Pesado se vuelve más rápido y devastador."
     },
-    "warriorRush": {
-      "name": "Embestida",
-      "desc": "Aumenta mucho la velocidad de movimiento."
+    "warriorAgileFighter": {
+      "name": "Luchador Ágil",
+      "desc": "Atacas con un ritmo creciente."
+    },
+    "warriorResilience": {
+      "name": "Resiliencia",
+      "desc": "Lo que no te mata te hace más fuerte."
+    },
+    "warriorRendingBlow": {
+      "name": "Golpe Desgarrador",
+      "desc": "Tu Golpe Sísmico destroza grupos de enemigos."
+    },
+    "warriorBattleTempo": {
+      "name": "Ritmo de Batalla",
+      "desc": "El Grito de Guerra te vigoriza, acortando su tiempo de espera."
+    },
+    "warriorUnbreakable": {
+      "name": "Inquebrantable",
+      "desc": "Tu determinación para sobrevivir es absoluta."
+    },
+    "warriorExecutioner": {
+      "name": "Verdugo",
+      "desc": "Percibes la debilidad y golpeas sin piedad."
+    },
+    "warriorWarRhythm": {
+      "name": "Ritmo de Guerra",
+      "desc": "La cadencia de la batalla se acelera a tu alrededor."
+    },
+    "warriorFortify": {
+      "name": "Fortificar",
+      "desc": "Te conviertes en un objeto inamovible."
+    },
+    "warriorRampage": {
+      "name": "Frenesí",
+      "desc": "Cada muerte alimenta tu sed de sangre."
+    },
+    "warriorQuickHands": {
+      "name": "Manos Rápidas",
+      "desc": "Tus reflejos se vuelven sobrenaturalmente rápidos."
     },
     "warriorLastStand": {
       "name": "Última Resistencia",
-      "desc": "Aumenta enormemente la vida máxima."
+      "desc": "Cuando todo parece perdido, te niegas a caer."
+    },
+    "warriorBerserker": {
+      "name": "Berserker",
+      "desc": "Abandonas la moderación y luchas con furia desenfrenada."
+    },
+    "warriorBattleMaster": {
+      "name": "Maestro de Batalla",
+      "desc": "Has dominado el arte de la guerra."
     }
   },
   "loot": {

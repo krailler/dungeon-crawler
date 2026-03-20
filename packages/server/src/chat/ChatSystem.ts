@@ -37,6 +37,8 @@ export interface ChatRoomBridge {
   killCreature(creatureId: string): void;
   /** Recompute derived stats for a player (base + talents + effects) */
   recomputePlayerStats(player: PlayerState): void;
+  /** Spawn a creature near a player. Returns the creature ID or null on failure. */
+  spawnCreature(creatureTypeId: string, x: number, z: number, level: number): string | null;
 }
 
 export class ChatSystem {

@@ -1,6 +1,5 @@
 import { Schema, MapSchema, type, view } from "@colyseus/schema";
 import {
-  computeDerivedStats,
   xpToNextLevel,
   MAX_LEVEL,
   INVENTORY_MAX_SLOTS,
@@ -48,8 +47,6 @@ export class PlayerState extends Schema {
   /** Number of real deaths this session (for escalating respawn timer) */
   deathCount: number = 0;
   currentPathIndex: number = 0;
-  speed: number = 0;
-  attackCooldown: number = 1.0;
   attackRange: number = 2.5;
   tutorialsCompleted: Set<string> = new Set();
   /** Client wants to sprint (set by SPRINT message) */
@@ -62,6 +59,10 @@ export class PlayerState extends Schema {
   itemCooldowns: Map<string, number> = new Map();
   /** Talent allocations (talentId → current rank) — server-only, not synced */
   talentAllocations: Map<string, number> = new Map();
+  /** God mode: player takes no damage — server-only */
+  godMode: boolean = false;
+  /** Pacifist mode: attacks deal 0 effective damage to creatures — server-only */
+  pacifist: boolean = false;
 
   // ── Convenience getters (delegate to secret for server-side code) ──────────
 
@@ -98,6 +99,20 @@ export class PlayerState extends Schema {
   }
   set defense(v: number) {
     this.secret.defense = v;
+  }
+
+  get speed(): number {
+    return this.secret.speed;
+  }
+  set speed(v: number) {
+    this.secret.speed = v;
+  }
+
+  get attackCooldown(): number {
+    return this.secret.attackCooldown;
+  }
+  set attackCooldown(v: number) {
+    this.secret.attackCooldown = v;
   }
 
   get gold(): number {
@@ -164,26 +179,9 @@ export class PlayerState extends Schema {
     return this.secret.inventory;
   }
 
-  /** Recompute all derived stats from current base stats and apply them. */
-  applyDerivedStats(): void {
-    const derived = computeDerivedStats(
-      {
-        strength: this.strength,
-        vitality: this.vitality,
-        agility: this.agility,
-      },
-      this.statScaling,
-    );
-    this.maxHealth = derived.maxHealth;
-    this.attackDamage = derived.attackDamage;
-    this.defense = derived.defense;
-    this.speed = derived.moveSpeed;
-    this.attackCooldown = derived.attackCooldown;
-    this.attackRange = derived.attackRange;
-  }
-
   /**
-   * Advance one level: grant +1 stat point, +1 talent point (if >= TALENT_UNLOCK_LEVEL), full heal.
+   * Advance one level: grant +1 stat point, +1 talent point (if >= TALENT_UNLOCK_LEVEL).
+   * Caller must call recomputeStats() after to apply derived stats + full heal.
    */
   levelUp(): void {
     this.level++;
@@ -191,25 +189,17 @@ export class PlayerState extends Schema {
     if (this.level >= TALENT_UNLOCK_LEVEL) {
       this.talentPoints++;
     }
-
-    this.applyDerivedStats();
-    this.health = this.maxHealth;
     this.xpToNext = xpToNextLevel(this.level);
   }
 
   /**
    * Allocate one stat point to a base stat. Returns true on success.
+   * Caller must call recomputeStats() after to update derived stats.
    */
   allocateStat(stat: AllocatableStatValue): boolean {
     if (this.statPoints <= 0) return false;
-    const oldMaxHealth = this.maxHealth;
     this[stat]++;
     this.statPoints--;
-    this.applyDerivedStats();
-    // Grant the extra HP from vitality so current health increases too
-    if (this.maxHealth > oldMaxHealth) {
-      this.health = Math.min(this.health + (this.maxHealth - oldMaxHealth), this.maxHealth);
-    }
     return true;
   }
 
@@ -231,8 +221,9 @@ export class PlayerState extends Schema {
   }
 
   /**
-   * Reset all manually allocated stat points: revert to base 10/10/10 and refund
-   * all stat points earned through leveling. Returns the number of refunded points.
+   * Reset all manually allocated stat points: revert to base 10/10/10 and refund.
+   * Caller must call recomputeStats() after to update derived stats.
+   * Returns the number of refunded points.
    */
   resetStats(): number {
     const spent = this.strength - 10 + (this.vitality - 10) + (this.agility - 10);
@@ -240,11 +231,6 @@ export class PlayerState extends Schema {
     this.vitality = 10;
     this.agility = 10;
     this.statPoints = this.level - 1;
-    this.applyDerivedStats();
-    // Cap health to new (lower) maxHealth
-    if (this.health > this.maxHealth) {
-      this.health = this.maxHealth;
-    }
     return spent;
   }
 
@@ -261,10 +247,23 @@ export class PlayerState extends Schema {
   }
 
   /**
-   * Set player to a specific level: reset base stats to 10/10/10, clear
-   * all allocations, then apply levelUp() rewards for each level gained.
+   * Set player to a specific level.
+   * - Level UP: keeps current stats & talents, just adds the missing level-ups.
+   * - Level DOWN: full reset (stats to 10/10/10, clear talents), then re-apply from 1.
+   * Returns true if talents were reset (so the caller can notify the client).
    */
-  setLevel(targetLevel: number): void {
+  setLevel(targetLevel: number): boolean {
+    if (targetLevel === this.level) return false;
+
+    if (targetLevel > this.level) {
+      // Level UP — preserve existing allocations, just add the new levels
+      for (let i = this.level; i < targetLevel; i++) {
+        this.levelUp();
+      }
+      return false;
+    }
+
+    // Level DOWN — full reset required
     this.level = 1;
     this.strength = 10;
     this.vitality = 10;
@@ -275,10 +274,10 @@ export class PlayerState extends Schema {
     this.xp = 0;
     this.xpToNext = xpToNextLevel(1);
 
-    // Apply levelUp() rewards for each level gained — single source of truth
     for (let i = 1; i < targetLevel; i++) {
       this.levelUp();
     }
+    return true;
   }
 
   // ── Inventory helpers ──────────────────────────────────────────────────────

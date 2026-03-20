@@ -257,9 +257,10 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         return;
       }
 
-      target.player.setLevel(targetLevel);
-      // Recompute stats with talents cleared
+      const talentsReset = target.player.setLevel(targetLevel);
+      // Recompute stats (talents preserved on level-up, cleared on level-down)
       bridge.recomputePlayerStats(target.player);
+      target.player.health = target.player.maxHealth;
 
       // Sync skills to match the target level
       syncAndNotifySkills(
@@ -279,12 +280,14 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         bridge.sendToClient.bind(bridge),
       );
 
-      // Send updated (empty) talent allocations to client
-      const classTalentIds = getTalentsForClass(target.player.classId).map((t) => t.id);
-      bridge.sendToClient(target.sessionId, MessageType.TALENT_STATE, {
-        allocations: [],
-        classTalentIds,
-      });
+      // Only send empty talent state if talents were actually reset (level-down)
+      if (talentsReset) {
+        const classTalentIds = getTalentsForClass(target.player.classId).map((t) => t.id);
+        bridge.sendToClient(target.sessionId, MessageType.TALENT_STATE, {
+          allocations: [],
+          classTalentIds,
+        });
+      }
 
       ctx.reply(`Set ${target.player.characterName} to level ${targetLevel}.`, "cmd.setLevel", {
         name: target.player.characterName,
@@ -522,6 +525,84 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         amount,
         name: target.player.characterName,
       });
+    },
+  });
+
+  // ── /spawn — spawn a creature near the player ─────────────────────────────
+
+  registry.register({
+    name: "spawn",
+    usage: "/spawn <type> [level] [count]",
+    description: "Spawn creature(s) near you. e.g. /spawn zombie 10 3",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const typeId = ctx.args[0];
+      if (!typeId) {
+        ctx.replyError("Usage: /spawn <type> [level] [count]", "cmd.usageSpawn");
+        return;
+      }
+      const level = ctx.args[1] ? parseInt(ctx.args[1], 10) : ctx.player.level;
+      const count = ctx.args[2] ? Math.min(20, Math.max(1, parseInt(ctx.args[2], 10))) : 1;
+      if (isNaN(level) || isNaN(count)) {
+        ctx.replyError("Level and count must be numbers.", "cmd.invalidNumber");
+        return;
+      }
+
+      let spawned = 0;
+      for (let i = 0; i < count; i++) {
+        // Offset each creature slightly so they don't stack
+        const angle = (i / count) * Math.PI * 2;
+        const dist = 2 + Math.random();
+        const x = ctx.player.x + Math.cos(angle) * dist;
+        const z = ctx.player.z + Math.sin(angle) * dist;
+        const id = bridge.spawnCreature(typeId, x, z, level);
+        if (id) spawned++;
+      }
+
+      if (spawned === 0) {
+        ctx.replyError(`Unknown creature type: ${typeId}`, "cmd.unknownCreature");
+      } else {
+        ctx.reply(`Spawned ${spawned}× ${typeId} (level ${level}).`, "cmd.spawned", {
+          count: spawned,
+          type: typeId,
+          level,
+        });
+      }
+    },
+  });
+
+  // ── /god — toggle god mode (invulnerability + optional pacifist) ──────────
+
+  registry.register({
+    name: "god",
+    usage: "/god [pacifist]",
+    description:
+      "Toggle god mode. With 'pacifist', your attacks also deal no damage (numbers still show).",
+    adminOnly: true,
+    handler: (ctx: CommandContext) => {
+      const player = ctx.player;
+      const wantPacifist = ctx.args[0] === "pacifist";
+
+      if (player.godMode) {
+        // Already on → turn everything off
+        player.godMode = false;
+        player.pacifist = false;
+        player.health = player.maxHealth;
+        ctx.reply("God mode OFF.", "cmd.godOff");
+        return;
+      }
+
+      player.godMode = true;
+      player.pacifist = wantPacifist;
+      player.health = player.maxHealth;
+      if (wantPacifist) {
+        ctx.reply(
+          "God mode ON (pacifist — your attacks deal no real damage).",
+          "cmd.godOnPacifist",
+        );
+      } else {
+        ctx.reply("God mode ON.", "cmd.godOn");
+      }
     },
   });
 }

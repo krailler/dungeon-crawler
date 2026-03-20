@@ -316,26 +316,58 @@ INSERT INTO "world"."class_skills" ("class_id", "skill_id", "is_default", "unloc
   ('warrior', 'ground_slam',   false, 15),
   ('warrior', 'execute',       false, 22);
 
--- ── Talents: Warrior tree ────────────────────────────────────────────────────
+-- ── Talents: Warrior tree (6 rows × 3 columns) ─────────────────────────────
+--
+--   Col 0 (Fortitude)      Col 1 (Arms)           Col 2 (Tactics)
+--   ─────────────────      ──────────────         ────────────────
+--   Row 0: Toughness(3)    Might(3)               Swiftness(2)
+--   Row 1: Thick Skin(3)   Brutal Strikes(2)      Agile Fighter(2)
+--   Row 2: Resilience(2)   Rending Blow(2)        Battle Tempo(2)
+--   Row 3: Unbreakable(2)  Executioner(2)         War Rhythm(2)
+--   Row 4: Fortify(2)      Rampage(2)             Quick Hands(2)
+--   Row 5: Last Stand(1)   Berserker(1)           Battle Master(1)
 
--- Row 0: base talents (no prerequisites)
+-- Row 0: base talents (no prerequisites, level 5)
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_toughness',  'warrior', 'talents.warriorToughness.name',  'talents.warriorToughness.desc',  'shield',    3, NULL, 0, 1, 0, 0),
-  ('warrior_might',      'warrior', 'talents.warriorMight.name',      'talents.warriorMight.desc',      'strength', 3, NULL, 0, 1, 0, 1),
-  ('warrior_swiftness',  'warrior', 'talents.warriorSwiftness.name',  'talents.warriorSwiftness.desc',  'agility',  2, NULL, 0, 1, 0, 2);
+  ('warrior_toughness',  'warrior', 'talents.warriorToughness.name',  'talents.warriorToughness.desc',  'toughness',  3, NULL, 0, 5, 0, 0),
+  ('warrior_might',      'warrior', 'talents.warriorMight.name',      'talents.warriorMight.desc',      'might',      3, NULL, 0, 5, 0, 1),
+  ('warrior_swiftness',  'warrior', 'talents.warriorSwiftness.name',  'talents.warriorSwiftness.desc',  'swiftness',  2, NULL, 0, 5, 0, 2);
 
--- Row 1: requires row 0 talents at rank 2, level 5
+-- Row 1: requires row 0 parent at rank 2, level 10
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_thick_skin', 'warrior', 'talents.warriorThickSkin.name', 'talents.warriorThickSkin.desc', 'thick_skin', 3, 'warrior_toughness', 2, 5, 1, 0),
-  ('warrior_cleave',     'warrior', 'talents.warriorCleave.name',    'talents.warriorCleave.desc',    'slash',      1, 'warrior_might',     2, 5, 1, 1),
-  ('warrior_rush',       'warrior', 'talents.warriorRush.name',      'talents.warriorRush.desc',      'charge',     1, 'warrior_swiftness', 2, 5, 1, 2);
+  ('warrior_thick_skin',     'warrior', 'talents.warriorThickSkin.name',     'talents.warriorThickSkin.desc',     'thick_skin',      3, 'warrior_toughness',  2, 10, 1, 0),
+  ('warrior_brutal_strikes', 'warrior', 'talents.warriorBrutalStrikes.name', 'talents.warriorBrutalStrikes.desc', 'brutal_strikes',  2, 'warrior_might',      2, 10, 1, 1),
+  ('warrior_agile_fighter',  'warrior', 'talents.warriorAgileFighter.name',  'talents.warriorAgileFighter.desc',  'agile_fighter',   2, 'warrior_swiftness',  2, 10, 1, 2);
 
--- Row 2: capstone, requires row 1 talent at rank 2, level 10
+-- Row 2: level 15
 INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
 VALUES
-  ('warrior_last_stand', 'warrior', 'talents.warriorLastStand.name', 'talents.warriorLastStand.desc', 'last_stand', 1, 'warrior_thick_skin', 2, 10, 2, 1);
+  ('warrior_resilience',   'warrior', 'talents.warriorResilience.name',   'talents.warriorResilience.desc',   'resilience',    2, 'warrior_thick_skin',     2, 15, 2, 0),
+  ('warrior_rending_blow', 'warrior', 'talents.warriorRendingBlow.name',  'talents.warriorRendingBlow.desc',  'rending_blow',  2, 'warrior_brutal_strikes', 1, 15, 2, 1),
+  ('warrior_battle_tempo', 'warrior', 'talents.warriorBattleTempo.name',  'talents.warriorBattleTempo.desc',  'battle_tempo',  2, 'warrior_agile_fighter',  1, 15, 2, 2);
+
+-- Row 3: level 20
+INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
+VALUES
+  ('warrior_unbreakable',  'warrior', 'talents.warriorUnbreakable.name',  'talents.warriorUnbreakable.desc',  'unbreakable',   2, 'warrior_resilience',   1, 20, 3, 0),
+  ('warrior_executioner',  'warrior', 'talents.warriorExecutioner.name',  'talents.warriorExecutioner.desc',  'executioner',   2, 'warrior_rending_blow', 1, 20, 3, 1),
+  ('warrior_war_rhythm',   'warrior', 'talents.warriorWarRhythm.name',    'talents.warriorWarRhythm.desc',    'war_rhythm',    2, 'warrior_battle_tempo', 1, 20, 3, 2);
+
+-- Row 4: level 25
+INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
+VALUES
+  ('warrior_fortify',      'warrior', 'talents.warriorFortify.name',      'talents.warriorFortify.desc',      'fortify',       2, 'warrior_unbreakable', 1, 25, 4, 0),
+  ('warrior_rampage',      'warrior', 'talents.warriorRampage.name',      'talents.warriorRampage.desc',      'rampage',       2, 'warrior_executioner', 1, 25, 4, 1),
+  ('warrior_quick_hands',  'warrior', 'talents.warriorQuickHands.name',   'talents.warriorQuickHands.desc',   'quick_hands',   2, 'warrior_war_rhythm',  1, 25, 4, 2);
+
+-- Row 5: Capstones (level 30)
+INSERT INTO "world"."talents" ("id", "class_id", "name", "description", "icon", "max_rank", "required_talent_id", "required_talent_rank", "required_level", "row", "col")
+VALUES
+  ('warrior_last_stand',    'warrior', 'talents.warriorLastStand.name',    'talents.warriorLastStand.desc',    'last_stand',      1, 'warrior_fortify',     1, 30, 5, 0),
+  ('warrior_berserker',     'warrior', 'talents.warriorBerserker.name',    'talents.warriorBerserker.desc',    'berserker',       1, 'warrior_rampage',     1, 30, 5, 1),
+  ('warrior_battle_master', 'warrior', 'talents.warriorBattleMaster.name', 'talents.warriorBattleMaster.desc', 'battle_master',   1, 'warrior_quick_hands', 1, 30, 5, 2);
 
 -- ── Talent effects ───────────────────────────────────────────────────────────
 
@@ -366,17 +398,97 @@ VALUES
   ('warrior_thick_skin', 2, 'stat_mod', 'defense', 'flat', 2),
   ('warrior_thick_skin', 3, 'stat_mod', 'defense', 'flat', 3);
 
--- warrior_cleave: modifies heavy_strike (0.8x cooldown, 1.2x damage)
+-- warrior_brutal_strikes: modify heavy_strike cooldown & damage
 INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
 VALUES
-  ('warrior_cleave', 1, 'modify_skill', 'heavy_strike', 0.8, 1.2);
+  ('warrior_brutal_strikes', 1, 'modify_skill', 'heavy_strike', 0.85, NULL),
+  ('warrior_brutal_strikes', 2, 'modify_skill', 'heavy_strike', 0.70, 1.15);
 
--- warrior_rush: +10% moveSpeed
+-- warrior_agile_fighter: -5%/-10% attackCooldown
 INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
 VALUES
-  ('warrior_rush', 1, 'stat_mod', 'moveSpeed', 'percent', 0.10);
+  ('warrior_agile_fighter', 1, 'stat_mod', 'attackCooldown', 'percent', -0.05),
+  ('warrior_agile_fighter', 2, 'stat_mod', 'attackCooldown', 'percent', -0.10);
 
--- warrior_last_stand: +20% maxHealth
+-- warrior_resilience: +8%/+16% maxHealth
 INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
 VALUES
-  ('warrior_last_stand', 1, 'stat_mod', 'maxHealth', 'percent', 0.20);
+  ('warrior_resilience', 1, 'stat_mod', 'maxHealth', 'percent', 0.08),
+  ('warrior_resilience', 2, 'stat_mod', 'maxHealth', 'percent', 0.16);
+
+-- warrior_rending_blow: modify ground_slam damage & cooldown
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
+VALUES
+  ('warrior_rending_blow', 1, 'modify_skill', 'ground_slam', NULL,  1.20),
+  ('warrior_rending_blow', 2, 'modify_skill', 'ground_slam', 0.85, 1.40);
+
+-- warrior_battle_tempo: modify war_cry cooldown
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
+VALUES
+  ('warrior_battle_tempo', 1, 'modify_skill', 'war_cry', 0.85, NULL),
+  ('warrior_battle_tempo', 2, 'modify_skill', 'war_cry', 0.70, NULL);
+
+-- warrior_unbreakable: +2/+4 defense flat AND +5%/+10% maxHealth
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_unbreakable', 1, 'stat_mod', 'defense',   'flat',    2),
+  ('warrior_unbreakable', 1, 'stat_mod', 'maxHealth', 'percent', 0.05),
+  ('warrior_unbreakable', 2, 'stat_mod', 'defense',   'flat',    4),
+  ('warrior_unbreakable', 2, 'stat_mod', 'maxHealth', 'percent', 0.10);
+
+-- warrior_executioner: modify execute damage & cooldown
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
+VALUES
+  ('warrior_executioner', 1, 'modify_skill', 'execute', NULL, 1.20),
+  ('warrior_executioner', 2, 'modify_skill', 'execute', 0.80, 1.40);
+
+-- warrior_war_rhythm: -5%/-10% attackCooldown + rank 2 also +3% moveSpeed
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_war_rhythm', 1, 'stat_mod', 'attackCooldown', 'percent', -0.05),
+  ('warrior_war_rhythm', 2, 'stat_mod', 'attackCooldown', 'percent', -0.10),
+  ('warrior_war_rhythm', 2, 'stat_mod', 'moveSpeed',      'percent',  0.03);
+
+-- warrior_fortify: +3/+5 defense flat AND +10%/+15% maxHealth
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_fortify', 1, 'stat_mod', 'defense',   'flat',    3),
+  ('warrior_fortify', 1, 'stat_mod', 'maxHealth', 'percent', 0.10),
+  ('warrior_fortify', 2, 'stat_mod', 'defense',   'flat',    5),
+  ('warrior_fortify', 2, 'stat_mod', 'maxHealth', 'percent', 0.15);
+
+-- warrior_rampage: rank 1 = heavy_strike damage ×1.20; rank 2 = heavy_strike ×1.35 + execute ×1.15
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
+VALUES
+  ('warrior_rampage', 1, 'modify_skill', 'heavy_strike', NULL, 1.20),
+  ('warrior_rampage', 2, 'modify_skill', 'heavy_strike', NULL, 1.35),
+  ('warrior_rampage', 2, 'modify_skill', 'execute',      NULL, 1.15);
+
+-- warrior_quick_hands: -5%/-10% attackCooldown + ground_slam cooldown ×0.85/×0.70
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_quick_hands', 1, 'stat_mod', 'attackCooldown', 'percent', -0.05),
+  ('warrior_quick_hands', 2, 'stat_mod', 'attackCooldown', 'percent', -0.10);
+
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "skill_id", "cooldown_mul", "damage_mul")
+VALUES
+  ('warrior_quick_hands', 1, 'modify_skill', 'ground_slam', 0.85, NULL),
+  ('warrior_quick_hands', 2, 'modify_skill', 'ground_slam', 0.70, NULL);
+
+-- warrior_last_stand (capstone): +25% maxHealth + +5 defense
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_last_stand', 1, 'stat_mod', 'maxHealth', 'percent', 0.25),
+  ('warrior_last_stand', 1, 'stat_mod', 'defense',   'flat',    5);
+
+-- warrior_berserker (capstone): +20% attackDamage, -10% maxHealth
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_berserker', 1, 'stat_mod', 'attackDamage', 'percent',  0.20),
+  ('warrior_berserker', 1, 'stat_mod', 'maxHealth',    'percent', -0.10);
+
+-- warrior_battle_master (capstone): -15% attackCooldown, +8% moveSpeed
+INSERT INTO "world"."talent_effects" ("talent_id", "rank", "effect_type", "stat_name", "stat_mod_type", "stat_mod_value")
+VALUES
+  ('warrior_battle_master', 1, 'stat_mod', 'attackCooldown', 'percent', -0.15),
+  ('warrior_battle_master', 1, 'stat_mod', 'moveSpeed',      'percent',  0.08);

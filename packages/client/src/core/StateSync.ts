@@ -466,6 +466,8 @@ export class StateSync {
               agility: secret.agility,
               attackDamage: secret.attackDamage,
               defense: secret.defense,
+              speed: secret.speed,
+              attackCooldown: secret.attackCooldown,
             }
           : undefined;
         // Prefetch class definition for UI
@@ -545,6 +547,8 @@ export class StateSync {
                 agility: secret.agility,
                 attackDamage: secret.attackDamage,
                 defense: secret.defense,
+                speed: secret.speed,
+                attackCooldown: secret.attackCooldown,
               },
             });
           });

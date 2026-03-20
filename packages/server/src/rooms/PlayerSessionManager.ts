@@ -46,6 +46,8 @@ export interface SessionRoomBridge {
   onSessionCleanup(sessionId: string): void;
   /** Called after a player is permanently removed from state. */
   onPlayerRemoved(): void;
+  /** Recompute derived stats including talent + effect modifiers. */
+  recomputeStats(player: PlayerState): void;
 }
 
 export class PlayerSessionManager {
@@ -70,7 +72,7 @@ export class PlayerSessionManager {
     return player ? `${player.characterName} (${short})` : short;
   }
 
-  handleJoin(client: Client): void {
+  async handleJoin(client: Client): Promise<void> {
     const {
       accountId,
       characterId,
@@ -179,27 +181,26 @@ export class PlayerSessionManager {
     // Compute an initial hash so early disconnects don't skip saves
     this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-    // Load inventory + skills + talents from DB — update hash after all complete
-    Promise.all([
+    // Load inventory + skills + talents from DB before computing stats
+    await Promise.all([
       this.loadInventory(characterId, player),
       this.loadCharacterSkills(characterId, player),
       this.loadCharacterTalents(characterId, player),
-    ]).then(() => {
-      this.lastSavedHash.set(characterId, this.buildProgressHash(player));
+    ]);
+    this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-      // Send talent state to owning client (talentPoints synced via Schema)
-      const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
-      this.bridge.sendToClient(client.sessionId, MessageType.TALENT_STATE, {
-        allocations: Array.from(player.talentAllocations.entries()).map(([talentId, rank]) => ({
-          talentId,
-          rank,
-        })),
-        classTalentIds,
-      });
+    // Send talent state to owning client (talentPoints synced via Schema)
+    const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
+    this.bridge.sendToClient(client.sessionId, MessageType.TALENT_STATE, {
+      allocations: Array.from(player.talentAllocations.entries()).map(([talentId, rank]) => ({
+        talentId,
+        rank,
+      })),
+      classTalentIds,
     });
 
-    // Compute derived stats
-    player.applyDerivedStats();
+    // Compute derived stats with talent modifiers + full heal
+    this.bridge.recomputeStats(player);
     player.health = player.maxHealth;
 
     // Find spawn position

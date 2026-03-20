@@ -105,7 +105,7 @@ export type { ClassDef, ClassDefClient, ClassSkillEntry } from "./Classes.js";
 export { ItemEffectType, ItemRarity, toItemDefClient } from "./Items.js";
 export type { ItemEffectTypeValue, ItemRarityValue, ItemDef, ItemDefClient } from "./Items.js";
 
-export { TalentEffectType, toTalentDefClient } from "./Talents.js";
+export { TalentEffectType, toTalentDefClient, computeTalentSkillMods } from "./Talents.js";
 export type {
   TalentEffectTypeValue,
   TalentStatModifier,

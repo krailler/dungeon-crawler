@@ -346,6 +346,7 @@ export class GameLoop {
   private handlePlayerDamage(sessionId: string, damage: number): void {
     const player = this.bridge.state.players.get(sessionId);
     if (!player || player.lifeState !== LifeState.ALIVE) return;
+    if (player.godMode) return;
     player.health -= damage;
     if (player.health < 0) player.health = 0;
     if (player.health <= 0) {
@@ -548,6 +549,10 @@ export class GameLoop {
         const levelUps = p.addXp(xpGain);
 
         if (levelUps.length > 0) {
+          // Recompute stats with talent modifiers + full heal on level-up
+          this.bridge.effectSystem.recomputeStats(p);
+          p.health = p.maxHealth;
+
           notifyLevelProgress(
             sessionId,
             p,

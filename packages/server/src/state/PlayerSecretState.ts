@@ -16,6 +16,8 @@ export class PlayerSecretState extends Schema {
   // Derived stats
   @type("int16") attackDamage: number = 0;
   @type("int16") defense: number = 0;
+  @type("float32") speed: number = 0;
+  @type("float32") attackCooldown: number = 1.0;
 
   // Stat points (unassigned)
   @type("int16") statPoints: number = 0;

@@ -166,6 +166,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   // ── Area of Interest (AOI) ──────────────────────────────────────────────────
   /** All creatures (authoritative) — includes those outside sync range */
   private allCreatures: Map<string, CreatureState> = new Map();
+  /** Next creature ID counter for spawning */
+  private nextCreatureId: number = 0;
   /** Whether AOI culling is active (false = bypass, all creatures synced) */
   private aoiEnabled: boolean = true;
   private aoiCheckCounter: number = 0;
@@ -237,6 +239,23 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.gameLoop.handleAdminCreatureKill(creatureId);
       },
       recomputePlayerStats: (player: PlayerState) => this.effectSystem.recomputeStats(player),
+      spawnCreature: (creatureTypeId: string, x: number, z: number, level: number) => {
+        const typeDef = getCreatureTypeDef(creatureTypeId);
+        if (!typeDef) return null;
+        const baseDerived = computeCreatureDerivedStats(typeDef);
+        const creature = new CreatureState();
+        creature.x = x;
+        creature.z = z;
+        creature.creatureType = typeDef.id;
+        creature.nameKey = typeDef.name;
+        creature.detectionRange = typeDef.detectionRange;
+        creature.applyStats(baseDerived, Math.min(MAX_LEVEL, Math.max(1, level)));
+        const id = `creature_${this.nextCreatureId++}`;
+        this.allCreatures.set(id, creature);
+        this.state.creatures.set(id, creature);
+        this.aiSystem.register(creature, id, typeDef.leashRange);
+        return id;
+      },
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
@@ -279,6 +298,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
         onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
         onPlayerRemoved: () => self.checkRoomEmpty(),
+        recomputeStats: (player: PlayerState) => self.effectSystem.recomputeStats(player),
       },
       this.log,
     );
@@ -527,8 +547,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
               const baseDamage = computeDamage(player.attackDamage, creature.defense);
               const finalDamage = Math.max(1, Math.round(baseDamage * dmgMul));
-              creature.health = Math.max(0, creature.health - finalDamage);
-              const killed = creature.health <= 0;
+              if (!player.pacifist) {
+                creature.health = Math.max(0, creature.health - finalDamage);
+              }
+              const killed = !player.pacifist && creature.health <= 0;
               if (killed) creature.isDead = true;
 
               this.gameLoop.handleCombatHit({
@@ -584,7 +606,16 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       if (!ALLOCATABLE_STATS.includes(data.stat as AllocatableStatValue)) return;
+      const oldMaxHealth = player.maxHealth;
       if (player.allocateStat(data.stat)) {
+        this.effectSystem.recomputeStats(player);
+        // Grant the extra HP so current health increases proportionally
+        if (player.maxHealth > oldMaxHealth) {
+          player.health = Math.min(
+            player.health + (player.maxHealth - oldMaxHealth),
+            player.maxHealth,
+          );
+        }
         // Auto-complete the allocate stats tutorial
         player.tutorialsCompleted.add(TutorialStep.ALLOCATE_STATS);
       }
@@ -1241,8 +1272,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     };
   }
 
-  onJoin(client: Client): void {
-    this.sessionManager.handleJoin(client);
+  async onJoin(client: Client): Promise<void> {
+    await this.sessionManager.handleJoin(client);
     // Create a StateView for this client and add their secret state
     const player = this.state.players.get(client.sessionId);
     if (player) {
@@ -1350,7 +1381,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const availableTypes = getCreatureTypesForLevel(dungeonLevel);
     const bossTypes = getBossTypesForLevel(dungeonLevel);
 
-    let creatureId = 0;
+    this.nextCreatureId = 0;
 
     // Pick a boss room: in the last third of rooms (skip room 0 = spawn)
     let bossRoomIndex = -1;
@@ -1381,7 +1412,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         creature.detectionRange = bossDef.detectionRange;
         creature.applyStats(baseDerived, creatureLevel);
 
-        const id = `creature_${creatureId++}`;
+        const id = `creature_${this.nextCreatureId++}`;
         this.allCreatures.set(id, creature);
         this.state.creatures.set(id, creature);
         this.aiSystem.register(creature, id, bossDef.leashRange);
@@ -1412,7 +1443,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         creature.detectionRange = typeDef.detectionRange;
         creature.applyStats(baseDerived, creatureLevel);
 
-        const id = `creature_${creatureId++}`;
+        const id = `creature_${this.nextCreatureId++}`;
         this.allCreatures.set(id, creature);
         this.state.creatures.set(id, creature);
         this.aiSystem.register(creature, id, typeDef.leashRange);

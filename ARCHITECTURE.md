@@ -16,7 +16,8 @@
 - Clients are dumb renderers: receive state, interpolate, render meshes
 - Colyseus Schema v4 for state sync (binary delta encoding)
 - `@type()` decorators with `experimentalDecorators: true` + `useDefineForClassFields: false` in server tsconfig
-- Server-only fields (path, speed, currentPathIndex, characterId) use normal initializers (not in Schema)
+- Private synced fields: `@view()` on `PlayerSecretState` — visible only to owning client (base stats, derived stats incl. speed/attackCooldown, gold, xp, inventory)
+- Server-only fields (path, currentPathIndex, characterId, godMode, pacifist, talentAllocations) use normal initializers (not in Schema)
 
 ### Entity pattern: Hybrid (not pure ECS)
 
@@ -176,7 +177,7 @@
 - **EffectDef type**: id, name (i18n key), description (i18n key with `{{value}}` interpolation), icon, duration, maxStacks, stackBehavior, isDebuff, statModifiers, tickEffect
 - **Stat modifiers**: `Record<string, StatModifier>` where StatModifier = `{type: "flat"|"percent", value: number}`. Applied as `(base + flatSum) * (1 + percentSum)`
 - **Stack behaviors**: `StackBehavior.REFRESH` resets timer only; `StackBehavior.INTENSITY` adds stacks (up to maxStacks) and multiplies modifier values
-- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, remove expired), `recomputeStats()` (apply all active modifiers to derived stats), `clearEffects()`, `removeEffect()`
+- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, remove expired), `recomputeStats()` (**single source of truth** for all derived stats: base × scaling + talent mods + effect mods; integer stats rounded, float stats like speed/attackCooldown keep precision), `clearEffects()`, `removeEffect()`
 - **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks, modValue) stored in `MapSchema<ActiveEffectState>` on both `PlayerState` and `CreatureState` (public, visible to all)
 - **Lifecycle**: effects cleared on downed, respawn, and revive (via `clearEffects()` in GameLoop)
 - **Client**: `effectDefStore` (lazy-loaded via `createDefStore`, batched requests, version-based cache invalidation)
@@ -212,7 +213,8 @@
 - Single `CHAT_SEND` message type from client; server parses `/commands` vs plain text
 - Single `CHAT_ENTRY` message type from server with `category` (PLAYER, SYSTEM, EMOTE, COMMAND, ERROR, ANNOUNCEMENT)
 - System events use i18n keys so clients can translate; fallback text for non-i18n clients
-- Slash commands registered via CommandRegistry with admin-only flag (/give for items)
+- Slash commands registered via CommandRegistry with admin-only flag
+- Admin commands: /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - Client ChatPanel: Enter to open/send, Escape to close, message fade after 10s, hover to reveal
 - Command help overlay appears when input starts with `/`, Tab to autocomplete
 - Chat input history: arrow up/down navigates sent messages (max 50, draft preserved on ArrowUp, restored past end on ArrowDown)
@@ -260,6 +262,7 @@
 - `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight)
 - `Skills.ts` — `SkillDef` type (id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange), `MAX_SKILL_SLOTS`, `DEFAULT_SKILL_IDS`
 - `Effects.ts` — `EffectDef`, `EffectDefClient`, `StatModifier`, `StackBehavior`, `StatModType`, `TickEffect`, `EffectScaling`, `CreatureEffectTrigger` types + `lerpEffectValue()`, `computeScalingFactor()`, `toEffectDefClient()` for buff/debuff system
+- `Talents.ts` — `TalentDef`, `TalentDefClient`, `TalentRankEffect`, `TalentStatModifier`, `TalentSkillModifier` types + `toTalentDefClient()`, `computeTalentSkillMods()` (pure function shared by server and client for skill cooldown/damage modifiers)
 - `Roles.ts` — `Role` type ("admin", "user")
 - `GateTypes.ts` — `GateType` ("lobby")
 - `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents)
@@ -291,18 +294,18 @@
 - `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle (300s window), session migration, `savePlayerProgress()` (stats + inventory upsert), `loadInventory()`, leader reassignment, tutorial hint sending
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
-- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /reset-tutorials, /resettalents
+- `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - `chat/notifyLevelProgress.ts` — Level-up notification: public announcement + private stat-point message + tutorial hints
 - `items/ItemRegistry.ts` — Loads item definitions from DB at startup, provides `getItemDef()`, `getDroppableItems()`, versioned cache
 - `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP)
 - `effects/EffectRegistry.ts` — Loads effect definitions from DB using `createRegistry` factory, with stackBehavior validation and comprehensive hash for version detection
 - `skills/SkillRegistry.ts` — Loads skill definitions from DB using `createRegistry` factory, provides `getSkillDef()`, versioned cache
 - `classes/ClassRegistry.ts` — Loads class definitions + class→skill mappings from DB, `getClassDefaultSkill()`, `getSkillsForLevel()`, `syncAndNotifySkills()` (grants level-gated skills + sends i18n chat notifications)
-- `talents/TalentRegistry.ts` — Loads talent definitions + effects from DB, `collectTalentSkillMods()` for cooldown/damage modifiers, `collectTalentStatMods()` for stat bonuses
+- `talents/TalentRegistry.ts` — Loads talent definitions + effects from DB, `collectTalentStatMods()` for stat bonuses, `collectTalentSkillMods()` delegates to shared `computeTalentSkillMods()`
 - `creatures/CreatureTypeRegistry.ts` — Loads creature types + loot tables + effect triggers + skills from DB, level-based filtering, loot/effect/skill entry lookups
 - `state/DungeonState.ts` — Root Schema state (MapSchema players/creatures/gates/lootBags, tileMapData, tickRate, dungeonLevel, dungeonVersion, serverRuntime)
-- `state/PlayerState.ts` — Player Schema (position, health, animation, lifeState, bleed/respawn/revive timers, level, sprint) + server-only (path, combat data, characterId, itemCooldowns, tutorials) + `addXp()`, `setLevel()`, `applyDerivedStats()`, `addItem()`, `removeItem()`, `countItem()`
-- `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: base/derived stats, gold, xp, skills, stamina, inventory (MapSchema\<InventorySlotState\>), role, auto-attack toggle
+- `state/PlayerState.ts` — Player Schema (position, health, animation, lifeState, bleed/respawn/revive timers, level, sprint) + server-only (path, combat data, characterId, itemCooldowns, tutorials, godMode, pacifist) + `addXp()`, `setLevel()`, `addItem()`, `removeItem()`, `countItem()`
+- `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: base stats, derived stats (attackDamage, defense, speed, attackCooldown), gold, xp, skills, stamina, inventory (MapSchema\<InventorySlotState\>), role, auto-attack toggle
 - `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16)
 - `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level, animation, aggro, isMoving, isWalking, MapSchema effects) + server-only (path, baseSpeed, speed, AI/combat data)
 - `state/GateState.ts` — Gate Schema (position, type, N/S vs E/W orientation, open state)

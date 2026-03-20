@@ -172,6 +172,18 @@ export const CharacterTab = (): ReactNode => {
           color="text-sky-400"
           tooltip={t("character.defenseTip")}
         />
+        <StatRow
+          label={t("character.speed")}
+          value={parseFloat(stats.speed.toFixed(1))}
+          color="text-emerald-400"
+          tooltip={t("character.speedTip")}
+        />
+        <StatRow
+          label={t("character.attackSpeed")}
+          value={parseFloat(stats.attackCooldown.toFixed(2))}
+          color="text-purple-400"
+          tooltip={t("character.attackSpeedTip")}
+        />
       </div>
 
       {/* Reset stats button */}

@@ -3,30 +3,52 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { hudStore } from "../stores/hudStore";
 import { skillDefStore } from "../stores/skillDefStore";
+import { talentDefStore } from "../stores/talentDefStore";
+import { talentStore } from "../stores/talentStore";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import type { BindableActionValue } from "../stores/settingsStore";
 import { LockIcon } from "../icons/LockIcon";
 import { ActionSlot } from "../components/ActionSlot";
 import { ItemIcon } from "../components/ItemIcon";
-import { MAX_SKILL_SLOTS } from "@dungeon/shared";
+import { MAX_SKILL_SLOTS, computeTalentSkillMods } from "@dungeon/shared";
 import type { SkillDef } from "@dungeon/shared";
 
 // ── Skill tooltip content ────────────────────────────────────────────────────
 
-const SkillTooltip = ({ skill }: { skill: SkillDef }): ReactNode => {
+const SkillTooltip = ({
+  skill,
+  cooldownMul,
+  damageMul,
+}: {
+  skill: SkillDef;
+  cooldownMul: number;
+  damageMul: number;
+}): ReactNode => {
   const { t } = useTranslation();
+  const effectiveCooldown = parseFloat((skill.cooldown * cooldownMul).toFixed(1));
+  const effectiveDamage = parseFloat((skill.damageMultiplier * damageMul).toFixed(2));
   return (
     <>
       <div className="text-[12px] font-semibold text-slate-100">{t(skill.name)}</div>
       <div className="mt-0.5 text-[11px] text-slate-400">
         {t(skill.description, {
-          multiplier: skill.damageMultiplier,
+          multiplier: effectiveDamage,
           threshold: Math.round(skill.hpThreshold * 100),
         })}
       </div>
-      {skill.cooldown > 0 && (
+      {effectiveCooldown > 0 && (
         <div className="mt-1 text-[10px] text-amber-400/80">
-          {t("skills.cooldown", { seconds: skill.cooldown })}
+          {t("skills.cooldown", { seconds: effectiveCooldown })}
+          {cooldownMul !== 1 && (
+            <span className="ml-1 text-green-400/70">
+              ({t("skills.cdReduced", { percent: Math.round((1 - cooldownMul) * 100) })})
+            </span>
+          )}
+        </div>
+      )}
+      {damageMul !== 1 && skill.damageMultiplier > 0 && (
+        <div className="text-[10px] text-green-400/70">
+          {t("skills.dmgBoosted", { percent: Math.round((damageMul - 1) * 100) })}
         </div>
       )}
       <div className="mt-1 text-[10px] text-slate-500">{t("skills.clickToUse")}</div>
@@ -39,6 +61,8 @@ const SkillTooltip = ({ skill }: { skill: SkillDef }): ReactNode => {
 export const SkillBar = (): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const skillDefs = useSyncExternalStore(skillDefStore.subscribe, skillDefStore.getSnapshot);
+  const talentDefs = useSyncExternalStore(talentDefStore.subscribe, talentDefStore.getSnapshot);
+  const talentSnap = useSyncExternalStore(talentStore.subscribe, talentStore.getSnapshot);
   const localMember = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const skills = localMember?.skills ?? [];
 
@@ -87,6 +111,17 @@ export const SkillBar = (): ReactNode => {
     return actions.map((a) => settings.keybindings[a]);
   }, [settings.keybindings]);
 
+  // Precompute talent skill mods for each slot
+  const slotMods = useMemo(
+    () =>
+      slots.map((skill) =>
+        skill
+          ? computeTalentSkillMods(talentDefs.values(), talentSnap.allocations, skill.id)
+          : { cooldownMul: 1, damageMul: 1 },
+      ),
+    [slots, talentDefs, talentSnap.allocations],
+  );
+
   // Keyboard shortcuts: activate skills via configurable bindings
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
@@ -114,7 +149,15 @@ export const SkillBar = (): ReactNode => {
             keybind={displayKeyName(skillBindKeys[i])}
             cooldown={skill ? (snapshot.skillCooldowns.get(skill.id) ?? null) : null}
             activationCount={activations[i]}
-            tooltip={skill ? <SkillTooltip skill={skill} /> : undefined}
+            tooltip={
+              skill ? (
+                <SkillTooltip
+                  skill={skill}
+                  cooldownMul={slotMods[i].cooldownMul}
+                  damageMul={slotMods[i].damageMul}
+                />
+              ) : undefined
+            }
           />
         ))}
       </div>

@@ -123,7 +123,8 @@ packages/
 
 - Use `@type()` decorators for synced fields (server tsconfig has `experimentalDecorators: true`)
 - Synced fields: `@type("float32") x: number = 0;` — with default values
-- Server-only fields: normal `path: WorldPos[] = [];` — no `@type()` decorator
+- Private synced fields: `@view()` on `PlayerSecretState` — visible only to owning client (stats, gold, xp, inventory, speed, attackCooldown)
+- Server-only fields: normal `path: WorldPos[] = [];` — no `@type()` decorator (godMode, pacifist, talentAllocations, etc.)
 - Client callbacks: `$(room.state).listen(prop, cb)`, `$(room.state).players.onAdd(cb)`, `$(player).onChange(cb)`
 
 ### UI Store pattern
@@ -203,7 +204,7 @@ packages/
 ### Chat
 
 - Server-side ChatSystem with rate limiting, command parsing, broadcasting
-- Slash commands: /help, /players, /kill (player or creature target), /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /reset-tutorials, /resettalents (admin)
+- Slash commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
 - Messages fade after 10s, hover to reveal all
@@ -282,6 +283,21 @@ packages/
 - Steps: start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents
 - Server sends hints contextually; client dismisses on action
 - Admin: /reset-tutorials command re-sends applicable hints
+
+### Admin & Debug Tools
+
+- `/god [pacifist]`: toggle invulnerability. With `pacifist`, attacks show damage numbers but don't reduce creature HP
+- `/spawn <type> [level] [count]`: spawn creatures near the player (e.g. `/spawn zombie 10 3`)
+- God mode (`godMode`) and pacifist (`pacifist`) are server-only fields on PlayerState, not synced to client
+- Debug panel (F9): tick rate, creature count, admin info
+
+### Derived Stats Architecture
+
+- `EffectSystem.recomputeStats()` is the **single source of truth** for all derived stats (maxHealth, attackDamage, defense, speed, attackCooldown)
+- Computes: base stats × class scaling → apply talent flat/percent mods → apply effect flat/percent mods
+- Integer stats (maxHealth, attackDamage, defense) are rounded; float stats (speed, attackCooldown) keep precision
+- Callers responsible for health adjustment after recompute (full heal on level-up, proportional on stat allocate, clamp on reset)
+- `PlayerState.levelUp()`, `allocateStat()`, `resetStats()` only mutate base data — callers must call `recomputeStats()`
 
 ### Visual Effects
 

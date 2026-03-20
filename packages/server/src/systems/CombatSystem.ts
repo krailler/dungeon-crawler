@@ -346,11 +346,14 @@ export class CombatSystem {
       if (combat.damageTimer > 0) {
         combat.damageTimer -= dt;
         if (combat.damageTimer <= 0 && combat.damageTarget) {
-          combat.damageTarget.health = Math.max(
-            0,
-            combat.damageTarget.health - combat.damageAmount,
-          );
-          const killed = combat.damageTarget.health <= 0;
+          const isPacifist = player?.pacifist === true;
+          if (!isPacifist) {
+            combat.damageTarget.health = Math.max(
+              0,
+              combat.damageTarget.health - combat.damageAmount,
+            );
+          }
+          const killed = !isPacifist && combat.damageTarget.health <= 0;
           if (killed) combat.damageTarget.isDead = true;
           const hitSkillId = combat.damageSkillId;
           if (onHit) {

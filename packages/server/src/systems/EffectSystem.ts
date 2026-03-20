@@ -196,12 +196,14 @@ export class EffectSystem {
     const applyMods = (base: number, stat: string): number => {
       const flat = flatMods[stat] ?? 0;
       const percent = percentMods[stat] ?? 0;
-      return Math.round((base + flat) * (1 + percent));
+      return (base + flat) * (1 + percent);
     };
 
-    player.maxHealth = Math.max(1, applyMods(derived.maxHealth, "maxHealth"));
-    player.attackDamage = Math.max(0, applyMods(derived.attackDamage, "attackDamage"));
-    player.defense = Math.max(0, applyMods(derived.defense, "defense"));
+    // Integer stats (round)
+    player.maxHealth = Math.max(1, Math.round(applyMods(derived.maxHealth, "maxHealth")));
+    player.attackDamage = Math.max(0, Math.round(applyMods(derived.attackDamage, "attackDamage")));
+    player.defense = Math.max(0, Math.round(applyMods(derived.defense, "defense")));
+    // Float stats (keep precision)
     player.speed = Math.max(0.5, applyMods(derived.moveSpeed, "moveSpeed"));
     player.attackCooldown = Math.max(0.3, applyMods(derived.attackCooldown, "attackCooldown"));
     player.attackRange = derived.attackRange;

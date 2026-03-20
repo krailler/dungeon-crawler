@@ -25,6 +25,8 @@ export type CharacterStats = {
   agility: number;
   attackDamage: number;
   defense: number;
+  speed: number;
+  attackCooldown: number;
 };
 
 export type PartyMember = {

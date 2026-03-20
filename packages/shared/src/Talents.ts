@@ -61,3 +61,28 @@ export type TalentDefClient = Omit<TalentDef, never>;
 export function toTalentDefClient(def: TalentDef): TalentDefClient {
   return { ...def };
 }
+
+/**
+ * Compute aggregated skill modifiers from talent allocations (pure function).
+ * Works on both server (TalentDef) and client (TalentDefClient).
+ */
+export function computeTalentSkillMods(
+  talentDefs: Iterable<TalentDef | TalentDefClient>,
+  allocations: ReadonlyMap<string, number>,
+  skillId: string,
+): { cooldownMul: number; damageMul: number } {
+  let cooldownMul = 1;
+  let damageMul = 1;
+  for (const def of talentDefs) {
+    const rank = allocations.get(def.id) ?? 0;
+    if (rank <= 0) continue;
+    for (const effect of def.effects) {
+      if (effect.rank > rank) continue;
+      if (effect.effectType !== TalentEffectType.MODIFY_SKILL) continue;
+      if (effect.skillModifier?.skillId !== skillId) continue;
+      if (effect.skillModifier.cooldownMul) cooldownMul *= effect.skillModifier.cooldownMul;
+      if (effect.skillModifier.damageMul) damageMul *= effect.skillModifier.damageMul;
+    }
+  }
+  return { cooldownMul, damageMul };
+}
