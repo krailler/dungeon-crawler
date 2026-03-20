@@ -9,7 +9,7 @@ import type { Observer } from "@babylonjs/core/Misc/observable";
 // Side-effect imports required for tree-shaking: enable scene picking
 import "@babylonjs/core/Culling/ray";
 
-import { Client, Room } from "@colyseus/sdk";
+import { Room } from "@colyseus/sdk";
 
 import { IsometricCamera } from "../camera/IsometricCamera";
 import { DungeonRenderer } from "../dungeon/DungeonRenderer";
@@ -32,7 +32,6 @@ import {
   MessageType,
   AMBIENT_INTENSITY,
   ChatCategory,
-  PROTOCOL_VERSION,
   TutorialStep,
 } from "@dungeon/shared";
 import type {
@@ -64,6 +63,7 @@ import { itemDefStore } from "../ui/stores/itemDefStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
 import { settingsStore } from "../ui/stores/settingsStore";
 import type { GraphicsSettings } from "../ui/stores/settingsStore";
+import { lobbyStore } from "../ui/stores/lobbyStore";
 import { setChatSendFn, clearChatSendFn, resolveItemLinksToText } from "../ui/hud/itemLinkUtils";
 import { t } from "../i18n/i18n";
 
@@ -76,7 +76,6 @@ export class ClientGame {
   private guiTexture: AdvancedDynamicTexture;
 
   // Colyseus
-  private client: Client;
   private room: Room | null = null;
 
   private loaderRegistry: CharacterLoaderRegistry;
@@ -99,7 +98,7 @@ export class ClientGame {
   private lastGraphics: GraphicsSettings;
   private renderObserver: Observer<Scene> | null = null;
 
-  constructor(canvas: HTMLCanvasElement, colyseusClient: Client) {
+  constructor(canvas: HTMLCanvasElement, room: Room) {
     const gfx = settingsStore.getSnapshot().graphics;
     this.engine = new Engine(canvas, gfx.antiAliasing, {
       preserveDrawingBuffer: true,
@@ -167,7 +166,7 @@ export class ClientGame {
 
     mountLoading();
     mountHud();
-    this.client = colyseusClient;
+    this.room = room;
 
     // Game loop — render + interpolation
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
@@ -260,45 +259,16 @@ export class ClientGame {
 
       loadingStore.setPhase(LoadingPhase.SERVER);
 
-      // Try to reconnect using a saved token (e.g. after page reload or "Reconnect" button)
-      console.log(`[Client] Protocol version: ${PROTOCOL_VERSION}`);
-      const joinOptions = { protocolVersion: PROTOCOL_VERSION };
-      const isReconnectAttempt = authStore.getSnapshot().canReconnect;
-      let room: Room;
-      const savedToken = localStorage.getItem("reconnectionToken");
-      if (savedToken) {
-        try {
-          console.log("[Client] Attempting reconnection…");
-          room = await this.client.reconnect(savedToken);
-          console.log("[Client] Reconnected to room:", room.sessionId);
-        } catch (err) {
-          console.warn("[Client] Reconnection failed:", err);
-          localStorage.removeItem("reconnectionToken");
-          if (isReconnectAttempt) {
-            // User clicked "Reconnect" but session expired — show login
-            authStore.reconnectFailed(t("reconnect.failed"));
-            return;
-          }
-          // Normal page-load reconnect failure — join new room
-          room = await this.client.joinOrCreate("dungeon", joinOptions);
-        }
-      } else {
-        if (isReconnectAttempt) {
-          // No token available — session is gone
-          authStore.reconnectFailed(t("reconnect.failed"));
-          return;
-        }
-        room = await this.client.joinOrCreate("dungeon", joinOptions);
-      }
+      // Room is already connected (passed in via constructor from lobbyStore)
+      const room = this.room!;
 
-      // Persist reconnection token (localStorage survives tab close)
+      // Persist reconnection data (localStorage survives tab close)
       localStorage.setItem("reconnectionToken", room.reconnectionToken);
+      localStorage.setItem("reconnectionRoomId", room.roomId);
       // Clear reconnect state now that we've successfully joined
       if (authStore.getSnapshot().canReconnect) {
         authStore.clearReconnect();
       }
-
-      this.room = room;
       adminStore.setRoom(room);
       hudStore.setRoom(room);
       gateStore.setRoom(room);
@@ -452,6 +422,11 @@ export class ClientGame {
 
       // Permanently left (kicked, or reconnection failed)
       room.onLeave((code: number) => {
+        // Intentional leave (e.g. "Leave Room" button) — handled by lobbyStore
+        if (lobbyStore.isLeavingIntentionally()) {
+          lobbyStore.clearLeavingFlag();
+          return;
+        }
         if (code === CloseCode.KICKED_DUPLICATE) {
           authStore.kick(t("kick.duplicate"));
         } else if (code === CloseCode.KICKED) {
@@ -565,6 +540,7 @@ export class ClientGame {
     // Only clear reconnection token if NOT in reconnectable state
     if (!authStore.getSnapshot().canReconnect) {
       localStorage.removeItem("reconnectionToken");
+      localStorage.removeItem("reconnectionRoomId");
     }
     this.room?.leave();
     window.clearInterval(this.pingInterval);

@@ -14,6 +14,17 @@
     "passwordTooShort": "La contraseña es demasiado corta.",
     "unknownError": "Algo salió mal. Inténtalo de nuevo."
   },
+  "lobby": {
+    "title": "Salas de Mazmorra",
+    "createRoom": "Crear Sala",
+    "join": "Unirse",
+    "noRooms": "No hay salas disponibles. ¡Crea una!",
+    "joining": "Uniéndose...",
+    "logout": "Cerrar sesión",
+    "level": "Nv.{{level}}",
+    "roomStarted": "Esta sala ya ha comenzado.",
+    "roomFull": "Esta sala está llena."
+  },
   "loading": {
     "title": "Dungeon Crawler",
     "models": "Cargando modelos y audio...",
@@ -64,6 +75,7 @@
     "resetTutorialsConfirm": "Reiniciar",
     "resetTutorialsCancel": "Cancelar",
     "settings": "Ajustes",
+    "leaveRoom": "Salir de la Sala",
     "logout": "Cerrar Sesión"
   },
   "settings": {

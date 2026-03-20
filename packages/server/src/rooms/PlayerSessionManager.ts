@@ -34,11 +34,13 @@ import {
   unregisterSession,
   isActiveSession,
 } from "../sessions/activeSessionRegistry";
+import { registerAccountRoom, unregisterAccountRoom } from "../sessions/reconnectionRegistry";
 
 const RECONNECT_TIMEOUT = 60 * 5; // seconds
 const RECONNECT_WARNINGS = [30, 10, 5, 4, 3, 2, 1]; // seconds before timeout to send warnings
 
 export interface SessionRoomBridge {
+  readonly roomId: string;
   readonly state: DungeonState;
   readonly clients: Iterable<Client>;
   tileMap: TileMap;
@@ -115,6 +117,7 @@ export class PlayerSessionManager {
 
     // Kick previous session if same account is already connected (any room)
     registerSession(accountId, client);
+    registerAccountRoom(accountId, this.bridge.roomId);
 
     // Check if this account already has a disconnected player in this room
     const oldSessionId = this.accountToSession.get(accountId);
@@ -999,6 +1002,7 @@ export class PlayerSessionManager {
     const auth = client.auth as { accountId?: string } | undefined;
     if (auth?.accountId && this.accountToSession.get(auth.accountId) === client.sessionId) {
       this.accountToSession.delete(auth.accountId);
+      unregisterAccountRoom(auth.accountId);
     }
     this.bridge.onSessionCleanup(client.sessionId);
   }

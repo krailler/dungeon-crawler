@@ -23,6 +23,7 @@ export interface GateSystemDeps {
   clock: ClockTimer;
   log: Logger;
   sendToClient: (sessionId: string, type: string, message: unknown) => void;
+  onLobbyGatesOpened?: () => void;
 }
 
 export class GateSystem {
@@ -32,6 +33,7 @@ export class GateSystem {
   private clock: ClockTimer;
   private log: Logger;
   private sendToClient: (sessionId: string, type: string, message: unknown) => void;
+  private onLobbyGatesOpened?: () => void;
   private gateCountdowns: Set<string> = new Set();
   private pendingTimers: { clear(): void }[] = [];
 
@@ -42,6 +44,7 @@ export class GateSystem {
     this.clock = deps.clock;
     this.log = deps.log;
     this.sendToClient = deps.sendToClient;
+    this.onLobbyGatesOpened = deps.onLobbyGatesOpened;
   }
 
   /** Reset countdowns (called on dungeon regeneration). */
@@ -151,6 +154,8 @@ export class GateSystem {
         this.gateCountdowns.delete(id);
       }
     });
+
+    this.onLobbyGatesOpened?.();
 
     // Send sprint tutorial hint to all players after a short delay
     const tTutorial = this.clock.setTimeout(() => {

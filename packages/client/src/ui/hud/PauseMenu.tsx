@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { targetStore } from "../stores/targetStore";
+import { lobbyStore } from "../stores/lobbyStore";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { MenuButton } from "../components/MenuButton";
 import { SettingsPanel } from "./SettingsPanel";
@@ -72,6 +73,15 @@ export const PauseMenu = (): ReactNode => {
               </MenuButton>
               <MenuButton onClick={() => setConfirmReset(true)} className="w-full">
                 {t("pause.resetTutorials")}
+              </MenuButton>
+              <MenuButton
+                variant="danger"
+                onClick={() => {
+                  lobbyStore.returnToLobby();
+                }}
+                className="w-full"
+              >
+                {t("pause.leaveRoom")}
               </MenuButton>
               <MenuButton
                 variant="danger"

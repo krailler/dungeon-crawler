@@ -1,4 +1,4 @@
-import { Server, auth } from "colyseus";
+import { Server, auth, JWT, LobbyRoom } from "colyseus";
 import { Encoder } from "@colyseus/schema";
 import { DungeonRoom } from "./rooms/DungeonRoom";
 import { initDatabase } from "./db/database";
@@ -8,6 +8,7 @@ import { loadSkillRegistry } from "./skills/SkillRegistry";
 import { loadEffectRegistry } from "./effects/EffectRegistry";
 import { loadClassRegistry } from "./classes/ClassRegistry";
 import { loadTalentRegistry } from "./talents/TalentRegistry";
+import { getAccountRoom } from "./sessions/reconnectionRegistry";
 import { logger } from "./logger";
 import { PROTOCOL_VERSION, MIN_PROTOCOL_VERSION } from "@dungeon/shared";
 
@@ -31,10 +32,33 @@ const server = new Server({
   },
   express: (app) => {
     app.use("/auth", auth.routes());
+
+    // Returns the roomId the authenticated player is currently in (if any).
+    // Used by the client to auto-rejoin after page reload / localStorage loss.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    app.get("/reconnect-room", async (req: any, res: any) => {
+      const header = req.headers.authorization as string | undefined;
+      if (!header?.startsWith("Bearer ")) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      try {
+        const payload = (await JWT.verify(header.slice(7))) as { accountId?: string };
+        if (!payload?.accountId) {
+          res.status(401).json({ error: "Invalid token" });
+          return;
+        }
+        const roomId = getAccountRoom(payload.accountId);
+        res.json({ roomId: roomId ?? null });
+      } catch {
+        res.status(401).json({ error: "Invalid token" });
+      }
+    });
   },
 });
 
-server.define("dungeon", DungeonRoom);
+server.define("lobby", LobbyRoom);
+server.define("dungeon", DungeonRoom).enableRealtimeListing();
 
 server.listen(port).then(() => {
   logger.info(

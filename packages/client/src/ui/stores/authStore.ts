@@ -6,7 +6,7 @@ const AUTH_TOKEN_KEY = "authToken";
 // In production, this would be the same origin; in dev, we bypass Vite proxy
 // so the SDK's WebSocket connects directly to the Colyseus port.
 // Use VITE_SERVER_URL env var to override (e.g. for LAN play).
-const SERVER_URL =
+export const SERVER_URL =
   import.meta.env.VITE_SERVER_URL ??
   (import.meta.env.DEV
     ? `http://${window.location.hostname}:3000`
@@ -144,6 +144,7 @@ export const authStore = {
   kick(reason: string): void {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem("reconnectionToken");
+    localStorage.removeItem("reconnectionRoomId");
     update({
       isAuthenticated: false,
       characterName: null,
@@ -167,6 +168,7 @@ export const authStore = {
   /** Reconnection attempt failed (token expired, server removed player) */
   reconnectFailed(reason: string): void {
     localStorage.removeItem("reconnectionToken");
+    localStorage.removeItem("reconnectionRoomId");
     update({ isAuthenticated: false, canReconnect: false, error: reason });
   },
 

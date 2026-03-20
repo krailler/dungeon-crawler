@@ -14,6 +14,17 @@
     "passwordTooShort": "Password is too short.",
     "unknownError": "Something went wrong. Please try again."
   },
+  "lobby": {
+    "title": "Dungeon Rooms",
+    "createRoom": "Create Room",
+    "join": "Join",
+    "noRooms": "No rooms available. Create one!",
+    "joining": "Joining...",
+    "logout": "Log out",
+    "level": "Lv.{{level}}",
+    "roomStarted": "This room has already started.",
+    "roomFull": "This room is full."
+  },
   "loading": {
     "title": "Dungeon Crawler",
     "models": "Loading models and audio...",
@@ -64,6 +75,7 @@
     "resetTutorialsConfirm": "Reset",
     "resetTutorialsCancel": "Cancel",
     "settings": "Settings",
+    "leaveRoom": "Leave Room",
     "logout": "Logout"
   },
   "settings": {

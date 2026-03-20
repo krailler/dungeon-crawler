@@ -1,3 +1,5 @@
+/** Maximum number of players in a dungeon room */
+export const MAX_PARTY_SIZE = 5;
 export const ATTACK_ANIM_DURATION = 0.67;
 /** Damage is applied at the midpoint of the attack animation */
 export const DAMAGE_DELAY = ATTACK_ANIM_DURATION / 2;

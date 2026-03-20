@@ -105,6 +105,7 @@ import {
   STAT_RESET_GOLD_PER_LEVEL,
   computeDamage,
   MAX_CONSUMABLE_BAR_SLOTS,
+  MAX_PARTY_SIZE,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -200,6 +201,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     // Generate dungeon (also creates pathfinder, AI, combat systems)
     const seed = DUNGEON_SEED ?? Date.now();
     this.generateDungeon(seed);
+    this.updateMetadata();
 
     // Setup chat system
     const self = this;
@@ -275,11 +277,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       clock: this.clock,
       log: this.log,
       sendToClient: this.sendToClient,
+      onLobbyGatesOpened: () => this.updateMetadata(),
     });
 
     // Setup session manager
     this.sessionManager = new PlayerSessionManager(
       {
+        get roomId() {
+          return self.roomId;
+        },
         get state() {
           return self.state;
         },
@@ -1353,6 +1359,17 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       .limit(1);
     if (!character) throw new Error("No character found");
 
+    // Block new players if the room is full
+    // Allow returning players (account already has a disconnected player in the room)
+    if (this.state.players.size >= MAX_PARTY_SIZE) {
+      const oldSessionId = this.sessionManager.getSessionForAccount(account.id);
+      const existingPlayer = oldSessionId ? this.state.players.get(oldSessionId) : undefined;
+      if (!existingPlayer) {
+        this.log.warn({ accountId: account.id }, "Rejected join — room full");
+        throw new Error("ROOM_FULL");
+      }
+    }
+
     // Block new players if the dungeon has already started (lobby gate open)
     // Allow returning players (account already has a disconnected player in the room)
     if (this.isDungeonStarted()) {
@@ -1410,6 +1427,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         runtime: this.state.serverRuntime,
       } satisfies AdminDebugInfoMessage);
     }
+
+    this.updateMetadata();
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -1418,6 +1437,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     } else {
       await this.sessionManager.handleLeave(client);
     }
+    this.updateMetadata();
   }
 
   onReconnect(client: Client): void {
@@ -1430,6 +1450,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
       client.view.add(player.secret);
     }
+    this.updateMetadata();
   }
 
   async onLeave(client: Client): Promise<void> {
@@ -1444,6 +1465,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       return;
     }
     await this.sessionManager.handleLeave(client);
+    this.updateMetadata();
   }
 
   /**
@@ -1604,6 +1626,17 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       if (gate.gateType === GateType.LOBBY && gate.open) started = true;
     });
     return started;
+  }
+
+  /** Update room metadata for the lobby room listing. */
+  private updateMetadata(): void {
+    this.setMetadata({
+      roomName: this.state.roomName,
+      dungeonLevel: this.state.dungeonLevel,
+      playerCount: this.state.players.size,
+      maxPlayers: MAX_PARTY_SIZE,
+      started: this.isDungeonStarted(),
+    });
   }
 
   /** Send a message only to clients with admin role */
