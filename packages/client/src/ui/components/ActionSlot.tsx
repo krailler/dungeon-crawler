@@ -253,7 +253,7 @@ export const ActionSlot = ({
     >
       {/* Tooltip */}
       {hovered && (tooltip || tooltipName) && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 z-50 whitespace-nowrap rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2 text-center shadow-xl backdrop-blur-sm">
+        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 z-50 w-max max-w-sm rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2 text-center shadow-xl backdrop-blur-sm">
           {tooltip ?? (
             <>
               <div className="text-[11px] font-semibold text-slate-100">{t(tooltipName!)}</div>

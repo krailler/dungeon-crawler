@@ -80,7 +80,7 @@ export const EffectIcon = ({
       {hovered && (
         <div
           className={[
-            "pointer-events-none absolute z-50 whitespace-nowrap rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2 text-center shadow-xl backdrop-blur-sm",
+            "pointer-events-none absolute z-50 w-max max-w-sm rounded-lg border border-slate-600/40 bg-slate-900/95 px-3 py-2 text-center shadow-xl backdrop-blur-sm",
             tooltipPosition,
           ].join(" ")}
         >

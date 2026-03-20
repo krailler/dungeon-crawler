@@ -117,6 +117,18 @@ export class StateSync {
     this.deps = deps;
   }
 
+  /**
+   * Register message-based stores early (before asset loading) so server
+   * messages sent during handleJoin (e.g. TALENT_STATE) are not missed.
+   */
+  connectMessageStores(room: Room): void {
+    skillDefStore.connect(room);
+    effectDefStore.connect(room);
+    classDefStore.connect(room);
+    talentDefStore.connect(room);
+    talentStore.connect(room);
+  }
+
   setup(room: Room, localSessionId: string): void {
     this.localSessionId = localSessionId;
 
@@ -131,13 +143,6 @@ export class StateSync {
       if (typeof unsub === "function") this.stateListeners.push(unsub as () => void);
       return unsub;
     };
-
-    // Connect def stores — lazy-loads definitions from server
-    skillDefStore.connect(room);
-    effectDefStore.connect(room);
-    classDefStore.connect(room);
-    talentDefStore.connect(room);
-    talentStore.connect(room);
 
     // Listen for skill cooldown messages from server
     room.onMessage(MessageType.SKILL_COOLDOWN, (data: SkillCooldownMessage) => {

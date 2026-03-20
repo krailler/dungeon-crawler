@@ -167,6 +167,9 @@ export class ClientGame {
     mountLoading();
     mountHud();
     this.room = room;
+    // Register message listeners early so server messages sent during
+    // handleJoin (e.g. TALENT_STATE) are not missed while loading assets.
+    this.stateSync.connectMessageStores(room);
 
     // Game loop — render + interpolation
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {

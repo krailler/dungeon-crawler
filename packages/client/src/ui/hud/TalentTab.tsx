@@ -51,7 +51,7 @@ const TalentNode = ({
   else if (currentRank > 0) borderColor = "border-emerald-400";
   else if (canAllocate) borderColor = "border-sky-400";
 
-  const rankLines = def.effects.map((e) => {
+  const rankLines = def.effects.map((e, i) => {
     let desc = "";
     if (e.statModifier) {
       const sign = e.statModifier.value > 0 ? "+" : "";
@@ -77,7 +77,7 @@ const TalentNode = ({
     }
     const active = e.rank <= currentRank;
     return (
-      <div key={e.rank} className={active ? "text-white" : "text-zinc-400"}>
+      <div key={`${e.rank}-${i}`} className={active ? "text-white" : "text-zinc-400"}>
         {t("talents.rank")} {e.rank}: {desc}
       </div>
     );

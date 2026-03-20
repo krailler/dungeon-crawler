@@ -32,7 +32,7 @@ export const Tooltip = ({
     <div className="group/tip relative">
       {children}
       <div
-        className={`pointer-events-none absolute z-50 hidden rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover/tip:block ${positionClass[position]} ${width ?? "whitespace-nowrap"} ${className}`}
+        className={`pointer-events-none absolute z-50 hidden max-w-sm rounded-lg border border-zinc-600 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg group-hover/tip:block ${positionClass[position]} ${width ?? "whitespace-nowrap"} ${className}`}
       >
         {content}
       </div>
