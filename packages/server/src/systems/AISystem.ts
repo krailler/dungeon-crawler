@@ -186,8 +186,10 @@ export class AISystem {
   addThreat(creatureId: string, sessionId: string, amount: number): void {
     const entry = this.entryById.get(creatureId);
     if (!entry || entry.creature.isDead) return;
-    // Don't accept threat while leashing
-    if (entry.state === AIState.LEASH) return;
+    // If leashing, interrupt and re-engage
+    if (entry.state === AIState.LEASH) {
+      entry.state = AIState.CHASE;
+    }
     const current = entry.threatTable.get(sessionId) ?? 0;
     entry.threatTable.set(sessionId, current + amount);
   }
