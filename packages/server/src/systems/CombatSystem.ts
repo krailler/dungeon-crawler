@@ -32,7 +32,6 @@ import type { PlayerState } from "../state/PlayerState";
 import type { CreatureState } from "../state/CreatureState";
 import {
   ATTACK_ANIM_DURATION,
-  DAMAGE_DELAY,
   GCD_DURATION,
   computeDamage,
   LifeState,
@@ -171,7 +170,7 @@ export class CombatSystem {
     return this.playerCooldowns.get(sessionId)?.targetCreatureId ?? null;
   }
 
-  /** Schedule a delayed hit: face creature, play punch anim, damage after delay. */
+  /** Schedule a delayed hit: face creature, play anim, damage after delay at animation peak. */
   private scheduleHit(
     combat: PlayerCombat,
     player: PlayerState,
@@ -179,14 +178,15 @@ export class CombatSystem {
     damage: number,
     animState: string = "punch",
     skillId: string = "",
+    animDuration: number = ATTACK_ANIM_DURATION,
   ): void {
     // Face the creature
     player.rotY = Math.atan2(target.creature.x - player.x, target.creature.z - player.z);
 
     // Trigger attack animation — damage applied after delay at animation peak
     player.animState = animState;
-    combat.animTimer = ATTACK_ANIM_DURATION;
-    combat.damageTimer = DAMAGE_DELAY;
+    combat.animTimer = animDuration;
+    combat.damageTimer = animDuration / 2;
     combat.damageTarget = target.creature;
     combat.damageTargetId = target.creatureId;
     combat.damageAmount = damage;
@@ -231,7 +231,7 @@ export class CombatSystem {
     if (def.effectId && def.damageMultiplier <= 0) {
       combat.skillCooldowns.set(skillId, cooldown);
       player.animState = def.animState;
-      combat.animTimer = ATTACK_ANIM_DURATION;
+      combat.animTimer = def.animDuration;
       return this.applyGcd(combat, sessionId, skillId, cooldown, player);
     }
 
@@ -239,7 +239,7 @@ export class CombatSystem {
     if (def.aoeRange > 0 && def.damageMultiplier > 0) {
       combat.skillCooldowns.set(skillId, cooldown);
       player.animState = def.animState;
-      combat.animTimer = ATTACK_ANIM_DURATION;
+      combat.animTimer = def.animDuration;
       combat.attackCooldown = player.attackCooldown;
       return this.applyGcd(combat, sessionId, skillId, cooldown, player);
     }
@@ -262,7 +262,7 @@ export class CombatSystem {
     const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
     const finalDamage = Math.max(1, Math.round(baseDamage * dmgMul));
 
-    this.scheduleHit(combat, player, target, finalDamage, def.animState, skillId);
+    this.scheduleHit(combat, player, target, finalDamage, def.animState, skillId, def.animDuration);
 
     // Reset auto-attack cooldown so skill doesn't "waste" the next auto
     combat.attackCooldown = player.attackCooldown;
@@ -459,7 +459,15 @@ export class CombatSystem {
         combat.attackCooldown = player.attackCooldown;
         const baseDamage = computeDamage(player.attackDamage, target.creature.defense);
         const damage = Math.max(1, Math.round(baseDamage * defaultSkill.damageMultiplier));
-        this.scheduleHit(combat, player, target, damage, defaultSkill.animState);
+        this.scheduleHit(
+          combat,
+          player,
+          target,
+          damage,
+          defaultSkill.animState,
+          "",
+          defaultSkill.animDuration,
+        );
       }
     }
   }

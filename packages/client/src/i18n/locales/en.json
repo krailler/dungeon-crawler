@@ -31,7 +31,8 @@
     "searching": "Searching for players...",
     "queueStatus": "{{count}} player(s) in queue",
     "cancelQueue": "Cancel",
-    "customGame": "Custom Game"
+    "customGame": "Custom Game",
+    "preloading": "Loading assets..."
   },
   "loading": {
     "title": "Dungeon Crawler",

@@ -11,6 +11,7 @@ const UI_SOUNDS = {
   ui_rollover: "/audio/ui/rollover.ogg",
   ui_announcement: "/audio/ui/announcement.ogg",
   ui_tutorial: "/audio/ui/tutorial_hint.ogg",
+  ui_queue_start: "/audio/ui/queue_start.ogg",
   level_up: "/audio/sfx/level_up.ogg",
 } as const;
 
@@ -68,22 +69,78 @@ export function playUiSfx(name: UiSoundName): void {
 // ── Volume integration ──────────────────────────────────────────────────────
 
 /** Current effective volume for UI sounds (ui × master). Updated by settingsStore listener. */
-let uiVolumeMultiplier = 0.5;
+let uiVolumeMultiplier = 1.0;
+/** Current effective volume for lobby music (ambient × master). */
+let musicVolumeMultiplier = 1.0;
 
 /** Called once at startup to connect UI sound volume to settingsStore. */
-export function initUiSfxVolume(getVolume: () => { ui: number; master: number }): void {
+export function initUiSfxVolume(
+  getVolume: () => { ui: number; master: number; ambient: number },
+): void {
   const update = (): void => {
     const v = getVolume();
     uiVolumeMultiplier = v.ui * v.master;
+    musicVolumeMultiplier = v.ambient * v.master;
     if (gainNode) {
       gainNode.gain.value = uiVolumeMultiplier;
+    }
+    if (lobbyGain) {
+      lobbyGain.gain.value = musicVolumeMultiplier;
     }
   };
   update();
 }
 
+// ── Lobby music ─────────────────────────────────────────────────────────────
+
+const LOBBY_MUSIC_URL = "/audio/music/lobby_theme.ogg";
+let lobbySource: AudioBufferSourceNode | null = null;
+let lobbyBuffer: AudioBuffer | null = null;
+let lobbyGain: GainNode | null = null;
+
+/** Start looping lobby/login background music. Safe to call multiple times. */
+export async function startLobbyMusic(): Promise<void> {
+  if (lobbySource) return; // already playing
+  const audioCtx = getContext();
+
+  if (!lobbyBuffer) {
+    try {
+      const res = await fetch(LOBBY_MUSIC_URL);
+      const arrayBuf = await res.arrayBuffer();
+      lobbyBuffer = await audioCtx.decodeAudioData(arrayBuf);
+    } catch {
+      return;
+    }
+  }
+
+  lobbyGain = audioCtx.createGain();
+  lobbyGain.gain.value = musicVolumeMultiplier;
+  lobbyGain.connect(audioCtx.destination);
+
+  lobbySource = audioCtx.createBufferSource();
+  lobbySource.buffer = lobbyBuffer;
+  lobbySource.loop = true;
+  lobbySource.connect(lobbyGain);
+  lobbySource.start();
+}
+
+/** Stop lobby music. */
+export function stopLobbyMusic(): void {
+  if (lobbySource) {
+    lobbySource.stop();
+    lobbySource.disconnect();
+    lobbySource = null;
+  }
+  if (lobbyGain) {
+    lobbyGain.disconnect();
+    lobbyGain = null;
+  }
+}
+
 /** Release the AudioContext and buffers */
 export function disposeUiSounds(): void {
+  stopLobbyMusic();
+  lobbyBuffer = null;
   buffers.clear();
   if (ctx) {
     ctx.close().catch(() => {});

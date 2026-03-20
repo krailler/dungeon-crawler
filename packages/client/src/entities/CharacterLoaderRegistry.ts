@@ -14,7 +14,7 @@ export type ModelConfig = {
 const MODEL_CONFIGS: Record<string, ModelConfig> = {
   warrior: {
     filePath: "/models/characters/warrior/idle.glb",
-    animNames: ["idle", "run", "punch", "walk", "death", "heavy_punch"],
+    animNames: ["idle", "run", "punch", "walk", "death", "heavy_punch", "ground_slam", "war_cry"],
     animMap: new Map<AnimName, string>([["idle", "Breathe"]]),
     animFiles: new Map<AnimName, string>([
       ["run", "/models/characters/warrior/run.glb"],
@@ -22,6 +22,8 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
       ["punch", "/models/characters/warrior/punch.glb"],
       ["death", "/models/characters/warrior/death.glb"],
       ["heavy_punch", "/models/characters/warrior/heavy_punch.glb"],
+      ["ground_slam", "/models/characters/warrior/ground_slam.glb"],
+      ["war_cry", "/models/characters/warrior/war_cry.glb"],
     ]),
     scale: 1.0,
   },
@@ -53,6 +55,20 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
 };
 
 const FALLBACK_KEY = "warrior";
+
+/** All character model URLs — used by asset prefetcher. */
+export function getAllCharacterModelUrls(): string[] {
+  const urls: string[] = [];
+  for (const config of Object.values(MODEL_CONFIGS)) {
+    urls.push(config.filePath);
+    if (config.animFiles) {
+      for (const path of config.animFiles.values()) {
+        urls.push(path);
+      }
+    }
+  }
+  return urls;
+}
 
 /**
  * Registry that maps model keys (classId, creatureType) to CharacterAssetLoader instances.

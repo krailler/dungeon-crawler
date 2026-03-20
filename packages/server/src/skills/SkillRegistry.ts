@@ -20,6 +20,7 @@ const registry = createRegistry<SkillRow, SkillDef>({
     resetOnKill: row.resetOnKill,
     effectId: row.effectId,
     aoeRange: row.aoeRange,
+    animDuration: row.animDuration,
   }),
   hashDef: (def) => simpleHash(JSON.stringify(def)),
 });

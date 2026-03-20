@@ -69,7 +69,7 @@ const DEFAULT_VOLUME: VolumeSettings = {
   master: 1.0,
   sfx: 0.6,
   ambient: 1.0,
-  ui: 0.5,
+  ui: 1.0,
 };
 
 const DEFAULT_KEYBINDINGS: KeybindingSettings = {

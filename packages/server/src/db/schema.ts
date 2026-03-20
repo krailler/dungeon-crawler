@@ -165,6 +165,7 @@ export const skills = worldSchema.table("skills", {
   resetOnKill: boolean("reset_on_kill").notNull().default(false),
   effectId: text("effect_id").notNull().default(""),
   aoeRange: real("aoe_range").notNull().default(0),
+  animDuration: real("anim_duration").notNull().default(0.67),
 });
 
 export const creatures = worldSchema.table("creatures", {

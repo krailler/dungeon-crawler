@@ -13,6 +13,7 @@ import { GameLogo } from "../components/GameLogo";
 import { GoldPanel } from "../components/GoldPanel";
 import { SettingsPanel } from "../hud/SettingsPanel";
 import { Tooltip } from "../components/Tooltip";
+import { assetPreloadStore } from "../stores/assetPreloadStore";
 
 const SwordDivider = (): ReactNode => (
   <div className="flex items-center gap-3 opacity-30">
@@ -29,6 +30,7 @@ export const LobbyScreen = (): ReactNode => {
   const lobby = useSyncExternalStore(lobbyStore.subscribe, lobbyStore.getSnapshot);
   const mm = useSyncExternalStore(matchmakingStore.subscribe, matchmakingStore.getSnapshot);
   const auth = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
+  const preload = useSyncExternalStore(assetPreloadStore.subscribe, assetPreloadStore.getSnapshot);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
@@ -48,7 +50,7 @@ export const LobbyScreen = (): ReactNode => {
   };
 
   const handleQuickPlay = () => {
-    playUiSfx("ui_click");
+    playUiSfx("ui_queue_start");
     setShowCustom(false);
     matchmakingStore.joinQueue(client, auth.characterLevel ?? 1);
   };
@@ -158,6 +160,19 @@ export const LobbyScreen = (): ReactNode => {
           {t("lobby.logout")}
         </button>
         <span className="pl-0.5 text-[10px] text-slate-700">Build Version: {PROTOCOL_VERSION}</span>
+        {!preload.done && preload.total > 0 && (
+          <div className="flex items-center gap-2 pl-0.5">
+            <div className="h-1 w-24 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-amber-600/50 transition-all duration-300"
+                style={{ width: `${Math.round(preload.progress * 100)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-slate-700">
+              {t("lobby.preloading")} {Math.round(preload.progress * 100)}%
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Settings modal ── */}

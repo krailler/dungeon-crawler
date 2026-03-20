@@ -49,6 +49,30 @@ interface SfxEntry {
   baseVolume: number;
 }
 
+/** All audio URLs used by SoundManager — used by asset prefetcher. */
+export function getAllAudioUrls(): string[] {
+  const urls: string[] = [];
+  for (let i = 0; i < FOOTSTEP_COUNT; i++) {
+    urls.push(`${FOOTSTEP_BASE_PATH}${String(i).padStart(2, "0")}.ogg`);
+  }
+  urls.push(...PUNCH_URLS, ...HEAVY_PUNCH_URLS);
+  urls.push(
+    "/audio/sfx/gold_pickup.ogg",
+    "/audio/sfx/gate_open.ogg",
+    "/audio/sfx/player_join.ogg",
+    "/audio/sfx/player_leave.ogg",
+    "/audio/sfx/chat_receive.ogg",
+    "/audio/sfx/chat_send.ogg",
+    "/audio/sfx/level_up.ogg",
+    "/audio/sfx/downed_hit.ogg",
+    "/audio/sfx/revive.ogg",
+    "/audio/sfx/potion_drink.ogg",
+  );
+  urls.push(AMBIENT_URL, DOWNED_LOOP_URL, DEAD_LOOP_URL);
+  urls.push("/audio/music/lobby_theme.ogg");
+  return urls;
+}
+
 export class SoundManager {
   private scene: Scene;
   private footsteps: Sound[] = [];

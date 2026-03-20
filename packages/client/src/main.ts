@@ -12,10 +12,13 @@ import { authStore } from "./ui/stores/authStore";
 import { lobbyStore } from "./ui/stores/lobbyStore";
 import { matchmakingStore } from "./ui/stores/matchmakingStore";
 import { ClientGame } from "./core/ClientGame";
-import { preloadUiSounds } from "./audio/uiSfx";
+import { preloadUiSounds, startLobbyMusic, stopLobbyMusic } from "./audio/uiSfx";
+import { assetPreloadStore } from "./ui/stores/assetPreloadStore";
 
 // Preload UI sounds early so they work in login/lobby screens
 preloadUiSounds();
+// Start lobby music on the login screen (requires user gesture to actually play)
+startLobbyMusic();
 
 const loginRoot = createRoot(document.getElementById("login-root")!);
 loginRoot.render(createElement(LoginScreen));
@@ -35,7 +38,14 @@ function showScreen(state: AppState): void {
   currentState = state;
   document.getElementById("login-root")!.style.display = state === "login" ? "" : "none";
   lobbyContainer.style.display = state === "lobby" ? "" : "none";
-  // Canvas is always visible but behind the overlays — only matters when game is running
+  // Start asset prefetch when entering lobby (warms browser cache)
+  if (state === "lobby") assetPreloadStore.start();
+  // Lobby music plays on login + lobby screens, stops in game
+  if (state === "login" || state === "lobby") {
+    startLobbyMusic();
+  } else {
+    stopLobbyMusic();
+  }
 }
 
 // Called when a dungeon room is successfully joined (from lobbyStore)

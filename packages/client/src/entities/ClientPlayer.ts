@@ -237,7 +237,7 @@ export class ClientPlayer {
         addTimer: (t) => this.pendingTimers.push(t),
       });
     } else if (!animState && this.lastAnimState) {
-      // Server cleared animState early (target died, player moved) — cancel animation
+      // Server cleared animState (timer expiry, target died, player moved) — cancel animation
       this.animController.cancelOneShot();
     }
     this.lastAnimState = animState;

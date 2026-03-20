@@ -8,7 +8,16 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 // Side-effect: register GLB loader
 import "@babylonjs/loaders/glTF";
 
-const ALL_ANIM_NAMES = ["idle", "run", "punch", "walk", "death", "heavy_punch"] as const;
+const ALL_ANIM_NAMES = [
+  "idle",
+  "run",
+  "punch",
+  "walk",
+  "death",
+  "heavy_punch",
+  "ground_slam",
+  "war_cry",
+] as const;
 export type AnimName = (typeof ALL_ANIM_NAMES)[number];
 
 export type CharacterInstance = {

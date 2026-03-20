@@ -26,4 +26,6 @@ export type SkillDef = {
   readonly effectId: string;
   /** AoE radius for the skill. 0 = single target (or self-only for buffs). */
   readonly aoeRange: number;
+  /** Animation duration in seconds. Controls how long the server holds animState and blocks auto-attack. */
+  readonly animDuration: number;
 };

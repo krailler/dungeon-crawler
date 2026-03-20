@@ -117,7 +117,7 @@ export const LoginScreen = (): ReactNode => {
       )}
 
       {/* Version */}
-      <span className="absolute bottom-3 right-4 text-[10px] text-slate-600">
+      <span className="absolute bottom-3 left-4 text-[10px] text-slate-600">
         Build Version: {PROTOCOL_VERSION}
       </span>
     </div>

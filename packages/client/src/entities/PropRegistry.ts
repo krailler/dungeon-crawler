@@ -12,6 +12,11 @@ const PROP_PATHS: Record<string, string> = {
   portal: "/models/props/portal.glb",
 };
 
+/** All prop URLs — used by asset prefetcher. */
+export function getAllPropUrls(): string[] {
+  return Object.values(PROP_PATHS);
+}
+
 export class PropRegistry {
   private scene: Scene;
   private containers: Map<string, AssetContainer> = new Map();
