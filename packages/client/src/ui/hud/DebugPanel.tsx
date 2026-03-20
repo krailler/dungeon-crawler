@@ -37,7 +37,7 @@ export const DebugPanel = (): ReactNode => {
   const toggleOpen = useCallback(() => setOpen((v) => !v), []);
 
   return (
-    <div className="pointer-events-auto absolute left-4 top-4 z-50 select-none">
+    <div className="pointer-events-auto absolute left-4 top-4 z-[300] select-none">
       <HudButton
         onClick={toggleOpen}
         isOpen={open}

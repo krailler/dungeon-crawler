@@ -159,6 +159,7 @@ export class ClientGame {
       getLocalSessionId: () => self.stateSync.localSessionId,
       getInputManager: () => self.stateSync.inputManager,
       getWallOcclusion: () => self.stateSync.wallOcclusion,
+      getDistanceCull: () => self.stateSync.distanceCull,
       getRoom: () => self.room,
     });
 

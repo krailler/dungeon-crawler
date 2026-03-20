@@ -208,6 +208,14 @@ export class DungeonRenderer {
     return this.wallDecoMap;
   }
 
+  getFloorRoots(): TransformNode[] {
+    return this.floorRoots;
+  }
+
+  getWallDecoRoots(): TransformNode[] {
+    return this.wallDecoRoots;
+  }
+
   getSpawnWorldPosition(map: TileMap): Vector3 | null {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {

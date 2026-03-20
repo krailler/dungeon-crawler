@@ -11,6 +11,7 @@ import type { ClientPlayer } from "../entities/ClientPlayer";
 import type { ClientCreature } from "../entities/ClientCreature";
 import type { InputManager } from "./InputManager";
 import type { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
+import type { DistanceCullSystem } from "../systems/DistanceCullSystem";
 import type { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
@@ -40,6 +41,7 @@ export interface UpdateLoopDeps {
   getLocalSessionId(): string;
   getInputManager(): InputManager | null;
   getWallOcclusion(): WallOcclusionSystem | null;
+  getDistanceCull(): DistanceCullSystem | null;
   getRoom(): Room | null;
 }
 
@@ -137,6 +139,12 @@ export class ClientUpdateLoop {
       const wallOcclusion = this.deps.getWallOcclusion();
       if (wallOcclusion && debug.wallOcclusion) {
         wallOcclusion.update(pos.x, pos.z);
+      }
+
+      // Distance culling
+      const distanceCull = this.deps.getDistanceCull();
+      if (distanceCull) {
+        distanceCull.update(pos.x, pos.z);
       }
 
       // Fog of war

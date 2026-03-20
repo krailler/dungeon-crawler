@@ -51,6 +51,7 @@ import { ClientLootBag } from "../entities/ClientLootBag";
 import { CharacterLoaderRegistry } from "../entities/CharacterLoaderRegistry";
 import { InputManager } from "./InputManager";
 import { WallOcclusionSystem } from "../systems/WallOcclusionSystem";
+import { DistanceCullSystem } from "../systems/DistanceCullSystem";
 import { FogOfWarSystem } from "../systems/FogOfWarSystem";
 import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
@@ -105,6 +106,7 @@ export class StateSync {
   lootBags: Map<string, ClientLootBag> = new Map();
   inputManager: InputManager | null = null;
   wallOcclusion: WallOcclusionSystem | null = null;
+  distanceCull: DistanceCullSystem | null = null;
   localSessionId: string = "";
 
   private deps: StateSyncDeps;
@@ -219,6 +221,8 @@ export class StateSync {
           this.inputManager = null;
           this.wallOcclusion?.dispose();
           this.wallOcclusion = null;
+          this.distanceCull?.dispose();
+          this.distanceCull = null;
           // Clean up loot bags (server clears them on restart)
           for (const bag of this.lootBags.values()) bag.dispose();
           this.lootBags.clear();
@@ -378,8 +382,17 @@ export class StateSync {
                 this.deps.dungeonRenderer.getWallDecoMap(),
               );
 
-              // Tell fog of war where spawn is (expanded visibility near spawn)
+              // Distance-based geometry culling (disable far floor/wall meshes)
               const spawnPos = this.deps.dungeonRenderer.getSpawnWorldPosition(tileMap);
+              const initPos = spawnPos ?? new Vector3(0, 0, 0);
+              this.distanceCull = new DistanceCullSystem(
+                this.deps.dungeonRenderer.getFloorRoots(),
+                this.deps.dungeonRenderer.getWallDecoRoots(),
+                initPos.x,
+                initPos.z,
+              );
+
+              // Tell fog of war where spawn is (expanded visibility near spawn)
               if (spawnPos) {
                 this.deps.fogOfWar.setSpawnPosition(spawnPos.x, spawnPos.z);
               }
@@ -1036,5 +1049,7 @@ export class StateSync {
     this.inputManager = null;
     this.wallOcclusion?.dispose();
     this.wallOcclusion = null;
+    this.distanceCull?.dispose();
+    this.distanceCull = null;
   }
 }
