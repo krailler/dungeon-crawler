@@ -517,11 +517,13 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         this.state.creatures as unknown as Map<string, CreatureState>,
       );
       if (result) {
-        client.send(MessageType.SKILL_COOLDOWN, {
-          skillId: result.skillId,
-          duration: result.duration,
-          remaining: result.remaining,
-        });
+        for (const event of result) {
+          client.send(MessageType.SKILL_COOLDOWN, {
+            skillId: event.skillId,
+            duration: event.duration,
+            remaining: event.remaining,
+          });
+        }
 
         const skillDef = getSkillDef(data.skillId);
         if (skillDef) {

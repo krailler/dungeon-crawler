@@ -33,6 +33,7 @@ import type { CreatureState } from "../state/CreatureState";
 import {
   ATTACK_ANIM_DURATION,
   DAMAGE_DELAY,
+  GCD_DURATION,
   computeDamage,
   LifeState,
   angleBetween,
@@ -197,15 +198,15 @@ export class CombatSystem {
   // ── Active skill usage ───────────────────────────────────────────────────
 
   /**
-   * Attempt to use an active skill. Returns a SkillCooldownEvent if the skill
-   * was successfully activated, or null if it failed (on cooldown, dead, etc.).
+   * Attempt to use an active skill. Returns an array of SkillCooldownEvents
+   * (the used skill + any GCD-affected skills), or null if it failed.
    */
   useSkill(
     sessionId: string,
     skillId: string,
     player: PlayerState,
     creatures: Map<string, CreatureState>,
-  ): SkillCooldownEvent | null {
+  ): SkillCooldownEvent[] | null {
     const combat = this.playerCooldowns.get(sessionId);
     if (!combat) return null;
     if (player.lifeState !== LifeState.ALIVE) return null;
@@ -231,7 +232,7 @@ export class CombatSystem {
       combat.skillCooldowns.set(skillId, cooldown);
       player.animState = def.animState;
       combat.animTimer = ATTACK_ANIM_DURATION;
-      return { sessionId, skillId, duration: cooldown, remaining: cooldown };
+      return this.applyGcd(combat, sessionId, skillId, cooldown, player);
     }
 
     // ── AoE damage skill (aoeRange > 0) — no specific target needed ──
@@ -240,7 +241,7 @@ export class CombatSystem {
       player.animState = def.animState;
       combat.animTimer = ATTACK_ANIM_DURATION;
       combat.attackCooldown = player.attackCooldown;
-      return { sessionId, skillId, duration: cooldown, remaining: cooldown };
+      return this.applyGcd(combat, sessionId, skillId, cooldown, player);
     }
 
     // ── Single-target damage skill — needs enemy target ──
@@ -266,12 +267,44 @@ export class CombatSystem {
     // Reset auto-attack cooldown so skill doesn't "waste" the next auto
     combat.attackCooldown = player.attackCooldown;
 
-    return {
-      sessionId,
-      skillId,
-      duration: cooldown,
-      remaining: cooldown,
-    };
+    return this.applyGcd(combat, sessionId, skillId, cooldown, player);
+  }
+
+  /**
+   * Apply Global Cooldown: set GCD_DURATION on all other active (non-passive)
+   * skills that don't already have a longer cooldown. Returns the full list of
+   * cooldown events to send to the client.
+   */
+  private applyGcd(
+    combat: PlayerCombat,
+    sessionId: string,
+    usedSkillId: string,
+    usedCooldown: number,
+    player: PlayerState,
+  ): SkillCooldownEvent[] {
+    const events: SkillCooldownEvent[] = [
+      { sessionId, skillId: usedSkillId, duration: usedCooldown, remaining: usedCooldown },
+    ];
+
+    // Apply GCD to all other non-passive skills the player has
+    for (const otherSkillId of player.skills as Iterable<string>) {
+      if (otherSkillId === usedSkillId) continue;
+      const otherDef = getSkillDef(otherSkillId);
+      if (!otherDef || otherDef.passive) continue;
+
+      const currentCd = combat.skillCooldowns.get(otherSkillId) ?? 0;
+      if (currentCd < GCD_DURATION) {
+        combat.skillCooldowns.set(otherSkillId, GCD_DURATION);
+        events.push({
+          sessionId,
+          skillId: otherSkillId,
+          duration: GCD_DURATION,
+          remaining: GCD_DURATION,
+        });
+      }
+    }
+
+    return events;
   }
 
   /** Get remaining cooldown for a skill (0 if not on cooldown) */
