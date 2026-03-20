@@ -193,6 +193,7 @@
     "goldGained": "+{{amount}} oro de {{enemy}}!",
     "itemPickup": "+{{amount}} {{item}}",
     "otherItemPickup": "{{player}} recogió {{amount}} {{item}}",
+    "transientDrop": "{{name}} soltó {{amount}}× {{item}}.",
     "levelUp": "¡{{name}} alcanzó el nivel {{level}}!",
     "levelUpStatPoint": "+1 punto de atributo. Tienes {{total}} por asignar.",
     "levelUpTalentPoint": "+1 punto de talento. Tienes {{total}} por asignar.",

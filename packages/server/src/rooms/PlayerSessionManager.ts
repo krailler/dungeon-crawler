@@ -15,6 +15,7 @@ import { getItemDef } from "../items/ItemRegistry";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
+import { LootBagState } from "../state/LootBagState";
 import {
   TileType,
   TILE_SIZE,
@@ -130,7 +131,7 @@ export class PlayerSessionManager {
 
       // Clean up old session references (don't notify — player is being migrated, not removed)
       this.clearReconnectTimers(oldSessionId);
-      this.removePlayerFromAllSystems(oldSessionId, false);
+      this.removePlayerFromAllSystems(oldSessionId, false, false);
 
       // Revive the player under the new session
       existingPlayer.online = true;
@@ -446,7 +447,54 @@ export class PlayerSessionManager {
     this.kickedSessions.add(sessionId);
   }
 
-  removePlayerFromAllSystems(sessionId: string, notify: boolean = true): void {
+  /**
+   * Drop all transient items (e.g. dungeon key) from the player's inventory
+   * as a loot bag at their current position, so other players can pick them up.
+   */
+  private dropTransientItems(player: PlayerState): void {
+    const bag = new LootBagState();
+    let slotIndex = 0;
+    const toRemove: string[] = [];
+
+    player.inventory.forEach((slot, key) => {
+      const def = getItemDef(slot.itemId);
+      if (def?.transient) {
+        const lootSlot = new InventorySlotState();
+        lootSlot.itemId = slot.itemId;
+        lootSlot.quantity = slot.quantity;
+        bag.items.set(String(slotIndex++), lootSlot);
+        toRemove.push(key);
+      }
+    });
+
+    for (const key of toRemove) player.inventory.delete(key);
+
+    if (bag.items.size > 0) {
+      bag.x = player.x;
+      bag.z = player.z;
+      this.bridge.state.lootBags.set(`drop_${player.characterName}_${Date.now()}`, bag);
+      this.log.info(
+        { player: player.characterName, items: slotIndex },
+        "Dropped transient items as loot bag",
+      );
+      // Notify all players about the dropped items
+      bag.items.forEach((slot) => {
+        this.bridge.chatSystem.broadcastSystemI18n(
+          "chat.transientDrop",
+          { name: player.characterName, item: `[item:${slot.itemId}]`, amount: slot.quantity },
+          `${player.characterName} dropped ${slot.quantity}× ${slot.itemId}.`,
+        );
+      });
+    }
+  }
+
+  removePlayerFromAllSystems(
+    sessionId: string,
+    notify: boolean = true,
+    dropTransient: boolean = true,
+  ): void {
+    const player = this.bridge.state.players.get(sessionId);
+    if (player && dropTransient) this.dropTransientItems(player);
     this.bridge.state.players.delete(sessionId);
     this.bridge.combatSystem.removePlayer(sessionId);
     this.bridge.aiSystem.removePlayer(sessionId);
