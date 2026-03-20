@@ -4,7 +4,13 @@ import { eq, and, notInArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
 import type { DbTransaction } from "../db/database";
-import { characters, characterInventory, characterSkills, characterTalents } from "../db/schema";
+import {
+  characters,
+  characterInventory,
+  characterConsumableBar,
+  characterSkills,
+  characterTalents,
+} from "../db/schema";
 import { getItemDef } from "../items/ItemRegistry";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
@@ -16,6 +22,7 @@ import {
   MessageType,
   TutorialStep,
   GateType,
+  MAX_CONSUMABLE_BAR_SLOTS,
 } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import { getClassDef } from "../classes/ClassRegistry";
@@ -181,9 +188,10 @@ export class PlayerSessionManager {
     // Compute an initial hash so early disconnects don't skip saves
     this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-    // Load inventory + skills + talents from DB before computing stats
+    // Load inventory + consumable bar + skills + talents from DB before computing stats
     await Promise.all([
       this.loadInventory(characterId, player),
+      this.loadConsumableBar(characterId, player),
       this.loadCharacterSkills(characterId, player),
       this.loadCharacterTalents(characterId, player),
     ]);
@@ -574,6 +582,7 @@ export class PlayerSessionManager {
       .where(eq(characters.id, characterId));
 
     await this.saveInventoryTx(tx, characterId, player);
+    await this.saveConsumableBarTx(tx, characterId, player);
     await this.saveSkillsTx(tx, characterId, player);
     await this.saveTalentsTx(tx, characterId, player);
   }
@@ -582,9 +591,10 @@ export class PlayerSessionManager {
     const { gold, xp, level, strength, vitality, agility, statPoints, talentPoints } = player;
     const tut = [...player.tutorialsCompleted].sort().join(",");
     const inv = this.buildInventoryHash(player);
+    const cbar = this.buildConsumableBarHash(player);
     const sk = this.buildSkillsHash(player);
     const tal = this.buildTalentsHash(player);
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${talentPoints}:${tut}:${inv}:${sk}:${tal}`;
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${talentPoints}:${tut}:${inv}:${cbar}:${sk}:${tal}`;
   }
 
   private buildInventoryHash(player: PlayerState): string {
@@ -667,6 +677,90 @@ export class PlayerSessionManager {
       // Inventory is empty — delete all
       await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
     }
+  }
+
+  private async loadConsumableBar(characterId: string, player: PlayerState): Promise<void> {
+    // Initialize with empty slots
+    for (let i = 0; i < MAX_CONSUMABLE_BAR_SLOTS; i++) {
+      player.consumableBar.push("");
+    }
+
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(characterConsumableBar)
+      .where(eq(characterConsumableBar.characterId, characterId));
+
+    let loaded = 0;
+    for (const row of rows) {
+      if (row.slotIndex < 0 || row.slotIndex >= MAX_CONSUMABLE_BAR_SLOTS) continue;
+      const itemDef = getItemDef(row.itemId);
+      if (!itemDef || !itemDef.consumable || itemDef.transient) {
+        this.log.warn(
+          { characterId, itemId: row.itemId },
+          "Consumable bar references invalid item — skipping",
+        );
+        continue;
+      }
+      player.consumableBar[row.slotIndex] = row.itemId;
+      loaded++;
+    }
+    if (loaded > 0) {
+      this.log.debug({ characterId, slots: loaded }, "Consumable bar loaded");
+    }
+  }
+
+  private async saveConsumableBarTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
+    const activeSlots: number[] = [];
+    const rows: { characterId: string; slotIndex: number; itemId: string }[] = [];
+    for (let i = 0; i < player.consumableBar.length; i++) {
+      const itemId = player.consumableBar[i];
+      if (itemId) {
+        activeSlots.push(i);
+        rows.push({ characterId, slotIndex: i, itemId });
+      }
+    }
+
+    if (rows.length > 0) {
+      await tx
+        .insert(characterConsumableBar)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [characterConsumableBar.characterId, characterConsumableBar.slotIndex],
+          set: {
+            itemId: sql`excluded.item_id`,
+          },
+        });
+    }
+
+    if (activeSlots.length > 0) {
+      await tx
+        .delete(characterConsumableBar)
+        .where(
+          and(
+            eq(characterConsumableBar.characterId, characterId),
+            notInArray(characterConsumableBar.slotIndex, activeSlots),
+          ),
+        );
+    } else {
+      await tx
+        .delete(characterConsumableBar)
+        .where(eq(characterConsumableBar.characterId, characterId));
+    }
+  }
+
+  private buildConsumableBarHash(player: PlayerState): string {
+    const parts: string[] = [];
+    for (let i = 0; i < player.consumableBar.length; i++) {
+      if (player.consumableBar[i]) {
+        parts.push(`${i}=${player.consumableBar[i]}`);
+      }
+    }
+    return parts.join("|");
   }
 
   private async loadCharacterSkills(characterId: string, player: PlayerState): Promise<void> {

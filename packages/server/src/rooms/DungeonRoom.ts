@@ -29,7 +29,7 @@
  *   a player moves within range. Checked every AOI_CHECK_TICKS.
  *
  * Message handlers:
- *   MOVE, SPRINT, SKILL_USE, SKILL_TOGGLE, ITEM_USE, ITEM_SWAP,
+ *   MOVE, SPRINT, SKILL_USE, SKILL_TOGGLE, ITEM_USE, ITEM_SWAP, CONSUMABLE_BAR_ASSIGN/UNASSIGN/SWAP,
  *   STAT_ALLOCATE, TALENT_ALLOCATE, CHAT_SEND, GATE_INTERACT,
  *   SET_TARGET, REVIVE_START, EXIT_INTERACT, LOOT_TAKE,
  *   PROMOTE_LEADER, PARTY_KICK, TUTORIAL_DISMISS, ADMIN_RESTART,
@@ -104,6 +104,7 @@ import {
   TALENT_RESET_GOLD_PER_LEVEL,
   STAT_RESET_GOLD_PER_LEVEL,
   computeDamage,
+  MAX_CONSUMABLE_BAR_SLOTS,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -118,6 +119,8 @@ import type {
   AdminDebugInfoMessage,
   ItemUseMessage,
   ItemSwapMessage,
+  ItemDestroyMessage,
+  ItemSplitMessage,
   ItemDefsRequestMessage,
   EffectDefsRequestMessage,
   ClassDefsRequestMessage,
@@ -126,6 +129,9 @@ import type {
   LootTakeMessage,
   SetTargetMessage,
   ReviveStartMessage,
+  ConsumableBarAssignMessage,
+  ConsumableBarUnassignMessage,
+  ConsumableBarSwapMessage,
 } from "@dungeon/shared";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
@@ -690,6 +696,87 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         return def?.maxStack ?? 1;
       });
     });
+
+    // Item destroy: remove an inventory slot entirely
+    this.onMessage(MessageType.ITEM_DESTROY, (client: Client, data: ItemDestroyMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (typeof data.slot !== "number") return;
+      const key = String(data.slot);
+      const slot = player.inventory.get(key);
+      if (!slot) return;
+      const def = getItemDef(slot.itemId);
+      if (def?.transient) return; // transient items cannot be destroyed
+      player.inventory.delete(key);
+    });
+
+    // Item split: move partial quantity from one slot to another
+    this.onMessage(MessageType.ITEM_SPLIT, (client: Client, data: ItemSplitMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (
+        typeof data.from !== "number" ||
+        typeof data.to !== "number" ||
+        typeof data.quantity !== "number"
+      )
+        return;
+      player.splitSlot(data.from, data.to, data.quantity, (itemId) => {
+        const def = getItemDef(itemId);
+        return def?.maxStack ?? 1;
+      });
+    });
+
+    // Consumable bar: assign an item to a slot
+    this.onMessage(
+      MessageType.CONSUMABLE_BAR_ASSIGN,
+      (client: Client, data: ConsumableBarAssignMessage) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player) return;
+        if (typeof data.slot !== "number" || typeof data.itemId !== "string") return;
+        if (data.slot < 0 || data.slot >= MAX_CONSUMABLE_BAR_SLOTS) return;
+
+        const itemDef = getItemDef(data.itemId);
+        if (!itemDef || !itemDef.consumable || itemDef.transient) return;
+
+        // If already assigned in another slot, clear it (no duplicates)
+        for (let i = 0; i < player.consumableBar.length; i++) {
+          if (player.consumableBar[i] === data.itemId) {
+            player.consumableBar[i] = "";
+          }
+        }
+
+        player.consumableBar[data.slot] = data.itemId;
+      },
+    );
+
+    // Consumable bar: clear a slot
+    this.onMessage(
+      MessageType.CONSUMABLE_BAR_UNASSIGN,
+      (client: Client, data: ConsumableBarUnassignMessage) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player) return;
+        if (typeof data.slot !== "number") return;
+        if (data.slot < 0 || data.slot >= MAX_CONSUMABLE_BAR_SLOTS) return;
+
+        player.consumableBar[data.slot] = "";
+      },
+    );
+
+    // Consumable bar: swap two slots
+    this.onMessage(
+      MessageType.CONSUMABLE_BAR_SWAP,
+      (client: Client, data: ConsumableBarSwapMessage) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player) return;
+        if (typeof data.from !== "number" || typeof data.to !== "number") return;
+        if (data.from < 0 || data.from >= MAX_CONSUMABLE_BAR_SLOTS) return;
+        if (data.to < 0 || data.to >= MAX_CONSUMABLE_BAR_SLOTS) return;
+
+        const tmp = player.consumableBar[data.from];
+        player.consumableBar[data.from] = player.consumableBar[data.to];
+        player.consumableBar[data.to] = tmp;
+      },
+    );
 
     // Target selection: player selects or clears their attack target
     this.onMessage(MessageType.SET_TARGET, (client: Client, data: SetTargetMessage) => {

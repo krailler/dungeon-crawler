@@ -11,6 +11,11 @@ import type {
   StatAllocateMessage,
   ItemUseMessage,
   ItemSwapMessage,
+  ItemDestroyMessage,
+  ItemSplitMessage,
+  ConsumableBarAssignMessage,
+  ConsumableBarUnassignMessage,
+  ConsumableBarSwapMessage,
 } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
@@ -54,6 +59,7 @@ export type PartyMember = {
   autoAttackEnabled?: boolean;
   stats?: CharacterStats;
   inventory?: { slot: number; itemId: string; quantity: number }[];
+  consumableBar?: string[];
   effects?: {
     effectId: string;
     remaining: number;
@@ -329,10 +335,35 @@ export const hudStore = {
     const msg: ItemSwapMessage = { from, to };
     room.send(MessageType.ITEM_SWAP, msg);
   },
+  destroyInventorySlot(slot: number): void {
+    if (!room) return;
+    const msg: ItemDestroyMessage = { slot };
+    room.send(MessageType.ITEM_DESTROY, msg);
+  },
+  splitInventorySlot(from: number, to: number, quantity: number): void {
+    if (!room) return;
+    const msg: ItemSplitMessage = { from, to, quantity };
+    room.send(MessageType.ITEM_SPLIT, msg);
+  },
   setItemCooldown(itemId: string, duration: number): void {
     itemCooldowns.set(itemId, { duration, startedAt: Date.now() });
     rebuildSnapshot();
     emit();
+  },
+  assignConsumableBar(slot: number, itemId: string): void {
+    if (!room) return;
+    const msg: ConsumableBarAssignMessage = { slot, itemId };
+    room.send(MessageType.CONSUMABLE_BAR_ASSIGN, msg);
+  },
+  unassignConsumableBar(slot: number): void {
+    if (!room) return;
+    const msg: ConsumableBarUnassignMessage = { slot };
+    room.send(MessageType.CONSUMABLE_BAR_UNASSIGN, msg);
+  },
+  swapConsumableBarSlots(from: number, to: number): void {
+    if (!room) return;
+    const msg: ConsumableBarSwapMessage = { from, to };
+    room.send(MessageType.CONSUMABLE_BAR_SWAP, msg);
   },
 };
 

@@ -19,7 +19,7 @@ import { AnnouncementOverlay } from "./AnnouncementOverlay";
 import { TutorialHint } from "./TutorialHint";
 import { XpBar } from "./XpBar";
 import { SkillBar } from "./SkillBar";
-import { ConsumableSlots } from "./ConsumableSlots";
+import { ConsumableBar } from "./ConsumableBar";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { ActionFeedback } from "./ActionFeedback";
@@ -489,9 +489,9 @@ export const HudRoot = (): ReactNode => {
       <BuffBar />
       {/* Action feedback — floats above action bar */}
       <ActionFeedback />
-      {/* Action bar — bottom center, above XP bar: consumables + skills */}
-      <div className="pointer-events-auto absolute bottom-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3">
-        <ConsumableSlots />
+      {/* Action bar — bottom center, above XP bar: consumable bar + skill bar */}
+      <div className="pointer-events-auto absolute bottom-[52px] left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+        <ConsumableBar />
         <SkillBar />
       </div>
       {/* Stamina bar — thin bar above XP bar, only visible when draining */}

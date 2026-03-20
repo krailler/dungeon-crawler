@@ -104,6 +104,22 @@ export const characterTalents = charactersSchema.table(
   ],
 );
 
+export const characterConsumableBar = charactersSchema.table(
+  "character_consumable_bar",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    slotIndex: integer("slot_index").notNull(),
+    itemId: text("item_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_char_cbar_slot").on(table.characterId, table.slotIndex),
+    index("idx_char_cbar_char").on(table.characterId),
+  ],
+);
+
 export const characterSkills = charactersSchema.table(
   "character_skills",
   {

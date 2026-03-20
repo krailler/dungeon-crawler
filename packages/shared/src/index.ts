@@ -29,6 +29,8 @@ export type {
   DamageDealtMessage,
   ItemUseMessage,
   ItemSwapMessage,
+  ItemDestroyMessage,
+  ItemSplitMessage,
   ItemCooldownMessage,
   ItemDefsRequestMessage,
   ItemDefsResponseMessage,
@@ -47,6 +49,9 @@ export type {
   TalentDefsRequestMessage,
   TalentDefsResponseMessage,
   TalentStateMessage,
+  ConsumableBarAssignMessage,
+  ConsumableBarUnassignMessage,
+  ConsumableBarSwapMessage,
 } from "./protocol.js";
 
 export {

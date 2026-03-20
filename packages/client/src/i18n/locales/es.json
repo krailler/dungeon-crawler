@@ -102,12 +102,13 @@
     "sprint": "Esprintar",
     "chat": "Abrir Chat",
     "interact": "Interactuar",
-    "skill1": "Habilidad 1",
-    "skill2": "Habilidad 2",
-    "skill3": "Habilidad 3",
-    "skill4": "Habilidad 4",
-    "skill5": "Habilidad 5",
-    "consumable1": "Consumible",
+    "skillN": "Habilidad {{n}}",
+    "consumableN": "Consumible {{n}}",
+    "categoryGeneral": "General",
+    "categorySkills": "Habilidades",
+    "categoryConsumables": "Consumibles",
+    "categoryPanels": "Paneles",
+    "categoryCombat": "Combate",
     "characterPanel": "Personaje",
     "inventoryPanel": "Inventario",
     "talentsPanel": "Talentos",
@@ -281,7 +282,17 @@
   "inventory": {
     "title": "Inventario",
     "clickToUse": "Clic para usar",
-    "rightClickToUse": "Clic derecho para usar"
+    "rightClickToUse": "Clic derecho para usar",
+    "destroyTitle": "Destruir objeto",
+    "destroyMessage": "¿Seguro que quieres destruir este objeto? No se puede deshacer.",
+    "destroyConfirm": "Destruir",
+    "destroyCancel": "Cancelar",
+    "cannotDestroy": "Este objeto no se puede destruir",
+    "splitTitle": "Dividir pila",
+    "splitConfirm": "Dividir"
+  },
+  "consumableBar": {
+    "dragToAssign": "Arrastra un consumible aquí"
   },
   "talents": {
     "title": "Talentos",

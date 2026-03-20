@@ -31,6 +31,8 @@ export const MessageType = {
   DAMAGE_DEALT: "combat:damage",
   ITEM_USE: "item:use",
   ITEM_SWAP: "item:swap",
+  ITEM_DESTROY: "item:destroy",
+  ITEM_SPLIT: "item:split",
   ITEM_COOLDOWN: "item:cooldown",
   ACTION_FEEDBACK: "action:feedback",
   ITEM_DEFS_REQUEST: "item:defs:req",
@@ -53,6 +55,9 @@ export const MessageType = {
   TALENT_DEFS_REQUEST: "talent:defs:req",
   TALENT_DEFS_RESPONSE: "talent:defs:res",
   TALENT_STATE: "talent:state",
+  CONSUMABLE_BAR_ASSIGN: "cbar:assign",
+  CONSUMABLE_BAR_UNASSIGN: "cbar:unassign",
+  CONSUMABLE_BAR_SWAP: "cbar:swap",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -271,6 +276,22 @@ export interface ItemSwapMessage {
   to: number;
 }
 
+/** Client → Server: destroy an inventory slot */
+export interface ItemDestroyMessage {
+  /** Slot index to destroy */
+  slot: number;
+}
+
+/** Client → Server: split a stack — move `quantity` items from one slot to another */
+export interface ItemSplitMessage {
+  /** Source slot index */
+  from: number;
+  /** Destination slot index (must be empty or same itemId) */
+  to: number;
+  /** Quantity to move */
+  quantity: number;
+}
+
 /** Server → Client: item used successfully (cooldown + optional sound) */
 export interface ItemCooldownMessage {
   itemId: string;
@@ -390,6 +411,27 @@ export interface TalentStateMessage {
   allocations: { talentId: string; rank: number }[];
   /** All talent IDs available for the player's class (for client to fetch defs) */
   classTalentIds: string[];
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+
+// ── Consumable Bar ──────────────────────────────────────────────────────────
+
+/** Client → Server: assign an item to a consumable bar slot */
+export interface ConsumableBarAssignMessage {
+  slot: number;
+  itemId: string;
+}
+
+/** Client → Server: clear a consumable bar slot */
+export interface ConsumableBarUnassignMessage {
+  slot: number;
+}
+
+/** Client → Server: swap two consumable bar slots */
+export interface ConsumableBarSwapMessage {
+  from: number;
+  to: number;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

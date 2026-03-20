@@ -40,6 +40,9 @@ export class PlayerSecretState extends Schema {
   // Inventory (slot index → item+qty)
   @type({ map: InventorySlotState }) inventory = new MapSchema<InventorySlotState>();
 
+  // Consumable bar (itemId per slot, empty string = unassigned)
+  @type(["string"]) consumableBar = new ArraySchema<string>();
+
   // Role (admin/user)
   @type("string") role: RoleValue = Role.USER;
 }

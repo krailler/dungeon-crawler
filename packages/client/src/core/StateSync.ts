@@ -496,6 +496,7 @@ export class StateSync {
             stamina: secret.stamina,
             skills: Array.from(secret.skills as Iterable<string>),
             autoAttackEnabled: secret.autoAttackEnabled ?? true,
+            consumableBar: Array.from(secret.consumableBar as Iterable<string>),
             stats: localStats,
           }),
         });
@@ -511,6 +512,15 @@ export class StateSync {
           };
           $(secret).skills.onAdd(syncSkills);
           $(secret).skills.onRemove(syncSkills);
+
+          // Sync consumable bar array
+          const syncConsumableBar = (): void => {
+            const bar = Array.from(secret.consumableBar as Iterable<string>);
+            hudStore.updateMember(sessionId, { consumableBar: bar });
+          };
+          $(secret).consumableBar.onAdd(syncConsumableBar);
+          $(secret).consumableBar.onChange(syncConsumableBar);
+          $(secret).consumableBar.onRemove(syncConsumableBar);
 
           // Sync inventory MapSchema + lazy-fetch unknown item defs
           // Also handles initial inventory on join (onAdd fires for existing items)

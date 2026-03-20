@@ -179,6 +179,10 @@ export class PlayerState extends Schema {
     return this.secret.inventory;
   }
 
+  get consumableBar() {
+    return this.secret.consumableBar;
+  }
+
   /**
    * Advance one level: grant +1 stat point, +1 talent point (if >= TALENT_UNLOCK_LEVEL).
    * Caller must call recomputeStats() after to apply derived stats + full heal.
@@ -394,6 +398,49 @@ export class PlayerState extends Schema {
       fromSlot.quantity = toSlot.quantity;
       toSlot.itemId = tmpId;
       toSlot.quantity = tmpQty;
+    }
+
+    return true;
+  }
+
+  /**
+   * Split a stack: move `quantity` items from `from` slot to `to` slot.
+   * Destination must be empty or contain the same itemId with room for more.
+   */
+  splitSlot(
+    from: number,
+    to: number,
+    quantity: number,
+    maxStackLookup: (itemId: string) => number,
+  ): boolean {
+    if (from === to) return false;
+    if (from < 0 || from >= INVENTORY_MAX_SLOTS) return false;
+    if (to < 0 || to >= INVENTORY_MAX_SLOTS) return false;
+
+    const fromSlot = this.inventory.get(String(from));
+    if (!fromSlot) return false;
+    if (quantity <= 0 || quantity >= fromSlot.quantity) return false;
+
+    const toSlot = this.inventory.get(String(to));
+
+    if (!toSlot) {
+      // Move to empty slot
+      const newSlot = new InventorySlotState();
+      newSlot.itemId = fromSlot.itemId;
+      newSlot.quantity = quantity;
+      this.inventory.set(String(to), newSlot);
+      fromSlot.quantity -= quantity;
+    } else if (toSlot.itemId === fromSlot.itemId) {
+      // Same item — add to existing stack if room
+      const maxStack = maxStackLookup(fromSlot.itemId);
+      const canAdd = maxStack - toSlot.quantity;
+      if (canAdd <= 0) return false;
+      const toMove = Math.min(quantity, canAdd);
+      toSlot.quantity += toMove;
+      fromSlot.quantity -= toMove;
+    } else {
+      // Different item in destination — cannot split here
+      return false;
     }
 
     return true;

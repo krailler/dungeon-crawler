@@ -199,6 +199,15 @@ export const ActionSlot = ({
   const cdTextSize = size === "md" ? "text-[14px]" : "text-[11px]";
 
   const [hovered, setHovered] = useState(false);
+
+  // Close tooltip when any drag starts anywhere (event bubbles from draggable ancestors)
+  useEffect(() => {
+    if (!hovered) return;
+    const close = (): void => setHovered(false);
+    document.addEventListener("dragstart", close);
+    return () => document.removeEventListener("dragstart", close);
+  }, [hovered]);
+
   const [showReady, setShowReady] = useState(false);
   const [showClick, setShowClick] = useState(false);
   const prevCountRef = useRef(activationCount);

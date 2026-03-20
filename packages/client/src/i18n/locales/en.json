@@ -105,12 +105,13 @@
     "sprint": "Sprint",
     "chat": "Open Chat",
     "interact": "Interact",
-    "skill1": "Skill 1",
-    "skill2": "Skill 2",
-    "skill3": "Skill 3",
-    "skill4": "Skill 4",
-    "skill5": "Skill 5",
-    "consumable1": "Consumable",
+    "skillN": "Skill {{n}}",
+    "consumableN": "Consumable {{n}}",
+    "categoryGeneral": "General",
+    "categorySkills": "Skills",
+    "categoryConsumables": "Consumables",
+    "categoryPanels": "Panels",
+    "categoryCombat": "Combat",
     "characterPanel": "Character",
     "inventoryPanel": "Inventory",
     "talentsPanel": "Talents",
@@ -281,7 +282,17 @@
   "inventory": {
     "title": "Inventory",
     "clickToUse": "Click to use",
-    "rightClickToUse": "Right-click to use"
+    "rightClickToUse": "Right-click to use",
+    "destroyTitle": "Destroy Item",
+    "destroyMessage": "Are you sure you want to destroy this item? This cannot be undone.",
+    "destroyConfirm": "Destroy",
+    "destroyCancel": "Cancel",
+    "cannotDestroy": "This item cannot be destroyed",
+    "splitTitle": "Split Stack",
+    "splitConfirm": "Split"
+  },
+  "consumableBar": {
+    "dragToAssign": "Drag a consumable here"
   },
   "talents": {
     "title": "Talents",

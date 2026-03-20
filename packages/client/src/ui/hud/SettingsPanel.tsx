@@ -94,25 +94,80 @@ const AudioTab = (): ReactNode => {
   );
 };
 
-// ── Keybinding action labels (i18n keys) ────────────────────────────────────
+// ── Keybinding categories ────────────────────────────────────────────────────
 
-const ACTION_ORDER: { action: BindableActionValue; i18nKey: string }[] = [
-  { action: BindableAction.SPRINT, i18nKey: "settings.sprint" },
-  { action: BindableAction.CHAT, i18nKey: "settings.chat" },
-  { action: BindableAction.INTERACT, i18nKey: "settings.interact" },
-  { action: BindableAction.SKILL_1, i18nKey: "settings.skill1" },
-  { action: BindableAction.SKILL_2, i18nKey: "settings.skill2" },
-  { action: BindableAction.SKILL_3, i18nKey: "settings.skill3" },
-  { action: BindableAction.SKILL_4, i18nKey: "settings.skill4" },
-  { action: BindableAction.SKILL_5, i18nKey: "settings.skill5" },
-  { action: BindableAction.CONSUMABLE_1, i18nKey: "settings.consumable1" },
-  { action: BindableAction.CHARACTER, i18nKey: "settings.characterPanel" },
-  { action: BindableAction.INVENTORY, i18nKey: "settings.inventoryPanel" },
-  { action: BindableAction.TALENTS, i18nKey: "settings.talentsPanel" },
-  { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
-  { action: BindableAction.FULLSCREEN, i18nKey: "settings.fullscreen" },
-  { action: BindableAction.TAB_TARGET, i18nKey: "settings.tabTarget" },
-  { action: BindableAction.REVIVE, i18nKey: "settings.revive" },
+type KeybindingEntry = {
+  action: BindableActionValue;
+  i18nKey: string;
+  i18nParams?: Record<string, number>;
+};
+
+type KeybindingCategory = {
+  labelKey: string;
+  actions: KeybindingEntry[];
+};
+
+const KEYBINDING_CATEGORIES: KeybindingCategory[] = [
+  {
+    labelKey: "settings.categoryGeneral",
+    actions: [
+      { action: BindableAction.SPRINT, i18nKey: "settings.sprint" },
+      { action: BindableAction.CHAT, i18nKey: "settings.chat" },
+      { action: BindableAction.INTERACT, i18nKey: "settings.interact" },
+      { action: BindableAction.FULLSCREEN, i18nKey: "settings.fullscreen" },
+    ],
+  },
+  {
+    labelKey: "settings.categorySkills",
+    actions: [
+      { action: BindableAction.SKILL_1, i18nKey: "settings.skillN", i18nParams: { n: 1 } },
+      { action: BindableAction.SKILL_2, i18nKey: "settings.skillN", i18nParams: { n: 2 } },
+      { action: BindableAction.SKILL_3, i18nKey: "settings.skillN", i18nParams: { n: 3 } },
+      { action: BindableAction.SKILL_4, i18nKey: "settings.skillN", i18nParams: { n: 4 } },
+      { action: BindableAction.SKILL_5, i18nKey: "settings.skillN", i18nParams: { n: 5 } },
+    ],
+  },
+  {
+    labelKey: "settings.categoryConsumables",
+    actions: [
+      {
+        action: BindableAction.CONSUMABLE_1,
+        i18nKey: "settings.consumableN",
+        i18nParams: { n: 1 },
+      },
+      {
+        action: BindableAction.CONSUMABLE_2,
+        i18nKey: "settings.consumableN",
+        i18nParams: { n: 2 },
+      },
+      {
+        action: BindableAction.CONSUMABLE_3,
+        i18nKey: "settings.consumableN",
+        i18nParams: { n: 3 },
+      },
+      {
+        action: BindableAction.CONSUMABLE_4,
+        i18nKey: "settings.consumableN",
+        i18nParams: { n: 4 },
+      },
+    ],
+  },
+  {
+    labelKey: "settings.categoryCombat",
+    actions: [
+      { action: BindableAction.TAB_TARGET, i18nKey: "settings.tabTarget" },
+      { action: BindableAction.REVIVE, i18nKey: "settings.revive" },
+    ],
+  },
+  {
+    labelKey: "settings.categoryPanels",
+    actions: [
+      { action: BindableAction.CHARACTER, i18nKey: "settings.characterPanel" },
+      { action: BindableAction.INVENTORY, i18nKey: "settings.inventoryPanel" },
+      { action: BindableAction.TALENTS, i18nKey: "settings.talentsPanel" },
+      { action: BindableAction.MINIMAP, i18nKey: "settings.minimapPanel" },
+    ],
+  },
 ];
 
 // ── Keybindings tab ─────────────────────────────────────────────────────────
@@ -150,36 +205,45 @@ const KeybindingsTab = (): ReactNode => {
 
   return (
     <div className="flex flex-col gap-1">
-      {ACTION_ORDER.map(({ action, i18nKey }) => {
-        const isCapturing = capturing === action;
-        return (
-          <button
-            key={action}
-            onClick={() => {
-              playUiSfx("ui_click");
-              setCapturing(isCapturing ? null : action);
-            }}
-            className={[
-              "flex items-center justify-between rounded px-2 py-1.5 text-xs transition-colors",
-              isCapturing
-                ? "bg-amber-500/20 text-amber-300"
-                : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100",
-            ].join(" ")}
-          >
-            <span>{t(i18nKey)}</span>
-            <kbd
-              className={[
-                "min-w-[32px] rounded border px-1.5 py-0.5 text-center text-[11px] font-mono",
-                isCapturing
-                  ? "animate-pulse border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-600/40 bg-slate-800/80 text-slate-400",
-              ].join(" ")}
-            >
-              {isCapturing ? t("settings.pressKey") : displayKeyName(settings.keybindings[action])}
-            </kbd>
-          </button>
-        );
-      })}
+      {KEYBINDING_CATEGORIES.map((category) => (
+        <div key={category.labelKey}>
+          <div className="mt-2 first:mt-0 mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            {t(category.labelKey)}
+          </div>
+          {category.actions.map(({ action, i18nKey, i18nParams }) => {
+            const isCapturing = capturing === action;
+            return (
+              <button
+                key={action}
+                onClick={() => {
+                  playUiSfx("ui_click");
+                  setCapturing(isCapturing ? null : action);
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors",
+                  isCapturing
+                    ? "bg-amber-500/20 text-amber-300"
+                    : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100",
+                ].join(" ")}
+              >
+                <span>{t(i18nKey, i18nParams)}</span>
+                <kbd
+                  className={[
+                    "min-w-[32px] rounded border px-1.5 py-0.5 text-center text-[11px] font-mono",
+                    isCapturing
+                      ? "animate-pulse border-amber-500/50 bg-amber-500/10 text-amber-300"
+                      : "border-slate-600/40 bg-slate-800/80 text-slate-400",
+                  ].join(" ")}
+                >
+                  {isCapturing
+                    ? t("settings.pressKey")
+                    : displayKeyName(settings.keybindings[action])}
+                </kbd>
+              </button>
+            );
+          })}
+        </div>
+      ))}
 
       <div className="mt-2 border-t border-slate-600/30 pt-2">
         <MenuButton onClick={() => settingsStore.resetKeybindings()} className="w-full">

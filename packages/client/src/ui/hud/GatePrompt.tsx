@@ -46,7 +46,7 @@ export const GateHint = (): ReactNode => {
   if (!gate.showInteractHint) return null;
 
   return (
-    <div className="pointer-events-none absolute bottom-32 left-1/2 -translate-x-1/2">
+    <div className="pointer-events-none absolute bottom-44 left-1/2 -translate-x-1/2">
       <div className="animate-pulse rounded-xl border border-amber-400/40 bg-slate-900/90 px-5 py-2.5 text-sm font-medium text-amber-300 shadow-lg shadow-black/40 backdrop-blur">
         <kbd className="mr-2 rounded bg-amber-400/20 px-2 py-0.5 text-xs font-bold text-amber-200">
           {displayKeyName(settings.keybindings.interact)}
