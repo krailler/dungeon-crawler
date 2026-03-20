@@ -20,6 +20,7 @@ import { feedbackStore } from "../stores/feedbackStore";
 import { playUiSfx } from "../../audio/uiSfx";
 import { ItemIcon } from "../components/ItemIcon";
 import { EMPTY_DRAG_IMG } from "../utils/dragGhost";
+import { insertItemLink } from "./itemLinkUtils";
 
 // ── InventorySlot ────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ type InventorySlotProps = {
   onDrop: (index: number, shiftKey: boolean) => void;
   onDragEnd: () => void;
   onContextMenu: (itemId: string) => void;
+  onShiftClick: (itemId: string) => void;
 };
 
 const InventorySlot = memo(
@@ -50,6 +52,7 @@ const InventorySlot = memo(
     onDrop,
     onDragEnd,
     onContextMenu,
+    onShiftClick,
   }: InventorySlotProps): ReactNode => {
     const { t } = useTranslation();
     const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
@@ -93,6 +96,16 @@ const InventorySlot = memo(
       [index, onDrop],
     );
 
+    const handleClick = useCallback(
+      (e: React.MouseEvent) => {
+        if (e.shiftKey && slot && def) {
+          e.preventDefault();
+          onShiftClick(slot.itemId);
+        }
+      },
+      [slot, def, onShiftClick],
+    );
+
     const handleContextMenu = useCallback(
       (e: React.MouseEvent) => {
         e.preventDefault();
@@ -106,6 +119,7 @@ const InventorySlot = memo(
     return (
       <div
         draggable={!!slot}
+        onClick={handleClick}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragLeave={onDragLeave}
@@ -439,6 +453,11 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
     hudStore.useItem(itemId);
   }, []);
 
+  const handleShiftClick = useCallback((itemId: string) => {
+    playUiSfx("ui_click");
+    insertItemLink(itemId);
+  }, []);
+
   const dragSlot = dragSourceIndex !== null ? slots[dragSourceIndex] : null;
 
   return (
@@ -465,6 +484,7 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
               onContextMenu={handleContextMenu}
+              onShiftClick={handleShiftClick}
             />
           ))}
         </div>

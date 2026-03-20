@@ -62,7 +62,7 @@ import { itemDefStore } from "../ui/stores/itemDefStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
 import { settingsStore } from "../ui/stores/settingsStore";
 import type { GraphicsSettings } from "../ui/stores/settingsStore";
-import { setChatSendFn, clearChatSendFn } from "../ui/hud/ChatPanel";
+import { setChatSendFn, clearChatSendFn, resolveItemLinksToText } from "../ui/hud/itemLinkUtils";
 import { t } from "../i18n/i18n";
 
 export class ClientGame {
@@ -324,7 +324,7 @@ export class ClientGame {
           for (const [sessionId, clientPlayer] of this.stateSync.players) {
             const member = hudStore.getSnapshot().members.find((m) => m.id === sessionId);
             if (member && member.name === entry.sender) {
-              clientPlayer.showChatBubble(entry.text);
+              clientPlayer.showChatBubble(resolveItemLinksToText(entry.text));
               if (sessionId === this.stateSync.localSessionId) isLocalMessage = true;
               break;
             }

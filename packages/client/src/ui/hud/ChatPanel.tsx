@@ -4,21 +4,20 @@ import { Trans, useTranslation } from "react-i18next";
 import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
+import { itemDefStore } from "../stores/itemDefStore";
+import { ItemIcon } from "../components/ItemIcon";
 import { CHAT_FADE_MS } from "@dungeon/shared";
 import type { CommandInfo } from "@dungeon/shared";
 import { settingsStore } from "../stores/settingsStore";
-
-// ── Send callback (set from ClientGame) ─────────────────────────────────────
-
-let sendChatFn: ((text: string) => void) | null = null;
-
-export function setChatSendFn(fn: (text: string) => void): void {
-  sendChatFn = fn;
-}
-
-export function clearChatSendFn(): void {
-  sendChatFn = null;
-}
+import { playUiSfx } from "../../audio/uiSfx";
+import { t as tFn } from "../../i18n/i18n";
+import {
+  ITEM_LINK_RE,
+  chatSend,
+  setInsertItemLinkFn,
+  clearInsertItemLinkFn,
+} from "./itemLinkUtils";
+import { getRarityStyle } from "../utils/rarityColors";
 
 // ── Autocomplete mode detection ─────────────────────────────────────────────
 
@@ -71,6 +70,152 @@ function getAutocompleteMode(
   return null;
 }
 
+/** Parse text and replace [item:id] with ReactNode item links */
+function parseItemLinks(
+  text: string,
+  onClickLink: (itemId: string, rect: DOMRect) => void,
+): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  ITEM_LINK_RE.lastIndex = 0;
+
+  while ((match = ITEM_LINK_RE.exec(text)) !== null) {
+    // Text before the link
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const itemId = match[1];
+    parts.push(
+      <ItemLinkSpan key={`${itemId}_${match.index}`} itemId={itemId} onClick={onClickLink} />,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+/** Inline item link rendered in chat messages */
+const ItemLinkSpan = ({
+  itemId,
+  onClick,
+}: {
+  itemId: string;
+  onClick: (itemId: string, rect: DOMRect) => void;
+}): ReactNode => {
+  const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
+  const def = itemDefs.get(itemId);
+  const spanRef = useRef<HTMLSpanElement>(null);
+
+  // Ensure item def is loaded
+  useEffect(() => {
+    itemDefStore.ensureLoaded([itemId]);
+  }, [itemId]);
+
+  const { t } = useTranslation();
+  const colorClass = def ? getRarityStyle(def.rarity).text : "text-slate-400";
+  const displayName = def ? t(def.name, { defaultValue: def.name }) : itemId;
+
+  return (
+    <span
+      ref={spanRef}
+      className={`cursor-pointer font-semibold hover:underline ${colorClass}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        playUiSfx("ui_click");
+        const rect = spanRef.current?.getBoundingClientRect();
+        if (rect) onClick(itemId, rect);
+      }}
+    >
+      [{displayName}]
+    </span>
+  );
+};
+
+// ── Item link tooltip popup ──────────────────────────────────────────────────
+
+const ItemLinkTooltip = ({
+  itemId,
+  anchorRect,
+  onClose,
+}: {
+  itemId: string;
+  anchorRect: DOMRect;
+  onClose: () => void;
+}): ReactNode => {
+  const { t } = useTranslation();
+  const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
+  const def = itemDefs.get(itemId);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Close on click outside or Escape (use "click" not "mousedown" to avoid
+  // racing with the ItemLinkSpan onClick that toggles the tooltip)
+  useEffect(() => {
+    const handleClick = (e: MouseEvent): void => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") onClose();
+    };
+    // Defer listener registration so the opening click doesn't immediately close
+    const timer = setTimeout(() => {
+      document.addEventListener("click", handleClick);
+    }, 0);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose]);
+
+  if (!def) return null;
+
+  const rarityColor = getRarityStyle(def.rarity).text;
+
+  // Position above the anchor
+  const style: React.CSSProperties = {
+    left: anchorRect.left,
+    bottom: window.innerHeight - anchorRect.top + 4,
+  };
+
+  return (
+    <div
+      ref={tooltipRef}
+      className="pointer-events-auto fixed z-[400] w-56 rounded-lg border border-slate-600/50 bg-slate-900/95 p-3 shadow-xl backdrop-blur"
+      style={style}
+    >
+      <div className="flex items-center gap-2">
+        {def.icon && (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-slate-600/40 bg-slate-800/80">
+            <ItemIcon iconId={def.icon} />
+          </div>
+        )}
+        <div>
+          <div className={`text-sm font-bold ${rarityColor}`}>
+            {t(def.name, { defaultValue: def.name })}
+          </div>
+          {def.rarity && def.rarity !== "common" && (
+            <div className="text-[10px] capitalize text-slate-500">{def.rarity}</div>
+          )}
+        </div>
+      </div>
+      {def.description && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+          {t(def.description, { ...def.effectParams, defaultValue: def.description })}
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ── Message row ─────────────────────────────────────────────────────────────
 
 const categoryStyles: Record<string, { wrapper: string; prefix: string }> = {
@@ -101,7 +246,15 @@ const senderColor = (role?: string): string => {
   return "text-sky-400";
 };
 
-const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): ReactNode => {
+const MessageRow = ({
+  msg,
+  faded,
+  onClickLink,
+}: {
+  msg: ChatMessage;
+  faded: boolean;
+  onClickLink: (itemId: string, rect: DOMRect) => void;
+}): ReactNode => {
   const { t } = useTranslation();
   const baseStyle = categoryStyles[msg.category] || categoryStyles.player;
   const variant = msg.variant ? variantStyles[msg.variant] : null;
@@ -113,6 +266,10 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): React
   const displayText = msg.i18nKey
     ? t(msg.i18nKey, { ...msg.i18nParams, defaultValue: msg.text })
     : msg.text;
+
+  // Check if text contains item links
+  const hasLinks = ITEM_LINK_RE.test(displayText);
+  ITEM_LINK_RE.lastIndex = 0;
 
   return (
     <div
@@ -128,7 +285,9 @@ const MessageRow = ({ msg, faded }: { msg: ChatMessage; faded: boolean }): React
           <span className="text-slate-500">: </span>
         </>
       )}
-      <span className="whitespace-pre-wrap break-words">{displayText}</span>
+      <span className="whitespace-pre-wrap break-words">
+        {hasLinks ? parseItemLinks(displayText, onClickLink) : displayText}
+      </span>
     </div>
   );
 };
@@ -270,6 +429,8 @@ export const ChatPanel = (): ReactNode => {
   const [inputValue, setInputValue] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputValueRef = useRef(inputValue);
+  inputValueRef.current = inputValue;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -280,6 +441,51 @@ export const ChatPanel = (): ReactNode => {
 
   // Player names from HUD store
   const playerNames = useMemo(() => hudSnapshot.members.map((m) => m.name), [hudSnapshot.members]);
+
+  // Item link tooltip state
+  const [linkTooltip, setLinkTooltip] = useState<{ itemId: string; rect: DOMRect } | null>(null);
+  const handleClickLink = useCallback((itemId: string, rect: DOMRect) => {
+    setLinkTooltip((prev) => (prev?.itemId === itemId ? null : { itemId, rect }));
+  }, []);
+  const closeLinkTooltip = useCallback(() => setLinkTooltip(null), []);
+
+  // Item link display→raw mapping (display name in input → [item:id] for sending)
+  const itemLinkMapRef = useRef<Map<string, string>>(new Map());
+
+  // Handle input changes — atomic deletion of item links
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    let newVal = e.target.value;
+    let cursor = e.target.selectionStart ?? newVal.length;
+    const prev = inputValueRef.current;
+    const linkMap = itemLinkMapRef.current;
+
+    // If a link was partially edited, remove the remaining fragment entirely
+    for (const displayText of linkMap.keys()) {
+      if (!prev.includes(displayText) || newVal.includes(displayText)) continue;
+      // Link was broken — find where it was in the old value and where the remnant is
+      const oldIdx = prev.indexOf(displayText);
+      // The user deleted some chars; the remnant is at roughly the same position
+      // Remove all chars of displayText that still exist in newVal at that region
+      const charsDeleted = prev.length - newVal.length;
+      const remnantLen = displayText.length - charsDeleted;
+      if (remnantLen > 0) {
+        const remnantIdx = Math.min(oldIdx, newVal.length);
+        newVal = newVal.slice(0, remnantIdx) + newVal.slice(remnantIdx + remnantLen);
+        cursor = remnantIdx;
+      }
+      linkMap.delete(displayText);
+    }
+
+    setInputValue(newVal);
+    // Restore cursor position after atomic deletion
+    if (newVal !== e.target.value) {
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.setSelectionRange(cursor, cursor);
+        }
+      }, 0);
+    }
+  }, []);
 
   // Autocomplete: selected index for arrow-key navigation
   const [selectedCmdIndex, setSelectedCmdIndex] = useState(0);
@@ -323,6 +529,39 @@ export const ChatPanel = (): ReactNode => {
     }
   }, [snapshot.inputOpen]);
 
+  // Register item link insertion callback
+  useEffect(() => {
+    setInsertItemLinkFn((itemId: string) => {
+      const def = itemDefStore.getSnapshot().get(itemId);
+      const displayName = def ? tFn(def.name, { defaultValue: def.name }) : itemId;
+      const displayText = `[${displayName}]`;
+      // Store mapping so we can convert back to [item:id] on send
+      itemLinkMapRef.current.set(displayText, `[item:${itemId}]`);
+
+      // Compute new value and cursor position
+      const el = inputRef.current;
+      const prev = inputValueRef.current;
+      const start =
+        el && document.activeElement === el ? (el.selectionStart ?? prev.length) : prev.length;
+      const newValue = prev.slice(0, start) + displayText + prev.slice(start);
+      const newCursor = start + displayText.length;
+      setInputValue(newValue);
+
+      // Open chat if not already open
+      if (!chatStore.getSnapshot().inputOpen) {
+        chatStore.setInputOpen(true);
+      }
+      // Focus and restore cursor after React re-renders
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
+    });
+    return () => clearInsertItemLinkFn();
+  }, []);
+
   // Global Enter key to open input
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -355,9 +594,13 @@ export const ChatPanel = (): ReactNode => {
   );
 
   const handleSend = useCallback(() => {
-    const text = inputValue.trim();
-    if (text && sendChatFn) {
-      sendChatFn(text);
+    let text = inputValue.trim();
+    if (text) {
+      // Convert display names back to [item:id] syntax before sending
+      for (const [display, raw] of itemLinkMapRef.current) {
+        text = text.replaceAll(display, raw);
+      }
+      chatSend(text);
       // Push to history (avoid duplicating the last entry)
       const history = historyRef.current;
       if (history.length === 0 || history[history.length - 1] !== text) {
@@ -365,6 +608,7 @@ export const ChatPanel = (): ReactNode => {
         if (history.length > HISTORY_MAX) history.shift();
       }
     }
+    itemLinkMapRef.current.clear();
     historyIndexRef.current = -1;
     draftRef.current = "";
     setInputValue("");
@@ -480,9 +724,18 @@ export const ChatPanel = (): ReactNode => {
         {snapshot.messages.map((msg) => {
           const age = now - msg.timestamp;
           const faded = !isHovered && !snapshot.inputOpen && age > CHAT_FADE_MS;
-          return <MessageRow key={msg.id} msg={msg} faded={faded} />;
+          return <MessageRow key={msg.id} msg={msg} faded={faded} onClickLink={handleClickLink} />;
         })}
       </div>
+
+      {/* Item link tooltip */}
+      {linkTooltip && (
+        <ItemLinkTooltip
+          itemId={linkTooltip.itemId}
+          anchorRect={linkTooltip.rect}
+          onClose={closeLinkTooltip}
+        />
+      )}
 
       {/* Input area */}
       {snapshot.inputOpen && (
@@ -506,7 +759,7 @@ export const ChatPanel = (): ReactNode => {
             ref={inputRef}
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onBlur={() => {
               // Small delay to allow click on help overlay

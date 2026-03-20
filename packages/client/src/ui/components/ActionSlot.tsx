@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { SkillCooldownState } from "../stores/hudStore";
+import { getRarityStyle } from "../utils/rarityColors";
 
 // ── Cooldown overlay ────────────────────────────────────────────────────────
 
@@ -59,13 +60,6 @@ const CooldownOverlay = ({
 // ── Variant colors ──────────────────────────────────────────────────────────
 
 type Variant = "default" | "red" | "empty";
-
-const RARITY_BORDER: Record<string, string> = {
-  uncommon: "border-emerald-400/80 shadow-[0_0_6px_rgba(52,211,153,0.3)]",
-  rare: "border-blue-400/80 shadow-[0_0_6px_rgba(96,165,250,0.3)]",
-  epic: "border-purple-400/80 shadow-[0_0_6px_rgba(192,132,252,0.3)]",
-  legendary: "border-amber-400/80 shadow-[0_0_6px_rgba(251,191,36,0.3)]",
-};
 
 const VARIANT_COLORS: Record<
   Variant,
@@ -282,7 +276,9 @@ export const ActionSlot = ({
         className={[
           `relative flex ${sizeClass} items-center justify-center rounded-lg border`,
           slotStyle,
-          rarity && active && RARITY_BORDER[rarity] ? RARITY_BORDER[rarity] : "",
+          rarity && active
+            ? `${getRarityStyle(rarity).border} ${getRarityStyle(rarity).shadow}`.trim()
+            : "",
           showClick && active ? "scale-90" : "",
         ]
           .filter(Boolean)

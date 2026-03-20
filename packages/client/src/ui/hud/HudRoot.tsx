@@ -42,8 +42,8 @@ import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { classDefStore } from "../stores/classDefStore";
 
-import { healthColor } from "../components/healthColor";
-import { isEntityDead } from "../components/lifeState";
+import { healthColor } from "../utils/healthColor";
+import { isEntityDead } from "../utils/lifeState";
 import { LifeState, BLEEDOUT_DURATION } from "@dungeon/shared";
 
 type FloatEntry = { id: number; amount: number };

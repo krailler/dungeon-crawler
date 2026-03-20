@@ -1022,7 +1022,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.chatSystem.sendSystemI18nTo(
         client.sessionId,
         "chat.itemPickup",
-        { item: def.name, amount: added },
+        { item: `[item:${def.id}]`, amount: added },
         `+${added} ${def.id}`,
       );
 
@@ -1030,7 +1030,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.chatSystem.broadcastSystemI18nExcept(
         client.sessionId,
         "chat.otherItemPickup",
-        { player: player.characterName, item: def.name, amount: added },
+        { player: player.characterName, item: `[item:${def.id}]`, amount: added },
         `${player.characterName} picked up ${added} ${def.id}`,
       );
 

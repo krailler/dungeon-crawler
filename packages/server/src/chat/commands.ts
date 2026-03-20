@@ -460,16 +460,17 @@ export function registerCommands(chat: ChatSystem, bridge: ChatRoomBridge): void
         });
         return;
       }
+      const itemLink = `[item:${itemId}]`;
       // Notify the receiving player
       chat.sendSystemI18nTo(
         target.sessionId,
         "chat.itemPickup",
-        { item: def.name, amount: added },
+        { item: itemLink, amount: added },
         `+${added} ${itemId}`,
       );
       ctx.reply(`Gave ${added}× ${itemId} to ${target.player.characterName}.`, "cmd.gaveItem", {
         amount: added,
-        item: itemId,
+        item: itemLink,
         name: target.player.characterName,
       });
     },

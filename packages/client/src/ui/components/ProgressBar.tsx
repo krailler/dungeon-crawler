@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { healthColor } from "./healthColor";
+import { healthColor } from "../utils/healthColor";
 
 type ProgressBarColor = "health" | "xp" | "emerald";
 
