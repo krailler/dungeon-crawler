@@ -345,7 +345,7 @@ export class CombatSystem {
       // Tick down damage timer — apply damage at punch peak
       if (combat.damageTimer > 0) {
         combat.damageTimer -= dt;
-        if (combat.damageTimer <= 0 && combat.damageTarget) {
+        if (combat.damageTimer <= 0 && combat.damageTarget && !combat.damageTarget.isDead) {
           const isPacifist = player?.pacifist === true;
           if (!isPacifist) {
             combat.damageTarget.health = Math.max(

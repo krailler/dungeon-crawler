@@ -116,6 +116,8 @@ export class GameLoop {
   private tickCreaturesMap: Map<string, CreatureState> = new Map();
   /** Clients subscribed to debug path visualization */
   private debugPathClients: Set<string> = new Set();
+  /** Incrementing counter for unique loot bag IDs */
+  private lootBagCounter: number = 0;
 
   constructor(bridge: GameLoopBridge) {
     this.bridge = bridge;
@@ -302,7 +304,7 @@ export class GameLoop {
   applyCreatureEffect(creature: CreatureState, effectId: string): void {
     const def = getEffectDef(effectId);
     if (!def) {
-      logger.error({ effectId }, "Effect not found in EffectRegistry");
+      logger.warn({ effectId }, "Effect not found in EffectRegistry");
       return;
     }
 
@@ -585,15 +587,17 @@ export class GameLoop {
         if (bag.items.size > 0) {
           bag.x = killedCreature.x;
           bag.z = killedCreature.z;
-          this.bridge.state.lootBags.set(`loot_${event.creatureId}_${Date.now()}`, bag);
+          this.bridge.state.lootBags.set(`loot_${event.creatureId}_${++this.lootBagCounter}`, bag);
         }
       }
     }
 
+    // Unregister from AI immediately so dead creatures don't process AI ticks
+    this.bridge.aiSystem.unregister(event.creatureId);
+
     // Keep corpse visible for a few seconds so players see the death animation
     this.bridge.clock.setTimeout(() => {
       this.bridge.state.creatures.delete(event.creatureId);
-      this.bridge.aiSystem.unregister(event.creatureId);
       this.bridge.onCreatureRemoved?.(event.creatureId);
     }, 5000);
   }
@@ -990,7 +994,10 @@ export class GameLoop {
             // Reviver died, disconnected, moved, attacked, or out of range — cancel
             this.cancelReviveOn(player);
           } else {
-            player.reviveProgress += dt / REVIVE_CHANNEL_DURATION;
+            player.reviveProgress = Math.min(
+              1.0,
+              player.reviveProgress + dt / REVIVE_CHANNEL_DURATION,
+            );
             if (player.reviveProgress >= 1.0) {
               // Revive successful!
               player.lifeState = LifeState.ALIVE;

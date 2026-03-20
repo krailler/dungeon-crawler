@@ -10,6 +10,7 @@ import { classes, classSkills } from "../db/schema.js";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
 import { getSkillDef } from "../skills/SkillRegistry.js";
+import { logger } from "../logger.js";
 
 type ClassRow = typeof classes.$inferSelect;
 
@@ -60,12 +61,19 @@ export async function loadClassRegistry(): Promise<void> {
   skillUnlocksByClass = new Map<string, Map<number, string[]>>();
   skillUnlockLevels = new Map<string, Map<string, number>>();
   for (const row of skillRows) {
+    const def = getSkillDef(row.skillId);
+    if (!def) {
+      logger.warn(
+        { classId: row.classId, skillId: row.skillId },
+        "Class references unknown skill — skipping",
+      );
+      continue;
+    }
     const arr = skillsByClass.get(row.classId) ?? [];
     arr.push(row.skillId);
     skillsByClass.set(row.classId, arr);
     if (row.isDefault) {
-      const def = getSkillDef(row.skillId);
-      if (def) defaultSkillByClass.set(row.classId, def);
+      defaultSkillByClass.set(row.classId, def);
     }
     // Track unlock levels
     let lvlMap = skillUnlockLevels.get(row.classId);

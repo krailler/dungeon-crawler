@@ -7,6 +7,8 @@ import type {
 } from "@dungeon/shared";
 import { creatures, creatureLoot, creatureEffects, creatureSkills } from "../db/schema.js";
 import { getSkillDef } from "../skills/SkillRegistry.js";
+import { getItemDef } from "../items/ItemRegistry.js";
+import { getEffectDef } from "../effects/EffectRegistry.js";
 import type { SkillDef } from "@dungeon/shared";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
 import { getDb } from "../db/database.js";
@@ -75,6 +77,13 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
   const lootRows = await db.select().from(creatureLoot);
   lootByCreature = new Map<string, CreatureLootEntry[]>();
   for (const row of lootRows) {
+    if (!getItemDef(row.itemId)) {
+      logger.warn(
+        { creatureId: row.creatureId, itemId: row.itemId },
+        "Creature loot references unknown item — skipping",
+      );
+      continue;
+    }
     const entries = lootByCreature.get(row.creatureId) ?? [];
     entries.push({
       itemId: row.itemId,
@@ -89,6 +98,13 @@ export async function loadCreatureTypeRegistry(): Promise<void> {
   const effectRows = await db.select().from(creatureEffects);
   effectsByCreature = new Map<string, CreatureEffectEntry[]>();
   for (const row of effectRows) {
+    if (!getEffectDef(row.effectId)) {
+      logger.warn(
+        { creatureId: row.creatureId, effectId: row.effectId },
+        "Creature effect references unknown effect — skipping",
+      );
+      continue;
+    }
     const entries = effectsByCreature.get(row.creatureId) ?? [];
     entries.push({
       trigger: row.trigger,

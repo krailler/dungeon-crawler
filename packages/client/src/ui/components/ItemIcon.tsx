@@ -31,6 +31,7 @@ export const ItemIcon = ({
         draggable={false}
         style={{ imageRendering: "auto" }}
         onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
       />
     </div>
   );

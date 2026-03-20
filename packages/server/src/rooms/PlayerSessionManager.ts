@@ -19,7 +19,7 @@ import {
 } from "@dungeon/shared";
 import type { TileMap, RoleValue } from "@dungeon/shared";
 import { getClassDef } from "../classes/ClassRegistry";
-import { getTalentsForClass } from "../talents/TalentRegistry";
+import { getTalentsForClass, getTalentDef } from "../talents/TalentRegistry";
 import { getSkillDef } from "../skills/SkillRegistry";
 import {
   registerSession,
@@ -383,12 +383,12 @@ export class PlayerSessionManager {
   }
 
   /** Remove the player after reconnect/rejoin timeout expired. */
-  private expirePlayer(client: Client, playerName: string): void {
+  private async expirePlayer(client: Client, playerName: string): Promise<void> {
     this.log.info({ player: this.who(client) }, "Reconnection timed out — player removed");
     this.clearReconnectTimers(client.sessionId);
     const player = this.bridge.state.players.get(client.sessionId);
     if (player) {
-      this.savePlayerProgress(player);
+      await this.savePlayerProgress(player);
     }
     this.removePlayerFromAllSystems(client.sessionId);
     this.removeAccountMapping(client);
@@ -401,7 +401,7 @@ export class PlayerSessionManager {
     );
   }
 
-  handleLeave(client: Client): void {
+  async handleLeave(client: Client): Promise<void> {
     // If already cleaned up by kick, skip everything
     if (this.kickedSessions.has(client.sessionId)) {
       this.kickedSessions.delete(client.sessionId);
@@ -409,7 +409,7 @@ export class PlayerSessionManager {
       // Still save progress for kicked players
       const kickedPlayer = this.bridge.state.players.get(client.sessionId);
       if (kickedPlayer) {
-        this.savePlayerProgress(kickedPlayer);
+        await this.savePlayerProgress(kickedPlayer);
       }
       this.removeAccountMapping(client);
       this.unregisterClient(client);
@@ -425,7 +425,7 @@ export class PlayerSessionManager {
     }
 
     const name = player.characterName;
-    this.savePlayerProgress(player);
+    await this.savePlayerProgress(player);
     this.log.info({ player: this.who(client) }, "Player left");
     this.removePlayerFromAllSystems(client.sessionId);
     this.removeAccountMapping(client);
@@ -527,30 +527,29 @@ export class PlayerSessionManager {
     }
   }
 
-  savePlayerProgress(player: PlayerState): void {
+  async savePlayerProgress(player: PlayerState): Promise<void> {
     if (!player.characterId) return;
     const hash = this.buildProgressHash(player);
     if (this.lastSavedHash.get(player.characterId) === hash) return;
 
     const db = getDb();
-    db.transaction(async (tx) => {
-      await this.savePlayerTx(tx, player);
-    })
-      .then(() => {
-        this.lastSavedHash.set(player.characterId, hash);
-        this.log.debug(
-          {
-            characterId: player.characterId,
-            gold: player.gold,
-            xp: player.xp,
-            level: player.level,
-          },
-          "Progress saved",
-        );
-      })
-      .catch((err) => {
-        this.log.error({ characterId: player.characterId, err }, "Failed to save progress");
+    try {
+      await db.transaction(async (tx) => {
+        await this.savePlayerTx(tx, player);
       });
+      this.lastSavedHash.set(player.characterId, hash);
+      this.log.debug(
+        {
+          characterId: player.characterId,
+          gold: player.gold,
+          xp: player.xp,
+          level: player.level,
+        },
+        "Progress saved",
+      );
+    } catch (err) {
+      this.log.error({ characterId: player.characterId, err }, "Failed to save progress");
+    }
   }
 
   /** Write a single player's stats + inventory inside an existing transaction. */
@@ -602,14 +601,23 @@ export class PlayerSessionManager {
       .select()
       .from(characterInventory)
       .where(eq(characterInventory.characterId, characterId));
+    let loaded = 0;
     for (const row of rows) {
+      if (!getItemDef(row.itemId)) {
+        this.log.warn(
+          { characterId, itemId: row.itemId },
+          "Inventory references unknown item — skipping",
+        );
+        continue;
+      }
       const slot = new InventorySlotState();
       slot.itemId = row.itemId;
       slot.quantity = row.quantity;
       player.inventory.set(String(row.slotIndex), slot);
+      loaded++;
     }
-    if (rows.length > 0) {
-      this.log.debug({ characterId, slots: rows.length }, "Inventory loaded");
+    if (loaded > 0) {
+      this.log.debug({ characterId, slots: loaded }, "Inventory loaded");
     }
   }
 
@@ -716,11 +724,20 @@ export class PlayerSessionManager {
       .from(characterTalents)
       .where(eq(characterTalents.characterId, characterId));
 
+    let loaded = 0;
     for (const row of rows) {
+      if (!getTalentDef(row.talentId)) {
+        this.log.warn(
+          { characterId, talentId: row.talentId },
+          "Character references unknown talent — skipping",
+        );
+        continue;
+      }
       player.talentAllocations.set(row.talentId, row.rank);
+      loaded++;
     }
-    if (rows.length > 0) {
-      this.log.debug({ characterId, talents: rows.length }, "Talents loaded");
+    if (loaded > 0) {
+      this.log.debug({ characterId, talents: loaded }, "Talents loaded");
     }
   }
 

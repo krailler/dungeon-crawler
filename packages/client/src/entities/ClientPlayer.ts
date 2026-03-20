@@ -92,6 +92,8 @@ export class ClientPlayer {
   private pendingTimers: ReturnType<typeof setTimeout>[] = [];
   /** Active particle systems — disposed on cleanup to prevent orphaned scene references */
   private activeParticles: Set<ParticleSystem> = new Set();
+  /** Cached flare texture shared across particle effects */
+  private flareTexture: Texture | null = null;
 
   // Target state from server
   private targetX: number = 0;
@@ -342,6 +344,7 @@ export class ClientPlayer {
         }
       } else {
         this.animController.playLoop("idle");
+        this.animController.setSpeedRatio(1.0);
         this.footstepTimer = 0;
       }
     }
@@ -439,12 +442,18 @@ export class ClientPlayer {
     }
   }
 
+  private getFlareTexture(): Texture {
+    if (!this.flareTexture) {
+      this.flareTexture = new Texture("/textures/flare.png", this.scene);
+    }
+    return this.flareTexture;
+  }
+
   /** Play a golden aura particle effect around the character (level-up). */
   playLevelUpEffect(): void {
     const ps = new ParticleSystem(`levelUp_${this.mesh.name}`, 200, this.scene);
 
-    // Use default particle texture (white circle)
-    ps.particleTexture = new Texture("/textures/flare.png", this.scene);
+    ps.particleTexture = this.getFlareTexture();
 
     // Emit from a cylinder around the player
     ps.emitter = this.mesh;
@@ -502,7 +511,7 @@ export class ClientPlayer {
   /** Play a green heal particle effect around the character. */
   playHealEffect(): void {
     const ps = new ParticleSystem(`heal_${this.mesh.name}`, 80, this.scene);
-    ps.particleTexture = new Texture("/textures/flare.png", this.scene);
+    ps.particleTexture = this.getFlareTexture();
 
     ps.emitter = this.mesh;
     ps.minEmitBox = new Vector3(-0.4, 0, -0.4);
@@ -578,6 +587,8 @@ export class ClientPlayer {
     }
     this.nameAnchor?.dispose();
     this.bubbleAnchor?.dispose();
+    this.flareTexture?.dispose();
+    this.flareTexture = null;
     this.modelRoot?.dispose(false, false);
     this.shadowGenerator?.dispose();
     this.torchLight?.dispose();

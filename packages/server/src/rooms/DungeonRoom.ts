@@ -854,6 +854,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.gold -= cost;
       player.resetTalents();
       this.effectSystem.recomputeStats(player);
+      if (player.health > player.maxHealth) player.health = player.maxHealth;
 
       // Send updated (empty) allocations to client
       const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
@@ -886,6 +887,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       player.gold -= cost;
       const points = player.resetStats();
       this.effectSystem.recomputeStats(player);
+      if (player.health > player.maxHealth) player.health = player.maxHealth;
 
       // Notify player via chat
       this.chatSystem.sendSystemI18nTo(
@@ -1306,7 +1308,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     if (this.isDungeonStarted()) {
       await this.sessionManager.handleDrop(client);
     } else {
-      this.sessionManager.handleLeave(client);
+      await this.sessionManager.handleLeave(client);
     }
   }
 
@@ -1322,7 +1324,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     }
   }
 
-  onLeave(client: Client): void {
+  async onLeave(client: Client): Promise<void> {
     // During an active dungeon, treat a consented leave (tab close / page reload)
     // as a soft disconnect: keep the player offline so the same account can
     // rejoin via session migration in onAuth/handleJoin.
@@ -1333,7 +1335,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       this.sessionManager.handleConsentedLeaveDuringDungeon(client);
       return;
     }
-    this.sessionManager.handleLeave(client);
+    await this.sessionManager.handleLeave(client);
   }
 
   /**
