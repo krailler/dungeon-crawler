@@ -33,6 +33,7 @@ import {
   AMBIENT_INTENSITY,
   ChatCategory,
   PROTOCOL_VERSION,
+  TutorialStep,
 } from "@dungeon/shared";
 import type {
   CombatLogMessage,
@@ -58,6 +59,7 @@ import { gateStore } from "../ui/stores/gateStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
+import { welcomeStore } from "../ui/stores/welcomeStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
 import { settingsStore } from "../ui/stores/settingsStore";
@@ -301,6 +303,7 @@ export class ClientGame {
       hudStore.setRoom(room);
       gateStore.setRoom(room);
       tutorialStore.setRoom(room);
+      welcomeStore.setRoom(room);
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
@@ -384,6 +387,10 @@ export class ClientGame {
 
       // Tutorial hints from server
       room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
+        if (msg.step === TutorialStep.WELCOME) {
+          welcomeStore.show();
+          return;
+        }
         tutorialStore.showHint(msg);
       });
 
@@ -554,6 +561,7 @@ export class ClientGame {
     promptStore.reset();
     announcementStore.reset();
     tutorialStore.reset();
+    welcomeStore.reset();
     // Only clear reconnection token if NOT in reconnectable state
     if (!authStore.getSnapshot().canReconnect) {
       localStorage.removeItem("reconnectionToken");

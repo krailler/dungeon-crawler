@@ -225,7 +225,8 @@ export class PlayerSessionManager {
     this.accountToSession.set(accountId, client.sessionId);
     this.reassignLeader();
 
-    // Tutorial: send START_DUNGEON hint to new leader after a short delay
+    // Tutorial: welcome message + START_DUNGEON hint after a short delay
+    this.sendWelcomeIfNeeded(client.sessionId);
     this.sendTutorialHintIfNeeded(client.sessionId);
 
     // Chat: broadcast join event
@@ -909,6 +910,22 @@ export class PlayerSessionManager {
   }
 
   /** Send START_DUNGEON tutorial hint to the given session if they are leader and haven't completed it. */
+  private sendWelcomeIfNeeded(sessionId: string): void {
+    const player = this.bridge.state.players.get(sessionId);
+    if (!player || player.tutorialsCompleted.has(TutorialStep.WELCOME)) return;
+
+    this.bridge.clock.setTimeout(() => {
+      const p = this.bridge.state.players.get(sessionId);
+      if (!p?.online) return;
+      if (p.tutorialsCompleted.has(TutorialStep.WELCOME)) return;
+
+      this.bridge.sendToClient(sessionId, MessageType.TUTORIAL_HINT, {
+        step: TutorialStep.WELCOME,
+        i18nKey: "tutorial.welcome",
+      });
+    }, 1000);
+  }
+
   private sendTutorialHintIfNeeded(sessionId: string): void {
     const player = this.bridge.state.players.get(sessionId);
     if (!player?.isLeader) return;

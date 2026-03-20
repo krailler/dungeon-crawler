@@ -269,6 +269,14 @@
     "dungeonKey": "¡Has encontrado la Llave de Mazmorra! Úsala en el portal de salida para escapar de la mazmorra.",
     "portalNoKey": "Necesitas la Llave de Mazmorra para abrir el portal. ¡Derrota al jefe para obtenerla!"
   },
+  "welcome": {
+    "subtitle": "Explora mazmorras procedurales con tu grupo",
+    "tip1": "Lucha contra criaturas y sube de nivel para desbloquear nuevas habilidades y talentos.",
+    "tip2": "Si caes, un compañero puede revivirte. ¡No te alejes del grupo!",
+    "tip3": "Gana XP y oro con cada enemigo. Asigna puntos de atributo y talento al subir de nivel.",
+    "tip4": "Derrota al jefe de la mazmorra para obtener la llave y escapa por el portal de salida.",
+    "button": "¡Adelante!"
+  },
   "reconnect": {
     "title": "Conexión Perdida",
     "message": "Tu sesión sigue activa en el servidor. Puedes intentar reconectar.",

@@ -12,6 +12,7 @@ export const TutorialStep = {
   ALLOCATE_TALENTS: "allocate_talents",
   DUNGEON_KEY: "dungeon_key",
   PORTAL_NO_KEY: "portal_no_key",
+  WELCOME: "welcome",
 } as const;
 
 export type TutorialStepValue = (typeof TutorialStep)[keyof typeof TutorialStep];

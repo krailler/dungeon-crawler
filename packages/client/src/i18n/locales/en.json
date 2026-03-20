@@ -269,6 +269,14 @@
     "dungeonKey": "You found the Dungeon Key! Use it at the exit portal to escape the dungeon.",
     "portalNoKey": "You need the Dungeon Key to open the portal. Defeat the boss to obtain it!"
   },
+  "welcome": {
+    "subtitle": "Explore procedural dungeons with your party",
+    "tip1": "Fight creatures and level up to unlock new skills and talents.",
+    "tip2": "If you fall, a teammate can revive you — stay close to your party!",
+    "tip3": "Earn XP and gold from every kill. Assign attribute and talent points as you level up.",
+    "tip4": "Defeat the dungeon boss to get the key and escape through the exit portal.",
+    "button": "Let's go!"
+  },
   "reconnect": {
     "title": "Connection Lost",
     "message": "Your session is still active on the server. You can try to reconnect.",

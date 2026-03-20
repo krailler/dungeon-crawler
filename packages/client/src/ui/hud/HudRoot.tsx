@@ -28,6 +28,7 @@ import { LootBagPanel } from "./LootBagPanel";
 import { DeathOverlay } from "./DeathOverlay";
 import { LowHealthVignette } from "./LowHealthVignette";
 import { LevelUpOverlay } from "./LevelUpOverlay";
+import { WelcomeOverlay } from "./WelcomeOverlay";
 import { TargetFrame } from "./TargetFrame";
 import { targetStore } from "../stores/targetStore";
 import { HudButton } from "../components/HudButton";
@@ -343,6 +344,7 @@ export const HudRoot = (): ReactNode => {
       <LowHealthVignette />
       <LevelUpOverlay />
       <DeathOverlay />
+      <WelcomeOverlay />
       <div className="pointer-events-auto absolute left-5 top-1/2 w-60 -translate-y-1/2">
         <div className="mb-3 flex items-center gap-3">
           <div className="h-6 w-6 rounded-full bg-sky-400/20 ring-1 ring-sky-400/40">
