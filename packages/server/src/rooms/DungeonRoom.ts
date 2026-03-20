@@ -114,6 +114,7 @@ import type {
   PartyKickMessage,
   AllocatableStatValue,
   TutorialDismissMessage,
+  TutorialHintMessage,
   StatAllocateMessage,
   SprintMessage,
   AdminDebugInfoMessage,
@@ -426,6 +427,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           "You need the Dungeon Key to open the portal!",
           ChatVariant.ERROR,
         );
+        // Tutorial: explain how to get the key
+        if (!player.tutorialsCompleted.has(TutorialStep.PORTAL_NO_KEY)) {
+          client.send(MessageType.TUTORIAL_HINT, {
+            step: TutorialStep.PORTAL_NO_KEY,
+            i18nKey: "tutorial.portalNoKey",
+          } satisfies TutorialHintMessage);
+          player.tutorialsCompleted.add(TutorialStep.PORTAL_NO_KEY);
+        }
         return;
       }
 
@@ -1033,6 +1042,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         { player: player.characterName, item: `[item:${def.id}]`, amount: added },
         `${player.characterName} picked up ${added} ${def.id}`,
       );
+
+      // Tutorial: picked up dungeon key
+      if (def.id === "dungeon_key" && !player.tutorialsCompleted.has(TutorialStep.DUNGEON_KEY)) {
+        client.send(MessageType.TUTORIAL_HINT, {
+          step: TutorialStep.DUNGEON_KEY,
+          i18nKey: "tutorial.dungeonKey",
+        } satisfies TutorialHintMessage);
+        player.tutorialsCompleted.add(TutorialStep.DUNGEON_KEY);
+      }
 
       // If bag empty → remove from world
       if (bag.items.size === 0) {

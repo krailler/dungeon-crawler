@@ -265,7 +265,9 @@
     "sprint": "¡Mantén Shift mientras te mueves para esprintar más rápido — pero vigila tu energía!",
     "youDowned": "¡Has caído! Un compañero puede revivirte antes de que te desangres. Puedes seguir usando el chat.",
     "teammateDowned": "¡Un compañero ha caído! Acércate y pulsa R (o haz clic en Revivir) para salvarlo.",
-    "firstDebuff": "¡Te han aplicado un debuff! Mira los iconos bajo tu personaje para ver su efecto y tiempo restante."
+    "firstDebuff": "¡Te han aplicado un debuff! Mira los iconos bajo tu personaje para ver su efecto y tiempo restante.",
+    "dungeonKey": "¡Has encontrado la Llave de Mazmorra! Úsala en el portal de salida para escapar de la mazmorra.",
+    "portalNoKey": "Necesitas la Llave de Mazmorra para abrir el portal. ¡Derrota al jefe para obtenerla!"
   },
   "reconnect": {
     "title": "Conexión Perdida",

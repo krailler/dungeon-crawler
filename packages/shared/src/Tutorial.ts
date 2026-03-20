@@ -10,6 +10,8 @@ export const TutorialStep = {
   TEAMMATE_DOWNED: "teammate_downed",
   FIRST_DEBUFF: "first_debuff",
   ALLOCATE_TALENTS: "allocate_talents",
+  DUNGEON_KEY: "dungeon_key",
+  PORTAL_NO_KEY: "portal_no_key",
 } as const;
 
 export type TutorialStepValue = (typeof TutorialStep)[keyof typeof TutorialStep];

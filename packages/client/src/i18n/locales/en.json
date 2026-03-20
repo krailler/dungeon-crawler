@@ -265,7 +265,9 @@
     "sprint": "Hold Shift while moving to sprint faster — but watch your stamina!",
     "youDowned": "You've been downed! A teammate can revive you before you bleed out. You can still use the chat.",
     "teammateDowned": "A teammate has fallen! Walk close and press R (or click Revive) to save them.",
-    "firstDebuff": "You've been hit with a debuff! Check the icons below your character to see its effect and remaining time."
+    "firstDebuff": "You've been hit with a debuff! Check the icons below your character to see its effect and remaining time.",
+    "dungeonKey": "You found the Dungeon Key! Use it at the exit portal to escape the dungeon.",
+    "portalNoKey": "You need the Dungeon Key to open the portal. Defeat the boss to obtain it!"
   },
   "reconnect": {
     "title": "Connection Lost",
