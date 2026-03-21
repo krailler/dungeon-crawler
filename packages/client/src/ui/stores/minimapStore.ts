@@ -51,6 +51,12 @@ export const minimapStore = {
 
   setTileMap(map: TileMap): void {
     tileMap = map;
+    discovered = new Set();
+    gatePositions = new Map();
+    creaturePositions = new Map();
+    lastRevealTileX = -999;
+    lastRevealTileY = -999;
+    dirty = true;
   },
 
   addGatePosition(id: string, x: number, y: number): void {

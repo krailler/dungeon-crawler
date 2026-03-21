@@ -1396,10 +1396,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     const seed = data.seed ?? this.state.dungeonSeed;
     this.log.warn({ seed }, "Admin restart requested");
 
-    // Clear all creatures and loot bags
+    // Clear all creatures, loot bags, and reset per-dungeon state
     this.allCreatures.clear();
     this.state.creatures.clear();
     this.state.lootBags.clear();
+    this.gameLoop.resetDungeonState();
 
     // Regenerate dungeon
     this.generateDungeon(seed);
@@ -1763,6 +1764,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     const spawnRng = mulberry32(this.creatureSpawnSeed);
     this.spawnCreatures(this.dungeonRooms, spawnRng, newLevel);
+
+    // Regenerate quests with updated creature count + boss timer
+    if (this.questSystem) {
+      const hasBoss = getBossTypesForLevel(newLevel).length > 0 && this.dungeonRooms.length > 1;
+      this.questSystem.generateQuests(this.allCreatures.size, hasBoss, newLevel);
+    }
 
     this.log.info(
       {

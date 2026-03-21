@@ -198,15 +198,7 @@ export class StateSync {
     // Quest state listeners (MapSchema<QuestState>)
     track(
       state$.quests.onAdd((quest: any, questId: string) => {
-        questStore.setQuest(questId, {
-          id: questId,
-          questType: quest.questType,
-          i18nKey: quest.i18nKey,
-          target: quest.target,
-          progress: quest.progress,
-          status: quest.status,
-        });
-        $(quest).onChange(() => {
+        const sync = (): void =>
           questStore.setQuest(questId, {
             id: questId,
             questType: quest.questType,
@@ -215,7 +207,8 @@ export class StateSync {
             progress: quest.progress,
             status: quest.status,
           });
-        });
+        sync();
+        $(quest).onChange(sync);
       }),
     );
     track(

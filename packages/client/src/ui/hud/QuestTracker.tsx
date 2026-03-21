@@ -36,6 +36,24 @@ function ProgressBar({ progress, target }: { progress: number; target: number })
   );
 }
 
+/** Countdown bar — shrinks from full to empty, changes color as time runs out */
+function CountdownBar({ remaining, total }: { remaining: number; total: number }): ReactNode {
+  const pct = Math.min(100, Math.max(0, (remaining / total) * 100));
+  const urgent = pct < 30;
+  return (
+    <div className="mt-0.5 h-[4px] w-full overflow-hidden rounded-full bg-slate-700/50">
+      <div
+        className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${
+          urgent
+            ? "bg-gradient-to-r from-red-500/90 to-red-400/80"
+            : "bg-gradient-to-r from-cyan-500/80 to-cyan-400/90"
+        }`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
 const QuestRow = ({ quest }: { quest: QuestEntry }): ReactNode => {
   const { t } = useTranslation();
   const isCompleted = quest.status === QuestStatus.COMPLETED;
@@ -55,7 +73,11 @@ const QuestRow = ({ quest }: { quest: QuestEntry }): ReactNode => {
     progressLabel = `${quest.progress}s`;
   }
 
-  const showBar = quest.questType === QuestType.KILL_ALL && !isCompleted && !isFailed;
+  const showKillBar = quest.questType === QuestType.KILL_ALL && !isCompleted && !isFailed;
+  const showTimerBar =
+    quest.questType === QuestType.BOSS_TIMED &&
+    quest.status === QuestStatus.ACTIVE &&
+    quest.progress < quest.target;
 
   return (
     <div className="flex flex-col gap-0">
@@ -66,7 +88,8 @@ const QuestRow = ({ quest }: { quest: QuestEntry }): ReactNode => {
           <span className="ml-auto font-mono text-[10px] text-slate-400">{progressLabel}</span>
         )}
       </div>
-      {showBar && <ProgressBar progress={quest.progress} target={quest.target} />}
+      {showKillBar && <ProgressBar progress={quest.progress} target={quest.target} />}
+      {showTimerBar && <CountdownBar remaining={quest.progress} total={quest.target} />}
     </div>
   );
 };

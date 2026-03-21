@@ -20,8 +20,9 @@ export class QuestSystem {
     this.chatSystem = chatSystem;
   }
 
-  /** Generate quests for the current dungeon run. */
+  /** Generate quests for the current dungeon run. Clears any existing quests. */
   generateQuests(totalCreatures: number, hasBoss: boolean, dungeonLevel: number): void {
+    this.state.quests.clear();
     // Kill all creatures
     const killAll = new QuestState();
     killAll.id = QuestType.KILL_ALL;
@@ -78,6 +79,7 @@ export class QuestSystem {
       const bossTimed = this.state.quests.get(QuestType.BOSS_TIMED);
       if (bossTimed && bossTimed.status === QuestStatus.ACTIVE) {
         bossTimed.status = QuestStatus.COMPLETED;
+        bossTimed.timerStarted = false;
         this.chatSystem.broadcastSystemI18n(
           "quest.objectiveCompleted",
           { quest: "quest.bossTimed" },

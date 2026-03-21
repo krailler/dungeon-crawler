@@ -133,6 +133,11 @@ export class GameLoop {
     this.bridge = bridge;
   }
 
+  /** Reset per-dungeon state (called on dungeon regeneration). */
+  resetDungeonState(): void {
+    this.bossEngageAnnounced = false;
+  }
+
   update(dt: number): void {
     const now = performance.now();
     if (this.lastTickTime > 0) {
