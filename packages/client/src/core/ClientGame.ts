@@ -95,7 +95,9 @@ export class ClientGame {
   private settingsUnsub: (() => void) | null = null;
   private glowLayer: GlowLayer | null = null;
   private fxaaPostProcess: FxaaPostProcess | null = null;
+  private fxaaAttached: boolean = true;
   private sharpenPostProcess: SharpenPostProcess | null = null;
+  private sharpenAttached: boolean = true;
   private lastGraphics: GraphicsSettings;
   private renderObserver: Observer<Scene> | null = null;
 
@@ -169,8 +171,24 @@ export class ClientGame {
     mountHud();
     this.room = room;
     // Register message listeners early so server messages sent during
-    // handleJoin (e.g. TALENT_STATE) are not missed while loading assets.
+    // handleJoin (e.g. TALENT_STATE, TUTORIAL_HINT) are not missed while loading assets.
     this.stateSync.connectMessageStores(room);
+
+    // Tutorial handlers must be registered before asset loading — the server
+    // sends WELCOME 1s after join, which would be missed if we waited for
+    // model preload to finish before registering onMessage handlers.
+    tutorialStore.setRoom(room);
+    welcomeStore.setRoom(room);
+    room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
+      if (msg.step === TutorialStep.WELCOME) {
+        welcomeStore.show();
+        return;
+      }
+      tutorialStore.showHint(msg);
+    });
+    room.onMessage(MessageType.TUTORIAL_DISMISS, (msg: TutorialDismissMessage) => {
+      tutorialStore.dismiss(msg.step, false);
+    });
 
     // Game loop — render + interpolation
     this.renderObserver = this.scene.onBeforeRenderObservable.add(() => {
@@ -276,8 +294,6 @@ export class ClientGame {
       adminStore.setRoom(room);
       hudStore.setRoom(room);
       gateStore.setRoom(room);
-      tutorialStore.setRoom(room);
-      welcomeStore.setRoom(room);
       minimapStore.setLocalSessionId(room.sessionId);
       console.log("[Client] Joined room:", room.sessionId);
 
@@ -358,20 +374,6 @@ export class ClientGame {
       if (debugStore.getSnapshot().showAllCreatures) {
         room.send(MessageType.TOGGLE_AOI, { enabled: false });
       }
-
-      // Tutorial hints from server
-      room.onMessage(MessageType.TUTORIAL_HINT, (msg: TutorialHintMessage) => {
-        if (msg.step === TutorialStep.WELCOME) {
-          welcomeStore.show();
-          return;
-        }
-        tutorialStore.showHint(msg);
-      });
-
-      // Server-initiated tutorial dismiss (e.g. revive completed, player died)
-      room.onMessage(MessageType.TUTORIAL_DISMISS, (msg: TutorialDismissMessage) => {
-        tutorialStore.dismiss(msg.step, false);
-      });
 
       // Connect item def store + item instance store to room for lazy loading
       itemDefStore.connect(room);
@@ -475,13 +477,31 @@ export class ClientGame {
     this.sharpenPostProcess.edgeAmount = 0.3;
   }
 
+  /** Attach or detach a post-process from the camera. */
+  private setPostProcessEnabled(
+    pp: FxaaPostProcess | SharpenPostProcess,
+    enabled: boolean,
+    attachedFlag: "fxaaAttached" | "sharpenAttached",
+  ): void {
+    const cam = this.isoCamera.camera;
+    if (enabled && !this[attachedFlag]) {
+      cam.attachPostProcess(pp);
+      this[attachedFlag] = true;
+    } else if (!enabled && this[attachedFlag]) {
+      cam.detachPostProcess(pp);
+      this[attachedFlag] = false;
+    }
+  }
+
   /** Force-apply all graphics settings (used on startup). */
   private applyGraphicsAll(gfx: GraphicsSettings): void {
     if (this.glowLayer) this.glowLayer.isEnabled = gfx.glow;
     this.scene.particlesEnabled = gfx.particles;
     this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
-    if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
-    if (this.sharpenPostProcess) this.sharpenPostProcess.isEnabled = gfx.sharpen;
+    if (this.fxaaPostProcess)
+      this.setPostProcessEnabled(this.fxaaPostProcess, gfx.fxaa, "fxaaAttached");
+    if (this.sharpenPostProcess)
+      this.setPostProcessEnabled(this.sharpenPostProcess, gfx.sharpen, "sharpenAttached");
     const local = this.stateSync.players.get(this.stateSync.localSessionId);
     local?.setShadowConfig(gfx.shadows, gfx.shadowQuality);
     this.lastGraphics = gfx;
@@ -502,10 +522,12 @@ export class ClientGame {
       this.engine.setHardwareScalingLevel(1 / gfx.resolutionScale);
     }
     if (gfx.fxaa !== prev.fxaa) {
-      if (this.fxaaPostProcess) this.fxaaPostProcess.isEnabled = gfx.fxaa;
+      if (this.fxaaPostProcess)
+        this.setPostProcessEnabled(this.fxaaPostProcess, gfx.fxaa, "fxaaAttached");
     }
     if (gfx.sharpen !== prev.sharpen) {
-      if (this.sharpenPostProcess) this.sharpenPostProcess.isEnabled = gfx.sharpen;
+      if (this.sharpenPostProcess)
+        this.setPostProcessEnabled(this.sharpenPostProcess, gfx.sharpen, "sharpenAttached");
     }
     if (gfx.shadows !== prev.shadows || gfx.shadowQuality !== prev.shadowQuality) {
       const local = this.stateSync.players.get(this.stateSync.localSessionId);

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { EquipmentSlotValue } from "@dungeon/shared";
 import { ActionSlot } from "./ActionSlot";
 import { ItemIcon } from "./ItemIcon";
 import { EquipmentTooltip } from "./EquipmentTooltip";
@@ -61,15 +60,9 @@ export const ItemActionSlot = ({
 }: ItemActionSlotProps): ReactNode => {
   const { t } = useTranslation();
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
-  const instances = useSyncExternalStore(
-    itemInstanceStore.subscribe,
-    itemInstanceStore.getSnapshot,
-  );
 
   const def = itemId ? itemDefs.get(itemId) : undefined;
-  const instance = instanceId ? instances.get(instanceId) : undefined;
   const isEquipment = !!def?.equipSlot;
-  const isConsumable = !!def?.consumable;
   const active = !!itemId;
   const loading = active && !def;
 

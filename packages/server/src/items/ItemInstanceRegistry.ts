@@ -38,11 +38,6 @@ export function createInstanceInMemory(
   return instance;
 }
 
-export function deleteInstance(id: string): void {
-  cache.delete(id);
-  pendingInserts.delete(id);
-}
-
 /** Load instances for a character (from inventory + equipment) into cache */
 export function cacheInstances(instances: ItemInstance[]): void {
   for (const inst of instances) {

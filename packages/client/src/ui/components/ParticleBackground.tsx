@@ -26,16 +26,18 @@ export const ParticleBackground = (): ReactNode => {
         <div
           key={p.id}
           className="absolute rounded-full"
-          style={{
-            left: `${p.left}%`,
-            bottom: "-5%",
-            width: p.size,
-            height: p.size,
-            background: `radial-gradient(circle, rgba(255,200,80,${p.opacity}) 0%, rgba(255,150,30,0) 70%)`,
-            boxShadow: `0 0 ${p.size * 2}px rgba(255,180,50,${p.opacity * 0.5})`,
-            "--drift": `${p.drift}px`,
-            animation: `loginParticleRise ${p.duration}s ${p.delay}s linear infinite`,
-          }}
+          style={
+            {
+              left: `${p.left}%`,
+              bottom: "-5%",
+              width: p.size,
+              height: p.size,
+              background: `radial-gradient(circle, rgba(255,200,80,${p.opacity}) 0%, rgba(255,150,30,0) 70%)`,
+              boxShadow: `0 0 ${p.size * 2}px rgba(255,180,50,${p.opacity * 0.5})`,
+              "--drift": `${p.drift}px`,
+              animation: `loginParticleRise ${p.duration}s ${p.delay}s linear infinite`,
+            } as React.CSSProperties
+          }
         />
       ))}
       <style>{`

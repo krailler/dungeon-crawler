@@ -4,19 +4,10 @@ import { useTranslation } from "react-i18next";
 import type { ItemDefClient } from "@dungeon/shared";
 import { itemInstanceStore } from "../stores/itemInstanceStore";
 import { getRarityStyle } from "../utils/rarityColors";
-import { STAT_I18N, formatStatValue } from "../utils/statLabels";
+import { STAT_I18N, formatStatValue, formatStatDiff } from "../utils/statLabels";
 
 /** Stats where lower is better */
 const LOWER_IS_BETTER = new Set(["attackCooldown"]);
-
-function formatDiff(stat: string, diff: number): string {
-  if (stat === "attackCooldown" || stat === "moveSpeed") {
-    const sign = diff > 0 ? "+" : "";
-    return `${sign}${diff.toFixed(2)}`;
-  }
-  const sign = diff > 0 ? "+" : "";
-  return `${sign}${Math.round(diff)}`;
-}
 
 function DiffArrow({ stat, diff }: { stat: string; diff: number }): ReactNode {
   if (Math.abs(diff) < 0.001) return null;
@@ -26,7 +17,7 @@ function DiffArrow({ stat, diff }: { stat: string; diff: number }): ReactNode {
   const arrow = isGood ? "▲" : "▼";
   return (
     <span className={`ml-1 text-[9px] ${color}`}>
-      {arrow} {formatDiff(stat, diff)}
+      {arrow} {formatStatDiff(stat, diff)}
     </span>
   );
 }

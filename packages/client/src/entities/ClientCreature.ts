@@ -45,7 +45,6 @@ export class ClientCreature {
   private targetX: number = 0;
   private targetZ: number = 0;
   private targetRotY: number = 0;
-  private previousHealth: number;
 
   // Hit flash
 
@@ -68,7 +67,7 @@ export class ClientCreature {
   constructor(
     scene: Scene,
     id: string,
-    initialHealth: number,
+    _initialHealth: number,
     guiTexture: AdvancedDynamicTexture,
     soundManager?: SoundManager,
   ) {
@@ -79,8 +78,6 @@ export class ClientCreature {
       this.soundManager = soundManager;
       this.animController.setSpatialPosition(() => this.mesh.position);
     }
-    this.previousHealth = initialHealth;
-
     // Invisible anchor for position/rotation
     this.mesh = MeshBuilder.CreateGround(`creature_${id}`, { width: 0.1, height: 0.1 }, scene);
     this.mesh.visibility = 0;
@@ -182,8 +179,6 @@ export class ClientCreature {
     this.isAggro = isAggro;
     this.serverMoving = isMoving;
     this.serverWalking = isWalking;
-
-    this.previousHealth = health;
 
     this.updateHealthBar(health, maxHealth);
 

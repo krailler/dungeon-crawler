@@ -12,6 +12,7 @@ import type {
   BindableActionValue,
   VolumeSettings,
   ShadowQualityValue,
+  GraphicsSettings,
 } from "../stores/settingsStore";
 import { MenuButton } from "../components/MenuButton";
 import { playUiSfx } from "../../audio/uiSfx";

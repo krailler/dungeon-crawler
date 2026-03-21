@@ -479,12 +479,20 @@ export class PlayerState extends Schema {
     const invSlot = this.inventory.get(invKey);
     if (!invSlot || !invSlot.instanceId) return false;
 
+    // Ensure the mapping exists for the item being equipped
+    this.instanceItemIds.set(invSlot.instanceId, invSlot.itemId);
+
     const existingEquip = this.equipment.get(equipSlot);
 
     if (existingEquip && existingEquip.instanceId) {
       // Swap: move currently equipped item back to the same inventory slot
       const oldInstanceId = existingEquip.instanceId;
       const oldItemId = this.getItemIdForInstance(oldInstanceId);
+
+      if (!oldItemId) {
+        // instanceItemIds is missing the mapping — should not happen
+        return false;
+      }
 
       // Put new item into equipment
       existingEquip.instanceId = invSlot.instanceId;

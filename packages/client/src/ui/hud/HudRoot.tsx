@@ -262,15 +262,14 @@ export const HudRoot = (): ReactNode => {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
   const lockKeyboard = useCallback(() => {
-    navigator.keyboard?.lock?.(["Escape"]).catch(() => {});
+    const nav = navigator as Navigator & {
+      keyboard?: { lock?: (keys: string[]) => Promise<void> };
+    };
+    nav.keyboard?.lock?.(["Escape"]).catch(() => {});
   }, []);
   const unlockKeyboard = useCallback(() => {
-    if (
-      "keyboard" in navigator &&
-      "unlock" in (navigator as Navigator & { keyboard: { unlock: () => void } }).keyboard
-    ) {
-      (navigator.keyboard as { unlock: () => void }).unlock();
-    }
+    const nav = navigator as Navigator & { keyboard?: { unlock?: () => void } };
+    nav.keyboard?.unlock?.();
   }, []);
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
@@ -315,7 +314,11 @@ export const HudRoot = (): ReactNode => {
   useEffect(() => {
     if (!ctxMenu) return;
     const handlePointer = (e: PointerEvent) => {
-      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
+      if (
+        ctxMenuRef.current &&
+        e.target instanceof Node &&
+        !ctxMenuRef.current.contains(e.target)
+      ) {
         setCtxMenu(null);
       }
     };

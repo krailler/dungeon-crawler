@@ -817,6 +817,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Validate inventory slot has an equipment item
       const invSlot = player.inventory.get(String(data.invSlot));
       if (!invSlot || !invSlot.instanceId) return;
+      if (!getItemInstance(invSlot.instanceId)) return;
 
       const itemDef = getItemDef(invSlot.itemId);
       if (!itemDef?.equipSlot) return;

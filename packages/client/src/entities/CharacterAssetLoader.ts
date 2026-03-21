@@ -138,7 +138,7 @@ export class CharacterAssetLoader {
 
   /** Instantiate each separate animation file, retarget onto base skeleton, dispose extra meshes. */
   private _retargetSeparateAnimations(
-    baseResult: ReturnType<AssetContainer["instantiateModelsToScene"]>,
+    _baseResult: ReturnType<AssetContainer["instantiateModelsToScene"]>,
     animations: Map<AnimName, AnimationGroup>,
     name: string,
   ): void {

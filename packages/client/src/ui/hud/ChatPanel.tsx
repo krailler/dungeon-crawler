@@ -314,7 +314,7 @@ const MessageRow = ({
 
   // Resolve text: use i18n key if available, otherwise fallback to plain text
   const displayText = msg.i18nKey
-    ? t(msg.i18nKey, { ...msg.i18nParams, defaultValue: msg.text })
+    ? t(msg.i18nKey, { ...(msg.i18nParams ?? {}), defaultValue: msg.text })
     : msg.text;
 
   // Check if text contains item links

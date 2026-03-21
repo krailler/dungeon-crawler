@@ -654,6 +654,7 @@ export class PlayerSessionManager {
       })
       .where(eq(characters.id, characterId));
 
+    await this.savePlayerInstancesTx(tx, player);
     await this.saveInventoryTx(tx, characterId, player);
     await this.saveEquipmentTx(tx, characterId, player);
     await this.saveConsumableBarTx(tx, characterId, player);
@@ -840,12 +841,8 @@ export class PlayerSessionManager {
     this.log.debug({ characterId, slots: rows.length }, "Equipment loaded");
   }
 
-  private async saveEquipmentTx(
-    tx: DbTransaction,
-    characterId: string,
-    player: PlayerState,
-  ): Promise<void> {
-    // Collect all instance IDs this player has (inventory + equipment)
+  /** Save all pending item instances for this player (must run before inventory/equipment saves) */
+  private async savePlayerInstancesTx(tx: DbTransaction, player: PlayerState): Promise<void> {
     const playerInstanceIds: string[] = [];
     player.inventory.forEach((slot) => {
       if (slot.instanceId) playerInstanceIds.push(slot.instanceId);
@@ -853,10 +850,14 @@ export class PlayerSessionManager {
     player.equipment.forEach((eqSlot) => {
       if (eqSlot.instanceId) playerInstanceIds.push(eqSlot.instanceId);
     });
-
-    // Save only this player's pending instances
     await savePendingInstancesTx(tx, playerInstanceIds);
+  }
 
+  private async saveEquipmentTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
     // Delete all equipment for this character, then re-insert
     await tx.delete(characterEquipment).where(eq(characterEquipment.characterId, characterId));
 

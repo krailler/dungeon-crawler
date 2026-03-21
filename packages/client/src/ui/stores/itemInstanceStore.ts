@@ -17,10 +17,11 @@ function emit(): void {
 }
 
 function flushBatch(): void {
-  if (!pendingBatch || pendingBatch.size === 0 || !roomRef) {
+  if (!pendingBatch || pendingBatch.size === 0) {
     pendingBatch = null;
     return;
   }
+  if (!roomRef) return; // keep batch for retry when room reconnects
   const ids = Array.from(pendingBatch);
   pendingBatch = null;
   for (const id of ids) inflight.add(id);

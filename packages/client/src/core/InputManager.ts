@@ -415,7 +415,7 @@ export class InputManager {
     this.onEntityPicked(entity.pickType, entity.pickId);
     // Enable auto-attack if not already active (toggle it on)
     const hud = hudStore.getSnapshot();
-    const localMember = hud.members?.find((m) => m.sessionId === hud.localSessionId);
+    const localMember = hud.members?.find((m) => m.isLocal);
     if (!localMember?.autoAttackEnabled) {
       this.room.send(MessageType.SKILL_TOGGLE, { skillId: "basic_attack" });
     }

@@ -216,7 +216,7 @@ export class EffectSystem {
     player.equipment.forEach((eqSlot) => {
       if (!eqSlot.instanceId) return;
       const instance = getItemInstance(eqSlot.instanceId);
-      if (!instance) return;
+      if (!instance?.rolledStats) return;
       for (const [stat, value] of Object.entries(instance.rolledStats)) {
         if (stat === "strength") equipStr += value;
         else if (stat === "vitality") equipVit += value;

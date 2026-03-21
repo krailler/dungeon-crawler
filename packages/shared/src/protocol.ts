@@ -356,8 +356,6 @@ export interface ReviveStartMessage {
   targetSessionId: string;
 }
 
-// ── Misc ─────────────────────────────────────────────────────────────────────
-
 // ── Effects ─────────────────────────────────────────────────────────────────
 
 /** Client → Server: request effect definitions by id */
@@ -385,8 +383,6 @@ export interface ClassDefsResponseMessage {
   version: number;
   classes: ClassDefClient[];
 }
-
-// ── Misc ─────────────────────────────────────────────────────────────────────
 
 // ── Talents ──────────────────────────────────────────────────────────────────
 
@@ -419,8 +415,6 @@ export interface TalentStateMessage {
   classTalentIds: string[];
 }
 
-// ── Misc ─────────────────────────────────────────────────────────────────────
-
 // ── Consumable Bar ──────────────────────────────────────────────────────────
 
 /** Client → Server: assign an item to a consumable bar slot */
@@ -439,8 +433,6 @@ export interface ConsumableBarSwapMessage {
   from: number;
   to: number;
 }
-
-// ── Misc ─────────────────────────────────────────────────────────────────────
 
 /** Command info sent to client on join for help overlay */
 export interface CommandInfo {
