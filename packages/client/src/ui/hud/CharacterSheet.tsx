@@ -8,9 +8,7 @@ import { HudPanel } from "../components/HudPanel";
 import { CharacterTab } from "./CharacterTab";
 import { TalentTab } from "./TalentTab";
 import { SpellbookTab } from "./SpellbookTab";
-import { EquipmentTab } from "./EquipmentTab";
-
-export type SheetTab = "character" | "equipment" | "talents" | "skills";
+export type SheetTab = "character" | "talents" | "skills";
 
 type TabDef = {
   id: SheetTab;
@@ -31,7 +29,7 @@ const TabButton = ({
   return (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+      className={`relative flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors ${
         active
           ? "border-b-2 border-sky-400 text-sky-300"
           : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"
@@ -74,7 +72,6 @@ export const CharacterSheet = ({
   const tabs: TabDef[] = useMemo(
     () => [
       { id: "character", labelKey: "character.tabCharacter", badge: statPoints },
-      { id: "equipment" as SheetTab, labelKey: "character.tabEquipment" },
       ...(playerLevel >= TALENT_UNLOCK_LEVEL
         ? [{ id: "talents" as SheetTab, labelKey: "character.tabTalents", badge: talentPoints }]
         : []),
@@ -96,8 +93,8 @@ export const CharacterSheet = ({
         </div>
       }
       panelId="character-sheet"
-      defaultPosition={{ x: window.innerWidth - 320, y: 56 }}
-      className="w-80"
+      defaultPosition={{ x: window.innerWidth - 460, y: 56 }}
+      className="w-[440px]"
       fitKey={activeTab}
     >
       {/* Tab bar */}
@@ -114,7 +111,6 @@ export const CharacterSheet = ({
 
       {/* Tab content */}
       {activeTab === "character" && <CharacterTab />}
-      {activeTab === "equipment" && <EquipmentTab />}
       {activeTab === "talents" && <TalentTab />}
       {activeTab === "skills" && <SpellbookTab />}
     </HudPanel>

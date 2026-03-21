@@ -1,11 +1,13 @@
-import { useMemo, useSyncExternalStore } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { EQUIPMENT_SLOTS } from "@dungeon/shared";
 import type { EquipmentSlotValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import { ItemActionSlot } from "../components/ItemActionSlot";
 import { itemInstanceStore } from "../stores/itemInstanceStore";
+
+const EQUIP_MIME = "application/x-equip-slot";
 
 type SlotConfig = {
   key: EquipmentSlotValue;
@@ -34,9 +36,36 @@ function EquipmentSlotItem({
     itemInstanceStore.getSnapshot,
   );
   const instance = instanceId ? instances.get(instanceId) : undefined;
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes(EQUIP_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback(() => setDragOver(false), []);
+
+  const handleDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      setDragOver(false);
+      const invSlot = e.dataTransfer.getData(EQUIP_MIME);
+      if (!invSlot) return;
+      hudStore.equipItem(Number(invSlot), slotConfig.key);
+    },
+    [slotConfig.key],
+  );
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div
+      className={`flex flex-col items-center gap-0.5 rounded-lg transition-colors ${dragOver ? "bg-sky-500/20 ring-1 ring-sky-400/40" : ""}`}
+      data-drop-zone
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <ItemActionSlot
         itemId={instance?.itemId}
         instanceId={instanceId}
@@ -48,14 +77,14 @@ function EquipmentSlotItem({
   );
 }
 
-export const EquipmentTab = (): ReactNode => {
+export const EquipmentTab = ({ compact }: { compact?: boolean } = {}): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const local = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const equipment = local?.equipment ?? {};
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2 place-items-center">
+      <div className={`grid ${compact ? "grid-cols-2" : "grid-cols-3"} gap-2 place-items-center`}>
         {SLOT_LAYOUT.map((slotConfig) => (
           <EquipmentSlotItem
             key={slotConfig.key}

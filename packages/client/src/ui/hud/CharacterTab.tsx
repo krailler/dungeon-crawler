@@ -10,6 +10,7 @@ import { CoinIcon } from "../icons/CoinIcon";
 import { Tooltip } from "../components/Tooltip";
 import { ProgressBar } from "../components/ProgressBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EquipmentTab } from "./EquipmentTab";
 import { playUiSfx } from "../../audio/uiSfx";
 
 const StatRow = ({
@@ -85,105 +86,117 @@ export const CharacterTab = (): ReactNode => {
 
   return (
     <>
-      {/* Health bar */}
-      <div className="mb-4">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">{t("character.health")}</span>
-          <span className="font-mono text-[11px] text-slate-400">
-            {Math.ceil(local.health)}/{local.maxHealth}
-          </span>
-        </div>
-        <ProgressBar value={local.health} max={local.maxHealth} color="health" />
-      </div>
+      <div className="flex gap-4">
+        {/* Left column: stats */}
+        <div className="flex-1 min-w-0">
+          {/* Health bar */}
+          <div className="mb-4">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">{t("character.health")}</span>
+              <span className="font-mono text-[11px] text-slate-400">
+                {Math.ceil(local.health)}/{local.maxHealth}
+              </span>
+            </div>
+            <ProgressBar value={local.health} max={local.maxHealth} color="health" />
+          </div>
 
-      {/* XP bar */}
-      {(local.xpToNext ?? 0) > 0 && (
-        <div className="mb-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500">{t("character.xp")}</span>
-            <span className="font-mono text-[11px] text-slate-400">
-              {(local.xp ?? 0).toLocaleString()}/{(local.xpToNext ?? 0).toLocaleString()}
+          {/* XP bar */}
+          {(local.xpToNext ?? 0) > 0 && (
+            <div className="mb-4">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">{t("character.xp")}</span>
+                <span className="font-mono text-[11px] text-slate-400">
+                  {(local.xp ?? 0).toLocaleString()}/{(local.xpToNext ?? 0).toLocaleString()}
+                </span>
+              </div>
+              <ProgressBar value={local.xp ?? 0} max={local.xpToNext ?? 1} color="xp" />
+            </div>
+          )}
+
+          {/* Gold */}
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-900/20 px-3 py-2">
+            <CoinIcon className="h-4 w-4 text-amber-400" />
+            <span className="text-sm font-semibold text-amber-300">
+              {(local.gold ?? 0).toLocaleString()} {t("character.gold")}
             </span>
           </div>
-          <ProgressBar value={local.xp ?? 0} max={local.xpToNext ?? 1} color="xp" />
+
+          {/* Divider + Base stats */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+              {t("character.baseStats")}
+            </span>
+            {statPoints > 0 && (
+              <span className="animate-pulse rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                {t("character.statPoints", { count: statPoints })}
+              </span>
+            )}
+          </div>
+          <div className="mb-3 rounded-xl bg-slate-900/40 px-3 py-1">
+            <StatRow
+              label={t("character.strength")}
+              value={stats.strength}
+              color="text-red-400"
+              tooltip={t("character.strengthTip")}
+              canAllocate={statPoints > 0}
+              onAllocate={() => handleAllocate(AllocatableStat.STRENGTH)}
+            />
+            <StatRow
+              label={t("character.vitality")}
+              value={stats.vitality}
+              color="text-green-400"
+              tooltip={t("character.vitalityTip")}
+              canAllocate={statPoints > 0}
+              onAllocate={() => handleAllocate(AllocatableStat.VITALITY)}
+            />
+            <StatRow
+              label={t("character.agility")}
+              value={stats.agility}
+              color="text-yellow-400"
+              tooltip={t("character.agilityTip")}
+              canAllocate={statPoints > 0}
+              onAllocate={() => handleAllocate(AllocatableStat.AGILITY)}
+            />
+          </div>
+
+          {/* Derived stats */}
+          <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            {t("character.derivedStats")}
+          </div>
+          <div className="rounded-xl bg-slate-900/40 px-3 py-1">
+            <StatRow
+              label={t("character.attackDamage")}
+              value={stats.attackDamage}
+              color="text-orange-400"
+              tooltip={t("character.attackDamageTip")}
+            />
+            <StatRow
+              label={t("character.defense")}
+              value={stats.defense}
+              color="text-sky-400"
+              tooltip={t("character.defenseTip")}
+            />
+            <StatRow
+              label={t("character.speed")}
+              value={parseFloat(stats.speed.toFixed(1))}
+              color="text-emerald-400"
+              tooltip={t("character.speedTip")}
+            />
+            <StatRow
+              label={t("character.attackSpeed")}
+              value={parseFloat(stats.attackCooldown.toFixed(2))}
+              color="text-purple-400"
+              tooltip={t("character.attackSpeedTip")}
+            />
+          </div>
         </div>
-      )}
-
-      {/* Gold */}
-      <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-900/20 px-3 py-2">
-        <CoinIcon className="h-4 w-4 text-amber-400" />
-        <span className="text-sm font-semibold text-amber-300">
-          {(local.gold ?? 0).toLocaleString()} {t("character.gold")}
-        </span>
-      </div>
-
-      {/* Divider + Base stats */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-          {t("character.baseStats")}
-        </span>
-        {statPoints > 0 && (
-          <span className="animate-pulse rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
-            {t("character.statPoints", { count: statPoints })}
-          </span>
-        )}
-      </div>
-      <div className="mb-3 rounded-xl bg-slate-900/40 px-3 py-1">
-        <StatRow
-          label={t("character.strength")}
-          value={stats.strength}
-          color="text-red-400"
-          tooltip={t("character.strengthTip")}
-          canAllocate={statPoints > 0}
-          onAllocate={() => handleAllocate(AllocatableStat.STRENGTH)}
-        />
-        <StatRow
-          label={t("character.vitality")}
-          value={stats.vitality}
-          color="text-green-400"
-          tooltip={t("character.vitalityTip")}
-          canAllocate={statPoints > 0}
-          onAllocate={() => handleAllocate(AllocatableStat.VITALITY)}
-        />
-        <StatRow
-          label={t("character.agility")}
-          value={stats.agility}
-          color="text-yellow-400"
-          tooltip={t("character.agilityTip")}
-          canAllocate={statPoints > 0}
-          onAllocate={() => handleAllocate(AllocatableStat.AGILITY)}
-        />
-      </div>
-
-      {/* Derived stats */}
-      <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
-        {t("character.derivedStats")}
-      </div>
-      <div className="rounded-xl bg-slate-900/40 px-3 py-1">
-        <StatRow
-          label={t("character.attackDamage")}
-          value={stats.attackDamage}
-          color="text-orange-400"
-          tooltip={t("character.attackDamageTip")}
-        />
-        <StatRow
-          label={t("character.defense")}
-          value={stats.defense}
-          color="text-sky-400"
-          tooltip={t("character.defenseTip")}
-        />
-        <StatRow
-          label={t("character.speed")}
-          value={parseFloat(stats.speed.toFixed(1))}
-          color="text-emerald-400"
-          tooltip={t("character.speedTip")}
-        />
-        <StatRow
-          label={t("character.attackSpeed")}
-          value={parseFloat(stats.attackCooldown.toFixed(2))}
-          color="text-purple-400"
-          tooltip={t("character.attackSpeedTip")}
-        />
+        {/* Right column: equipment */}
+        <div className="w-[140px] shrink-0">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            {t("character.tabEquipment")}
+          </div>
+          <EquipmentTab compact />
+        </div>
       </div>
 
       {/* Reset stats button */}

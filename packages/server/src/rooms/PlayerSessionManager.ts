@@ -208,15 +208,19 @@ export class PlayerSessionManager {
     ]);
     this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-    // Send talent state to owning client (talentPoints synced via Schema)
+    // Send talent state to owning client after a short delay — the client
+    // needs time to register onMessage handlers after the join resolves.
     const classTalentIds = getTalentsForClass(player.classId).map((t) => t.id);
-    this.bridge.sendToClient(client.sessionId, MessageType.TALENT_STATE, {
+    const talentPayload = {
       allocations: Array.from(player.talentAllocations.entries()).map(([talentId, rank]) => ({
         talentId,
         rank,
       })),
       classTalentIds,
-    });
+    };
+    this.bridge.clock.setTimeout(() => {
+      this.bridge.sendToClient(client.sessionId, MessageType.TALENT_STATE, talentPayload);
+    }, 100);
 
     // Compute derived stats with talent modifiers + full heal
     this.bridge.recomputeStats(player);

@@ -10,6 +10,7 @@ import {
 import type { ReactNode, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { INVENTORY_MAX_SLOTS } from "@dungeon/shared";
+import type { EquipmentSlotValue } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { SkillCooldownState } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
@@ -30,6 +31,7 @@ type InventorySlotProps = {
   isDragOver: boolean;
   cooldown: SkillCooldownState | null;
   compareInstanceId: string | undefined;
+  equipment: Record<string, { instanceId?: string } | undefined>;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDragLeave: () => void;
@@ -46,6 +48,7 @@ const InventorySlot = memo(
     isDragOver,
     cooldown,
     compareInstanceId,
+    equipment,
     onDragStart,
     onDragOver,
     onDragLeave,
@@ -67,6 +70,9 @@ const InventorySlot = memo(
         e.dataTransfer.effectAllowed = "move";
         if (def?.consumable && !def.transient) {
           e.dataTransfer.setData("application/x-consumable-item", slot.itemId);
+        }
+        if (def?.equipSlot) {
+          e.dataTransfer.setData("application/x-equip-slot", String(index));
         }
         onDragStart(index);
       },
@@ -96,9 +102,20 @@ const InventorySlot = memo(
       if (def.consumable) {
         onUseItem(slot.itemId);
       } else if (def.equipSlot) {
-        hudStore.equipItem(index, def.equipSlot);
+        let targetSlot = def.equipSlot;
+        // Accessories: pick first empty slot, or first slot if both occupied
+        if (def.equipSlot.startsWith("accessory")) {
+          const eq1 = equipment["accessory_1"];
+          const eq2 = equipment["accessory_2"];
+          targetSlot = !eq1?.instanceId
+            ? "accessory_1"
+            : !eq2?.instanceId
+              ? "accessory_2"
+              : "accessory_1";
+        }
+        hudStore.equipItem(index, targetSlot as EquipmentSlotValue);
       }
-    }, [slot, def, index, onUseItem]);
+    }, [slot, def, index, onUseItem, equipment]);
 
     // Build hint text
     const hint = def?.consumable
@@ -471,6 +488,7 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
               isDragOver={dragOverIndex === i && dragSourceIndex !== i}
               cooldown={slot ? (snapshot.itemCooldowns.get(slot.itemId) ?? null) : null}
               compareInstanceId={getCompareInstanceId(slot)}
+              equipment={equipment}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
