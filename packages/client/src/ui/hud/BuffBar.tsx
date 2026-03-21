@@ -14,20 +14,18 @@ export const BuffBar = (): ReactNode => {
   if (!effects || effects.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute top-[55%] left-1/2 -translate-x-1/2">
-      <div className="flex items-center gap-1.5">
-        {effects.map((effect) => (
-          <EffectIcon
-            key={effect.effectId}
-            effectId={effect.effectId}
-            remaining={effect.remaining}
-            duration={effect.duration}
-            stacks={effect.stacks}
-            def={defSnap.get(effect.effectId)}
-            modValue={effect.modValue}
-          />
-        ))}
-      </div>
+    <div className="flex items-center gap-1.5">
+      {effects.map((effect) => (
+        <EffectIcon
+          key={effect.effectId}
+          effectId={effect.effectId}
+          remaining={effect.remaining}
+          duration={effect.duration}
+          stacks={effect.stacks}
+          def={defSnap.get(effect.effectId)}
+          modValue={effect.modValue}
+        />
+      ))}
     </div>
   );
 };

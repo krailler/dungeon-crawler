@@ -22,8 +22,7 @@ import { SkillBar } from "./SkillBar";
 import { ConsumableBar } from "./ConsumableBar";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
-import { ActionFeedback } from "./ActionFeedback";
-import { BuffBar } from "./BuffBar";
+import { PlayerOverhead } from "./PlayerOverhead";
 import { LootBagPanel } from "./LootBagPanel";
 import { DeathOverlay } from "./DeathOverlay";
 import { LowHealthVignette } from "./LowHealthVignette";
@@ -39,7 +38,6 @@ import { CharacterIcon } from "../icons/CharacterIcon";
 import { MapIcon } from "../icons/MapIcon";
 import { StarIcon } from "../icons/StarIcon";
 import { BackpackIcon } from "../icons/BackpackIcon";
-import { FullscreenIcon, ExitFullscreenIcon } from "../icons/FullscreenIcon";
 import { settingsStore, displayKeyName } from "../stores/settingsStore";
 import { classDefStore } from "../stores/classDefStore";
 
@@ -254,34 +252,7 @@ export const HudRoot = (): ReactNode => {
     return () => window.removeEventListener("keydown", handleKey);
   }, [settings.keybindings.spellbook, toggleSheet]);
 
-  // Fullscreen
-  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
-  useEffect(() => {
-    const onChange = (): void => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-  const lockKeyboard = useCallback(() => {
-    const nav = navigator as Navigator & {
-      keyboard?: { lock?: (keys: string[]) => Promise<void> };
-    };
-    nav.keyboard?.lock?.(["Escape"]).catch(() => {});
-  }, []);
-  const unlockKeyboard = useCallback(() => {
-    const nav = navigator as Navigator & { keyboard?: { unlock?: () => void } };
-    nav.keyboard?.unlock?.();
-  }, []);
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      unlockKeyboard();
-      document.exitFullscreen();
-    } else {
-      document.documentElement
-        .requestFullscreen()
-        .then(() => lockKeyboard())
-        .catch(() => {});
-    }
-  }, [lockKeyboard, unlockKeyboard]);
+  // Fullscreen (handled globally by GlobalOverlay)
 
   // Context menu for party members
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
@@ -343,11 +314,6 @@ export const HudRoot = (): ReactNode => {
 
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
-      <div className="absolute inset-x-0 top-3 flex justify-center">
-        <span className="rounded-full bg-amber-500/10 px-4 py-1 text-[11px] font-medium text-amber-400/70 backdrop-blur-sm">
-          {t("devBanner")}
-        </span>
-      </div>
       {isAdmin && <DebugPanel />}
       <PauseMenu />
       <GateHint />
@@ -465,7 +431,7 @@ export const HudRoot = (): ReactNode => {
           </button>
         </div>
       )}
-      <div className="pointer-events-auto absolute right-5 top-4 flex items-center gap-2">
+      <div className="pointer-events-auto absolute right-14 top-4 flex items-center gap-2">
         {debugSnapshot.showCoords && snapshot.localCoords && (
           <HudPill variant="amber" mono>
             X: {snapshot.localCoords.x.toFixed(1)} Z: {snapshot.localCoords.z.toFixed(1)}
@@ -506,24 +472,11 @@ export const HudRoot = (): ReactNode => {
             </span>
           </HudPill>
         )}
-        <button
-          onClick={toggleFullscreen}
-          className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-600/40 bg-slate-900/60 text-slate-400 shadow-lg shadow-black/30 backdrop-blur-md transition-all hover:border-slate-500/50 hover:text-slate-200"
-          title={t("settings.fullscreen")}
-        >
-          {isFullscreen ? (
-            <ExitFullscreenIcon className="h-3.5 w-3.5" />
-          ) : (
-            <FullscreenIcon className="h-3.5 w-3.5" />
-          )}
-        </button>
       </div>
       {/* Chat panel — bottom left */}
       <ChatPanel />
-      {/* Buff/debuff bar — above action bar */}
-      <BuffBar />
-      {/* Action feedback — floats above action bar */}
-      <ActionFeedback />
+      {/* Player overhead: health bar + buffs — centered above character */}
+      <PlayerOverhead />
       {/* Action bar — bottom center, above XP bar: consumable bar + skill bar */}
       <div className="pointer-events-auto absolute bottom-[52px] left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
         <ConsumableBar />

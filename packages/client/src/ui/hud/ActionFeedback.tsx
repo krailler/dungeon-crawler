@@ -10,7 +10,7 @@ export const ActionFeedback = (): ReactNode => {
   if (entries.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute bottom-[120px] left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1">
       {entries.map((entry) => (
         <span
           key={entry.id}

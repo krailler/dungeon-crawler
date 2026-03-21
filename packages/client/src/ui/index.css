@@ -31,6 +31,12 @@ body {
   letter-spacing: 0.01em;
   position: relative;
   user-select: none;
+  -webkit-user-drag: none;
+}
+
+img {
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 /* Allow text selection in input fields globally */

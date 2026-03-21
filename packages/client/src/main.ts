@@ -14,11 +14,16 @@ import { matchmakingStore } from "./ui/stores/matchmakingStore";
 import { ClientGame } from "./core/ClientGame";
 import { preloadUiSounds, startLobbyMusic, stopLobbyMusic } from "./audio/uiSfx";
 import { assetPreloadStore } from "./ui/stores/assetPreloadStore";
+import { GlobalOverlay } from "./ui/components/GlobalOverlay";
 
 // Preload UI sounds early so they work in login/lobby screens
 preloadUiSounds();
 // Start lobby music on the login screen (requires user gesture to actually play)
 startLobbyMusic();
+
+// Global overlay (fullscreen toggle + dev badge) — visible on all screens
+const globalRoot = createRoot(document.getElementById("global-overlay")!);
+globalRoot.render(createElement(GlobalOverlay));
 
 const loginRoot = createRoot(document.getElementById("login-root")!);
 loginRoot.render(createElement(LoginScreen));

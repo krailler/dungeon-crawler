@@ -439,7 +439,7 @@ export class ClientGame {
         } else if (code === CloseCode.KICKED) {
           authStore.kick(t("kick.kicked"));
         } else if (code === CloseCode.DUNGEON_COMPLETED) {
-          authStore.kick(t("kick.dungeonCompleted"));
+          lobbyStore.returnToLobby();
         } else {
           // Connection lost — session may still be alive on server for 5 min
           authStore.disconnect();

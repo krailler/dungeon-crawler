@@ -31,7 +31,7 @@ const TabButton = ({
   return (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`relative flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
         active
           ? "border-b-2 border-sky-400 text-sky-300"
           : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"

@@ -66,10 +66,11 @@ export function createDefStore<TDef extends { id: string }>(
   };
 
   function flushBatch(): void {
-    if (!pendingBatch || pendingBatch.size === 0 || !roomRef) {
+    if (!pendingBatch || pendingBatch.size === 0) {
       pendingBatch = null;
       return;
     }
+    if (!roomRef) return; // keep batch for retry when room connects
     const ids = Array.from(pendingBatch);
     pendingBatch = null;
 
