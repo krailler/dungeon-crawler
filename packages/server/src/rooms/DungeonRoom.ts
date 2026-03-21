@@ -56,6 +56,7 @@ import { CombatSystem } from "../systems/CombatSystem";
 import { GateSystem } from "../systems/GateSystem";
 import { GameLoop } from "../systems/GameLoop";
 import { EffectSystem } from "../systems/EffectSystem";
+import { QuestSystem } from "../systems/QuestSystem";
 import { ChatSystem } from "../chat/ChatSystem";
 import type { ChatRoomBridge } from "../chat/ChatSystem";
 import { registerCommands } from "../chat/commands";
@@ -164,6 +165,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private chatSystem!: ChatSystem;
   private gateSystem!: GateSystem;
   private gameLoop!: GameLoop;
+  private questSystem!: QuestSystem;
   private sessionManager!: PlayerSessionManager;
   /** Tracks which player session each player is targeting (for commands fallback). */
   private playerTargets: Map<string, string> = new Map();
@@ -206,12 +208,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state = new DungeonState();
     this.state.serverRuntime = `Bun ${Bun.version} (${process.arch})`;
 
-    // Generate dungeon (also creates pathfinder, AI, combat systems)
-    const seed = DUNGEON_SEED ?? Date.now();
-    this.generateDungeon(seed);
-    this.updateMetadata();
-
-    // Setup chat system
+    // Setup chat system (before dungeon so QuestSystem can use it)
     const self = this;
     const chatBridge: ChatRoomBridge = {
       getClients: () => this.clients,
@@ -276,6 +273,11 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     };
     this.chatSystem = new ChatSystem(chatBridge);
     registerCommands(this.chatSystem, chatBridge);
+
+    // Generate dungeon (also creates pathfinder, AI, combat, quest systems)
+    const seed = DUNGEON_SEED ?? Date.now();
+    this.generateDungeon(seed);
+    this.updateMetadata();
 
     // Setup gate system (after dungeon + chat system are ready)
     this.gateSystem = new GateSystem({
@@ -358,6 +360,9 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
       getSpawnPoint: () => self.sessionManager.findSpawnPosition(),
       hasPlayerTarget: (sessionId: string) => self.playerTargets.has(sessionId),
+      get questSystem() {
+        return self.questSystem;
+      },
     });
 
     // Register message handlers
@@ -476,6 +481,26 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
       this.exitCountdownActive = true;
       const EXIT_COUNTDOWN = 10;
+
+      // Distribute quest completion rewards
+      const { bonusGold, bonusXp } = this.questSystem.getCompletionRewards(this.state.dungeonLevel);
+      if (bonusGold > 0 || bonusXp > 0) {
+        this.state.players.forEach((p: PlayerState) => {
+          if (p.lifeState === LifeState.ALIVE || p.lifeState === LifeState.DOWNED) {
+            p.gold += bonusGold;
+            const levelUps = p.addXp(bonusXp);
+            if (levelUps.length > 0) {
+              this.effectSystem.recomputeStats(p);
+              p.health = p.maxHealth;
+            }
+          }
+        });
+        this.chatSystem.broadcastSystemI18n(
+          "quest.bonusReward",
+          { gold: bonusGold, xp: bonusXp },
+          `Quest bonus: +${bonusGold} gold, +${bonusXp} XP!`,
+        );
+      }
 
       this.chatSystem.broadcastAnnouncement(
         "announce.dungeonCompleted",
@@ -1345,6 +1370,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.creatureSpawnSeed = seed ^ 0x454e454d;
     const spawnRng = mulberry32(this.creatureSpawnSeed);
     this.spawnCreatures(rooms, spawnRng, dungeonLevel);
+
+    // Generate dungeon quests based on spawned creatures
+    const hasBoss = getBossTypesForLevel(dungeonLevel).length > 0 && rooms.length > 1;
+    if (!this.questSystem) {
+      this.questSystem = new QuestSystem(this.state, this.chatSystem);
+    } else {
+      this.questSystem.reset(this.state, this.chatSystem);
+    }
+    this.questSystem.generateQuests(this.allCreatures.size, hasBoss, dungeonLevel);
 
     this.log.info(
       { seed, rooms: rooms.length, creatures: this.state.creatures.size },

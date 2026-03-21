@@ -3,12 +3,14 @@ import { PlayerState } from "./PlayerState";
 import { CreatureState } from "./CreatureState";
 import { GateState } from "./GateState";
 import { LootBagState } from "./LootBagState";
+import { QuestState } from "./QuestState";
 
 export class DungeonState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type({ map: CreatureState }) creatures = new MapSchema<CreatureState>();
   @type({ map: GateState }) gates = new MapSchema<GateState>();
   @type({ map: LootBagState }) lootBags = new MapSchema<LootBagState>();
+  @type({ map: QuestState }) quests = new MapSchema<QuestState>();
   @type("string") tileMapData: string = "";
   @type("string") floorVariantData: string = "";
   @type("string") wallVariantData: string = "";

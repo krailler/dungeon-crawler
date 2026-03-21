@@ -105,6 +105,16 @@ export type { RoleValue } from "./Roles.js";
 export { GateType } from "./GateTypes.js";
 export type { GateTypeValue } from "./GateTypes.js";
 
+export {
+  QuestType,
+  QuestStatus,
+  BOSS_TIMER_BASE,
+  BOSS_TIMER_PER_LEVEL,
+  QUEST_BONUS_GOLD_PER_LEVEL,
+  QUEST_BONUS_XP_PER_LEVEL,
+} from "./Quests.js";
+export type { QuestTypeValue, QuestStatusValue } from "./Quests.js";
+
 export { TutorialStep } from "./Tutorial.js";
 export type { TutorialStepValue } from "./Tutorial.js";
 

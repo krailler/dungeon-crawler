@@ -23,6 +23,7 @@ import { ConsumableBar } from "./ConsumableBar";
 import { InventoryPanel } from "./InventoryPanel";
 import { StaminaBar } from "./StaminaBar";
 import { PlayerOverhead } from "./PlayerOverhead";
+import { QuestTracker } from "./QuestTracker";
 import { LootBagPanel } from "./LootBagPanel";
 import { DeathOverlay } from "./DeathOverlay";
 import { LowHealthVignette } from "./LowHealthVignette";
@@ -315,6 +316,7 @@ export const HudRoot = (): ReactNode => {
   return (
     <div className="pointer-events-none absolute inset-0 text-slate-100">
       {isAdmin && <DebugPanel />}
+      <QuestTracker />
       <PauseMenu />
       <GateHint />
       <PromptOverlay />

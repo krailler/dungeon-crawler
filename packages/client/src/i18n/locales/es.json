@@ -181,6 +181,17 @@
     "resetNotEnoughGold": "No tienes suficiente oro ({{cost}} necesario)"
   },
   "devBanner": "En desarrollo — todo puede cambiar",
+  "quest": {
+    "title": "Objetivos",
+    "killAll": "Elimina todas las criaturas",
+    "bossTimed": "Derrota al jefe a tiempo",
+    "noDeaths": "Sin bajas",
+    "objectiveCompleted": "Objetivo completado: $t({{quest}})!",
+    "objectiveFailed": "Objetivo fallido: $t({{quest}})",
+    "bossEngage": "El combate contra el jefe ha comenzado!",
+    "bossTimerStarted": "Combate contra el jefe! {{seconds}}s para derrotarlo!",
+    "bonusReward": "Bonus de misión: +{{gold}} oro, +{{xp}} XP!"
+  },
   "hud": {
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",

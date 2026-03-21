@@ -181,6 +181,17 @@
     "resetNotEnoughGold": "Not enough gold ({{cost}} needed)"
   },
   "devBanner": "Early development — everything may change",
+  "quest": {
+    "title": "Objectives",
+    "killAll": "Kill all creatures",
+    "bossTimed": "Defeat the boss in time",
+    "noDeaths": "No casualties",
+    "objectiveCompleted": "Objective completed: $t({{quest}})!",
+    "objectiveFailed": "Objective failed: $t({{quest}})",
+    "bossEngage": "The boss fight has begun!",
+    "bossTimerStarted": "Boss fight! {{seconds}}s to defeat it!",
+    "bonusReward": "Quest bonus: +{{gold}} gold, +{{xp}} XP!"
+  },
   "hud": {
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",

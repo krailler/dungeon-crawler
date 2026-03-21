@@ -38,6 +38,8 @@ import type { AISystem, AIHitEvent } from "./AISystem";
 import type { CombatSystem, CombatHitEvent } from "./CombatSystem";
 import type { EffectSystem } from "./EffectSystem";
 import type { ChatSystem } from "../chat/ChatSystem";
+import type { QuestSystem } from "./QuestSystem";
+import { getCreatureTypeDef } from "../creatures/CreatureTypeRegistry";
 import {
   MessageType,
   CreatureEffectTrigger,
@@ -108,6 +110,8 @@ export interface GameLoopBridge {
   getSpawnPoint(): { x: number; z: number } | null;
   /** Check if a player has a player-type target (e.g. revive target). */
   hasPlayerTarget(sessionId: string): boolean;
+  /** Quest system for tracking dungeon objectives. */
+  readonly questSystem?: QuestSystem;
 }
 
 export class GameLoop {
@@ -122,6 +126,8 @@ export class GameLoop {
   private debugPathClients: Set<string> = new Set();
   /** Incrementing counter for unique loot bag IDs */
   private lootBagCounter: number = 0;
+  /** Whether the boss fight announcement has been sent */
+  private bossEngageAnnounced: boolean = false;
 
   constructor(bridge: GameLoopBridge) {
     this.bridge = bridge;
@@ -166,6 +172,9 @@ export class GameLoop {
 
     // Tick active effects — creatures
     this.tickCreatureEffects(dtSec);
+
+    // Tick quest system (boss timer countdown)
+    this.bridge.questSystem?.tick(dtSec);
 
     // Update life states (downed, dead, respawn, revive channels)
     this.updateLifeStates(dtSec);
@@ -502,6 +511,23 @@ export class GameLoop {
     };
     this.bridge.sendToClient(event.sessionId, MessageType.DAMAGE_DEALT, dmgMsg);
 
+    // Boss engagement announcement + quest timer
+    const hitCreature = this.bridge.state.creatures.get(event.creatureId);
+    if (hitCreature) {
+      if (!this.bossEngageAnnounced) {
+        const typeDef = getCreatureTypeDef(hitCreature.creatureType);
+        if (typeDef?.isBoss) {
+          this.bossEngageAnnounced = true;
+          this.bridge.chatSystem.broadcastAnnouncement(
+            "quest.bossEngage",
+            {},
+            "The boss fight has begun!",
+          );
+        }
+      }
+      this.bridge.questSystem?.onCreatureHit(hitCreature.creatureType);
+    }
+
     // Clear target for all players that had this creature selected
     if (event.killed) {
       this.bridge.combatSystem.clearTargetFor(event.creatureId);
@@ -609,6 +635,11 @@ export class GameLoop {
           this.bridge.state.lootBags.set(`loot_${event.creatureId}_${++this.lootBagCounter}`, bag);
         }
       }
+    }
+
+    // Notify quest system of creature kill
+    if (killedCreature) {
+      this.bridge.questSystem?.onCreatureKilled(killedCreature.creatureType);
     }
 
     // Unregister from AI immediately so dead creatures don't process AI ticks
@@ -914,6 +945,7 @@ export class GameLoop {
 
   /** Transition a player from ALIVE to DOWNED. */
   private transitionToDowned(player: PlayerState, sessionId: string): void {
+    this.bridge.questSystem?.onPlayerDied();
     player.lifeState = LifeState.DOWNED;
     player.bleedTimer = BLEEDOUT_DURATION;
     player.isMoving = false;

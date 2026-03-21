@@ -97,10 +97,13 @@ const LOBBY_MUSIC_URL = "/audio/music/lobby_theme.ogg";
 let lobbySource: AudioBufferSourceNode | null = null;
 let lobbyBuffer: AudioBuffer | null = null;
 let lobbyGain: GainNode | null = null;
+/** Incremented on each start/stop to cancel stale async loads */
+let lobbyGeneration = 0;
 
 /** Start looping lobby/login background music. Safe to call multiple times. */
 export async function startLobbyMusic(): Promise<void> {
   if (lobbySource) return; // already playing
+  const gen = ++lobbyGeneration;
   const audioCtx = getContext();
 
   if (!lobbyBuffer) {
@@ -112,6 +115,9 @@ export async function startLobbyMusic(): Promise<void> {
       return;
     }
   }
+
+  // stop was called or another start happened while loading — abort
+  if (gen !== lobbyGeneration) return;
 
   lobbyGain = audioCtx.createGain();
   lobbyGain.gain.value = musicVolumeMultiplier;
@@ -126,6 +132,7 @@ export async function startLobbyMusic(): Promise<void> {
 
 /** Stop lobby music. */
 export function stopLobbyMusic(): void {
+  lobbyGeneration++;
   if (lobbySource) {
     lobbySource.stop();
     lobbySource.disconnect();

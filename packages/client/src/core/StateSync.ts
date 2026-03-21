@@ -66,6 +66,7 @@ import { talentStore } from "../ui/stores/talentStore";
 import { adminStore } from "../ui/stores/adminStore";
 import { authStore } from "../ui/stores/authStore";
 import { gateStore } from "../ui/stores/gateStore";
+import { questStore } from "../ui/stores/questStore";
 import { lootBagStore } from "../ui/stores/lootBagStore";
 import { targetStore } from "../ui/stores/targetStore";
 import { creatureStore } from "../ui/stores/creatureStore";
@@ -191,6 +192,35 @@ export class StateSync {
         gateStore.removeGate(gateId);
         minimapStore.removeGatePosition(gateId);
         this.deps.dungeonRenderer.removeGate(gateId);
+      }),
+    );
+
+    // Quest state listeners (MapSchema<QuestState>)
+    track(
+      state$.quests.onAdd((quest: any, questId: string) => {
+        questStore.setQuest(questId, {
+          id: questId,
+          questType: quest.questType,
+          i18nKey: quest.i18nKey,
+          target: quest.target,
+          progress: quest.progress,
+          status: quest.status,
+        });
+        $(quest).onChange(() => {
+          questStore.setQuest(questId, {
+            id: questId,
+            questType: quest.questType,
+            i18nKey: quest.i18nKey,
+            target: quest.target,
+            progress: quest.progress,
+            status: quest.status,
+          });
+        });
+      }),
+    );
+    track(
+      state$.quests.onRemove((_quest: any, questId: string) => {
+        questStore.removeQuest(questId);
       }),
     );
 
@@ -1087,6 +1117,7 @@ export class StateSync {
     classDefStore.reset();
     talentDefStore.reset();
     talentStore.reset();
+    questStore.reset();
     this.inputManager?.dispose();
     this.inputManager = null;
     this.wallOcclusion?.dispose();
