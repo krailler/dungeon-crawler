@@ -137,8 +137,8 @@ export type ActionSlotProps = {
   disabled?: boolean;
   /** Show diagonal red slash overlay (passive skills only) */
   disabledSlash?: boolean;
-  /** Click handler */
-  onClick?: () => void;
+  /** Click handler — receives the mouse event */
+  onClick?: (e?: React.MouseEvent) => void;
   /** Keyboard shortcut badge at bottom-center */
   keybind?: string;
   /** Item quantity badge */
@@ -163,6 +163,10 @@ export type ActionSlotProps = {
   tooltip?: ReactNode;
   /** Item rarity — adds a colored border (uncommon=green, rare=blue, epic=purple, legendary=gold) */
   rarity?: string;
+  /** Show shimmer loading overlay covering the entire slot */
+  loading?: boolean;
+  /** Context menu handler — called on right-click, receives the event */
+  onContextMenu?: (e: React.MouseEvent) => void;
 };
 
 export const ActionSlot = ({
@@ -185,6 +189,8 @@ export const ActionSlot = ({
   tooltipHint,
   tooltip,
   rarity,
+  loading = false,
+  onContextMenu,
 }: ActionSlotProps): ReactNode => {
   const { t } = useTranslation();
   const colors = VARIANT_COLORS[variant];
@@ -219,13 +225,15 @@ export const ActionSlot = ({
     }
   }, [activationCount]);
 
-  const handleClick = useCallback(() => {
-    if (!onClick) return;
-    onClick();
-    // Trigger click pulse on direct click too
-    setShowClick(true);
-    setTimeout(() => setShowClick(false), CLICK_DURATION_MS);
-  }, [onClick]);
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onClick) return;
+      onClick(e);
+      setShowClick(true);
+      setTimeout(() => setShowClick(false), CLICK_DURATION_MS);
+    },
+    [onClick],
+  );
 
   const handleCooldownComplete = useCallback(() => {
     setShowReady(true);
@@ -273,6 +281,7 @@ export const ActionSlot = ({
       {/* Slot */}
       <div
         onClick={handleClick}
+        onContextMenu={onContextMenu}
         className={[
           `relative flex ${sizeClass} items-center justify-center rounded-lg border`,
           slotStyle,
@@ -293,6 +302,13 @@ export const ActionSlot = ({
         >
           {icon}
         </span>
+
+        {/* Loading shimmer overlay */}
+        {loading && (
+          <div className="absolute inset-0 overflow-hidden rounded-lg">
+            <div className="h-full w-full animate-shimmer bg-slate-700/50" />
+          </div>
+        )}
 
         {/* Disabled slash overlay (passive skills) */}
         {disabledSlash && (

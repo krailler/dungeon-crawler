@@ -36,14 +36,14 @@ scripts/
 packages/
   shared/           # Code shared between client and server
     src/
-      constants/      # Game balance constants (economy, items, death, stamina, camera, lighting, talents)
+      constants/      # Game balance constants (economy, items, death, stamina, camera, lighting, talents, matchmaking)
       TileMap.ts      # 2D grid data + TileType + serialization
       protocol.ts     # MessageType + CloseCode + all message interfaces
       Stats.ts        # BaseStats, DerivedStats, computeDerivedStats(), computeDamage()
       CreatureTypes.ts # Creature type definitions + computeCreatureDerivedStats() + scaleCreatureDerivedStats()
       Economy.ts      # computeGoldDrop(), computeLevelModifier() — gold distribution formula
       Leveling.ts     # xpToNextLevel(), computeXpDrop() — XP formulas
-      Items.ts        # ItemDef, ItemRarity, ItemEffectType (heal, apply_effect), InventorySlot types
+      Items.ts        # ItemDef, ItemRarity, ItemEffectType, ItemInstance, BonusPoolEntry, StatRange types
       Skills.ts       # SkillDef type (hpThreshold, resetOnKill, effectId, aoeRange)
       Effects.ts      # EffectDef, StatModifier, StackBehavior, StatModType, CreatureEffectTrigger
       Classes.ts      # ClassDef, ClassDefClient types
@@ -57,11 +57,11 @@ packages/
       index.ts        # Barrel export
   server/           # Authoritative game server (Colyseus)
     src/
-      state/          # Schema state classes (PlayerState, PlayerSecretState, CreatureState, DungeonState, GateState, LootBagState, InventorySlotState, ActiveEffectState)
+      state/          # Schema state classes (PlayerState, PlayerSecretState, CreatureState, DungeonState, GateState, LootBagState, InventorySlotState, ActiveEffectState, EquipmentSlotState)
       rooms/          # DungeonRoom + PlayerSessionManager (lifecycle, persistence)
       systems/        # AISystem, CombatSystem, EffectSystem, GameLoop, GateSystem
       chat/           # ChatSystem, CommandRegistry, commands, notifyLevelProgress
-      items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, apply_effect)
+      items/          # ItemRegistry (DB-loaded item defs), EffectHandlers (heal, apply_effect), ItemInstanceRegistry (unique item instances), LootRoller (Diablo-style stat rolling)
       effects/        # EffectRegistry (DB-loaded effect defs)
       creatures/      # CreatureTypeRegistry (DB-loaded creature types + loot tables + effect triggers + skills)
       classes/        # ClassRegistry (DB-loaded class defs + default skills)
@@ -85,13 +85,13 @@ packages/
       audio/          # SoundManager (ambient + spatial audio), uiSfx
       i18n/           # i18next config + locales (en.json, es.json)
       ui/
-        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, skillDef, classDefStore, talentDefStore, talentStore, creature, target, death, lootBag, settings, tutorial, feedback, levelUp, welcome)
-        hud/          # HUD components (HudRoot, CharacterPanel, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableBar, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay, WelcomeOverlay)
-        components/   # Reusable UI (HudButton, HudPill, ActionSlot, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog)
-        utils/        # UI utilities (healthColor, lifeState, rarityColors, itemLinkUtils, dragGhost)
+        stores/       # Pub-sub stores (auth, hud, chat, debug, admin, loading, minimap, gate, prompt, announcement, itemDef, effectDef, skillDef, classDefStore, talentDefStore, talentStore, creature, target, death, lootBag, settings, tutorial, feedback, levelUp, welcome, itemInstance, assetPreload, matchmaking, lobby)
+        hud/          # HUD components (HudRoot, CharacterPanel, CharacterSheet, EquipmentTab, ChatPanel, DebugPanel, MinimapOverlay, SkillBar, ConsumableBar, InventoryPanel, XpBar, StaminaBar, TargetFrame, DeathOverlay, LootBagPanel, ActionFeedback, TutorialHint, SettingsPanel, PauseMenu, GatePrompt, PromptOverlay, AnnouncementOverlay, BuffBar, TalentPanel, LowHealthVignette, LevelUpOverlay, WelcomeOverlay)
+        components/   # Reusable UI (HudButton, HudPill, ActionSlot, ItemActionSlot, EquipmentTooltip, EffectIcon, ItemIcon, HudPanel, MenuButton, ConfirmDialog, GoldPanel, GoldButton)
+        utils/        # UI utilities (healthColor, lifeState, rarityColors, itemLinkUtils, dragGhost, statLabels)
         hooks/        # useDraggable
         icons/        # SVG icon components (CharacterIcon, MapIcon, BackpackIcon, WeaknessIcon, HamstringIcon, WarCryIcon, DazedIcon, LockIcon, etc.)
-        screens/      # LoginScreen, LoadingScreen
+        screens/      # LoginScreen, LoadingScreen, LobbyScreen
       main.ts         # Client entry point
     public/
       models/
@@ -139,7 +139,7 @@ packages/
 - Manual SQL migrations in `packages/server/src/migrations/`
 - Journal + snapshot metadata in `migrations/meta/`
 - Auto-applied on server start via Drizzle `migrate()`
-- Two schemas: `characters` (player data) and `world` (game data: items, creatures, skills, effects, classes, talents)
+- Two schemas: `characters` (player data, item_instances, character_equipment) and `world` (game data: items, creatures, skills, effects, classes, talents)
 - Reset: `./scripts/reset-db.sh` drops all + re-runs migrations + seed
 - Registry load order: items → skills → effects → creatures → classes → talents (dependency order)
 
@@ -210,8 +210,8 @@ packages/
 - Slash commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god (admin)
 - Client: Enter to open, Escape to close, Tab autocomplete for commands + player names
 - Chat input history: arrow up/down to navigate sent messages (max 50, draft preserved)
-- Item links: `[item:id]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips
-- Shift+click item in inventory to insert item link in chat
+- Item links: `[item:id]` or `[item:id:instanceId]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips (shows rolled stats if instanceId present)
+- Shift+click (left or right) on any ItemActionSlot to insert item link in chat
 - Messages fade after 10s, hover to reveal all
 
 ### Death & Revive
@@ -231,6 +231,23 @@ packages/
 - Server: LootBagState (MapSchema), CreatureTypeRegistry loads loot tables
 - Client: ClientLootBag entity, lootBagStore, LootBagPanel
 
+### Equipment System
+
+- Diablo-inspired: each equipment drop is a unique instance with randomly rolled stats
+- 6 equipment slots: weapon, head, chest, boots, accessory_1, accessory_2
+- Item templates in `world.items`: `equipSlot`, `levelReq`, `statRanges` (guaranteed), `bonusPool` (weighted random)
+- Item instances in `characters.item_instances`: `rolledStats` (JSONB), `itemLevel`
+- Stat rolling: `ilvlFactor` scales effective range (50% at lvl 1, 100% at max); `random()^0.8` biases toward higher values
+- Bonus affixes by rarity: common=0, uncommon=1, rare=1-2, epic=2-3, legendary=2-3
+- Base stats (str/vit/agi) from equipment applied BEFORE class scaling in `recomputeStats()`; derived stats (HP/ATK/DEF/speed/cooldown) applied as flat mods
+- No class restrictions — any class can equip any item
+- Equip: right-click in inventory; Unequip: click in equipment tab; Swap: auto-swaps if slot occupied
+- Shift-held comparison: shows stat diffs with color coding (green=better, red=worse) vs equipped item
+- Server: ItemInstanceRegistry (in-memory cache + DB), LootRoller (stat rolling), EquipmentSlotState
+- Client: itemInstanceStore (lazy-load via INSTANCE_DEFS_REQUEST), EquipmentTab, EquipmentTooltip, ItemActionSlot
+- Persistence: `character_equipment` table, loaded on join before recomputeStats(), saved on disconnect/auto-save
+- See [docs/equipment-system-design.md](./docs/equipment-system-design.md) for full spec
+
 ### Stamina & Sprint
 
 - Shift to sprint: 1.5x speed, drains 20/s (5s full drain), regens 10/s after 1s delay
@@ -239,7 +256,7 @@ packages/
 
 ### Skills
 
-- Skills defined in DB (`world.skills`): id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange
+- Skills defined in DB (`world.skills`): id, name, icon, passive, cooldown, damageMultiplier, animState, animDuration, hpThreshold, resetOnKill, effectId, aoeRange
 - Class skills in DB (`world.class_skills`): maps classes to skills with `is_default` flag and `unlock_level` (level-gated unlock)
 - Creature skills in DB (`world.creature_skills`): maps creatures to skills with `is_default` flag
 - Three skill paths in CombatSystem: buff (effectId + no damage → self-buff), AoE (aoeRange > 0 → area damage), single-target (default → needs enemy target)
@@ -302,7 +319,7 @@ packages/
 ### Derived Stats Architecture
 
 - `EffectSystem.recomputeStats()` is the **single source of truth** for all derived stats (maxHealth, attackDamage, defense, speed, attackCooldown)
-- Computes: base stats × class scaling → apply talent flat/percent mods → apply effect flat/percent mods
+- Computes: (base stats + equipment base bonuses) × class scaling → equipment derived mods (flat) → talent mods (flat/percent) → effect mods (flat/percent)
 - Integer stats (maxHealth, attackDamage, defense) are rounded; float stats (speed, attackCooldown) keep precision
 - Callers responsible for health adjustment after recompute (full heal on level-up, proportional on stat allocate, clamp on reset)
 - `PlayerState.levelUp()`, `allocateStat()`, `resetStats()` only mutate base data — callers must call `recomputeStats()`

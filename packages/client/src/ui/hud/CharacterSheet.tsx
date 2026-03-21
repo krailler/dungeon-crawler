@@ -8,8 +8,9 @@ import { HudPanel } from "../components/HudPanel";
 import { CharacterTab } from "./CharacterTab";
 import { TalentTab } from "./TalentTab";
 import { SpellbookTab } from "./SpellbookTab";
+import { EquipmentTab } from "./EquipmentTab";
 
-export type SheetTab = "character" | "talents" | "skills";
+export type SheetTab = "character" | "equipment" | "talents" | "skills";
 
 type TabDef = {
   id: SheetTab;
@@ -73,6 +74,7 @@ export const CharacterSheet = ({
   const tabs: TabDef[] = useMemo(
     () => [
       { id: "character", labelKey: "character.tabCharacter", badge: statPoints },
+      { id: "equipment" as SheetTab, labelKey: "character.tabEquipment" },
       ...(playerLevel >= TALENT_UNLOCK_LEVEL
         ? [{ id: "talents" as SheetTab, labelKey: "character.tabTalents", badge: talentPoints }]
         : []),
@@ -112,6 +114,7 @@ export const CharacterSheet = ({
 
       {/* Tab content */}
       {activeTab === "character" && <CharacterTab />}
+      {activeTab === "equipment" && <EquipmentTab />}
       {activeTab === "talents" && <TalentTab />}
       {activeTab === "skills" && <SpellbookTab />}
     </HudPanel>

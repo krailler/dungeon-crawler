@@ -53,9 +53,11 @@ Remaining: EffectIcon still uses SVG icons for effects (WeaknessIcon, HamstringI
 
 **Files:** `DungeonRoom.ts` (SKILL_USE handler), `CombatSystem.ts`
 
-AoE skills (Ground Slam) apply damage instantly in the message handler, bypassing the `scheduleHit()`/`DAMAGE_DELAY` system that single-target skills use. Creatures take damage before the player's animation reaches the impact frame.
+AoE skills (Ground Slam) apply damage instantly in the message handler, bypassing the `scheduleHit()` system that single-target skills use. Creatures take damage before the player's animation reaches the impact frame.
 
-**Proposed solution:** Use `this.bridge.clock.setTimeout()` in the AoE handler to defer the damage loop by `DAMAGE_DELAY`, same pattern as the corpse removal timer in `processCreatureKill()`.
+**Note:** Per-skill `animDuration` is now in DB (migration 0003), and single-target/buff skills use it correctly. AoE still needs the same treatment — defer damage by `animDuration / 2`.
+
+**Proposed solution:** Use `this.bridge.clock.setTimeout()` in the AoE handler to defer the damage loop by `def.animDuration / 2`, same pattern as `scheduleHit()`.
 
 ## Native desktop client (Electron)
 

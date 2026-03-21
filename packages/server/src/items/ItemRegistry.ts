@@ -1,4 +1,11 @@
-import type { ItemDef, ItemDefClient, ItemRarityValue } from "@dungeon/shared";
+import type {
+  ItemDef,
+  ItemDefClient,
+  ItemRarityValue,
+  BonusPoolEntry,
+  StatRange,
+  EquipmentSlotValue,
+} from "@dungeon/shared";
 import { toItemDefClient } from "@dungeon/shared";
 import { items } from "../db/schema.js";
 import { createRegistry, simpleHash } from "../db/createRegistry.js";
@@ -21,6 +28,10 @@ const registry = createRegistry<ItemRow, ItemDef>({
     useSound: row.useSound,
     transient: row.transient,
     rarity: row.rarity as ItemRarityValue,
+    equipSlot: (row.equipSlot as EquipmentSlotValue) ?? null,
+    levelReq: row.levelReq,
+    statRanges: (row.statRanges as Record<string, StatRange>) ?? {},
+    bonusPool: (row.bonusPool as BonusPoolEntry[]) ?? [],
   }),
   hashDef: (def) => simpleHash(JSON.stringify(def)),
 });

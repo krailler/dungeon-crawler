@@ -2,6 +2,7 @@ import type { PlayerState } from "../state/PlayerState.js";
 import { ActiveEffectState } from "../state/ActiveEffectState.js";
 import { getEffectDef } from "../effects/EffectRegistry.js";
 import { collectTalentStatMods } from "../talents/TalentRegistry.js";
+import { getInstance as getItemInstance } from "../items/ItemInstanceRegistry.js";
 import { computeDerivedStats, StackBehavior, StatModType, lerpEffectValue } from "@dungeon/shared";
 import type { StatModifier, EffectScaling, TickEffect } from "@dungeon/shared";
 
@@ -32,13 +33,15 @@ import type { StatModifier, EffectScaling, TickEffect } from "@dungeon/shared";
  *       ▼
  *   recomputeStats()
  *   ┌─────────────────────────────────────────────────────┐
- *   │ 1. Compute clean base stats from str/vit/agi       │
- *   │ 2. Aggregate talent passive stat modifiers          │
- *   │ 3. For each active effect:                         │
+ *   │ 1. Collect equipment base bonuses (str/vit/agi)     │
+ *   │ 2. computeDerivedStats(base + equip, classScaling)  │
+ *   │ 3. Equipment derived mods (flat: HP, ATK, DEF...)   │
+ *   │ 4. Aggregate talent passive stat modifiers          │
+ *   │ 5. For each active effect:                         │
  *   │    └─ lerp modifier with stored scalingFactor      │
  *   │    └─ multiply by stacks if INTENSITY              │
- *   │ 4. Apply: stat = (base + flat) * (1 + percent)     │
- *   │ 5. Clamp minimums (health≥1, attack≥0, etc.)      │
+ *   │ 6. Apply: stat = (base + flat) * (1 + percent)     │
+ *   │ 7. Clamp minimums (health≥1, attack≥0, etc.)      │
  *   └─────────────────────────────────────────────────────┘
  */
 export class EffectSystem {
@@ -204,18 +207,36 @@ export class EffectSystem {
    * Recompute player derived stats, applying all active effect modifiers.
    */
   recomputeStats(player: PlayerState): void {
-    // Start from clean base stats (using per-class scaling)
+    // Collect equipment base stat bonuses (str/vit/agi) — applied before class scaling
+    let equipStr = 0;
+    let equipVit = 0;
+    let equipAgi = 0;
+    const equipDerivedMods: Record<string, number> = {};
+
+    player.equipment.forEach((eqSlot) => {
+      if (!eqSlot.instanceId) return;
+      const instance = getItemInstance(eqSlot.instanceId);
+      if (!instance) return;
+      for (const [stat, value] of Object.entries(instance.rolledStats)) {
+        if (stat === "strength") equipStr += value;
+        else if (stat === "vitality") equipVit += value;
+        else if (stat === "agility") equipAgi += value;
+        else equipDerivedMods[stat] = (equipDerivedMods[stat] ?? 0) + value;
+      }
+    });
+
+    // Start from base stats + equipment base bonuses (using per-class scaling)
     const derived = computeDerivedStats(
       {
-        strength: player.strength,
-        vitality: player.vitality,
-        agility: player.agility,
+        strength: player.strength + equipStr,
+        vitality: player.vitality + equipVit,
+        agility: player.agility + equipAgi,
       },
       player.statScaling,
     );
 
-    // Aggregate all modifiers from active effects + talents
-    const flatMods: Record<string, number> = {};
+    // Aggregate all modifiers from active effects + talents + equipment derived
+    const flatMods: Record<string, number> = { ...equipDerivedMods };
     const percentMods: Record<string, number> = {};
 
     // Talent passive stat modifiers

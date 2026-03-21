@@ -16,7 +16,10 @@ import type {
   ConsumableBarAssignMessage,
   ConsumableBarUnassignMessage,
   ConsumableBarSwapMessage,
+  EquipItemMessage,
+  UnequipItemMessage,
 } from "@dungeon/shared";
+import type { EquipmentSlotValue } from "@dungeon/shared";
 import { HudRoot } from "../hud/HudRoot";
 
 /** Chrome-only performance.memory API */
@@ -58,8 +61,9 @@ export type PartyMember = {
   skills?: string[];
   autoAttackEnabled?: boolean;
   stats?: CharacterStats;
-  inventory?: { slot: number; itemId: string; quantity: number }[];
+  inventory?: { slot: number; itemId: string; quantity: number; instanceId?: string }[];
   consumableBar?: string[];
+  equipment?: Record<string, { instanceId: string }>;
   effects?: {
     effectId: string;
     remaining: number;
@@ -364,6 +368,16 @@ export const hudStore = {
     if (!room) return;
     const msg: ConsumableBarSwapMessage = { from, to };
     room.send(MessageType.CONSUMABLE_BAR_SWAP, msg);
+  },
+  equipItem(invSlot: number, equipSlot: EquipmentSlotValue): void {
+    if (!room) return;
+    const msg: EquipItemMessage = { invSlot, equipSlot };
+    room.send(MessageType.EQUIP_ITEM, msg);
+  },
+  unequipItem(equipSlot: EquipmentSlotValue): void {
+    if (!room) return;
+    const msg: UnequipItemMessage = { equipSlot };
+    room.send(MessageType.UNEQUIP_ITEM, msg);
   },
 };
 

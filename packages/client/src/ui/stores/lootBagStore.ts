@@ -1,10 +1,13 @@
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
 import type { LootTakeMessage } from "@dungeon/shared";
+import { itemInstanceStore } from "./itemInstanceStore";
+import { itemDefStore } from "./itemDefStore";
 
 export type LootBagSlot = {
   itemId: string;
   quantity: number;
+  instanceId?: string;
 } | null;
 
 type LootBagSnapshot = {
@@ -48,7 +51,11 @@ function readBagSlots(bagId: string): LootBagSlot[] {
   if (maxIndex < 0) return [];
   const result: LootBagSlot[] = Array.from({ length: maxIndex + 1 }, () => null);
   bag.items.forEach((item: any, key: string) => {
-    result[Number(key)] = { itemId: item.itemId, quantity: item.quantity };
+    result[Number(key)] = {
+      itemId: item.itemId,
+      quantity: item.quantity,
+      instanceId: item.instanceId || undefined,
+    };
   });
   return result;
 }
@@ -71,6 +78,13 @@ export const lootBagStore = {
   open(id: string): void {
     lootBagId = id;
     slots = readBagSlots(id);
+    // Pre-fetch item defs + instance data for equipment items
+    const itemIds = slots.filter(Boolean).map((s) => s!.itemId);
+    if (itemIds.length > 0) itemDefStore.ensureLoaded(itemIds);
+    const instanceIds = slots
+      .filter((s): s is NonNullable<typeof s> => s != null && !!s.instanceId)
+      .map((s) => s.instanceId!);
+    if (instanceIds.length > 0) itemInstanceStore.ensureLoaded(instanceIds);
     emit();
   },
 

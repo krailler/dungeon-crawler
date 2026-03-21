@@ -79,6 +79,8 @@ import type { Pathfinder } from "../navigation/Pathfinder";
 import { notifyLevelProgress } from "../chat/notifyLevelProgress";
 import { getCreatureLoot, getCreatureEffects } from "../creatures/CreatureTypeRegistry";
 import { getEffectDef } from "../effects/EffectRegistry";
+import { getItemDef } from "../items/ItemRegistry";
+import { rollEquipmentDrop } from "../items/LootRoller";
 import { getSkillDef } from "../skills/SkillRegistry";
 import { syncAndNotifySkills } from "../classes/ClassRegistry";
 import { logger } from "../logger";
@@ -583,12 +585,21 @@ export class GameLoop {
         let slotIndex = 0;
         for (const entry of lootEntries) {
           if (Math.random() < entry.dropChance) {
-            const qty =
-              entry.minQuantity +
-              Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1));
+            const itemDef = getItemDef(entry.itemId);
             const slot = new InventorySlotState();
             slot.itemId = entry.itemId;
-            slot.quantity = qty;
+
+            if (itemDef?.equipSlot) {
+              // Equipment item — roll a unique instance with random stats
+              const instance = rollEquipmentDrop(itemDef, killedCreature.level);
+              slot.instanceId = instance.id;
+              slot.quantity = 1;
+            } else {
+              const qty =
+                entry.minQuantity +
+                Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1));
+              slot.quantity = qty;
+            }
             bag.items.set(String(slotIndex++), slot);
           }
         }

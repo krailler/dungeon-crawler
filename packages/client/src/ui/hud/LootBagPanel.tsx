@@ -2,16 +2,13 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { lootBagStore } from "../stores/lootBagStore";
-import { itemDefStore } from "../stores/itemDefStore";
 import { HudPanel } from "../components/HudPanel";
-import { ActionSlot } from "../components/ActionSlot";
-import { ItemIcon } from "../components/ItemIcon";
+import { ItemActionSlot } from "../components/ItemActionSlot";
 import { playUiSfx } from "../../audio/uiSfx";
 
 export const LootBagPanel = (): ReactNode => {
   const { t } = useTranslation();
   const snap = useSyncExternalStore(lootBagStore.subscribe, lootBagStore.getSnapshot);
-  const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
 
   const handleClose = useCallback(() => lootBagStore.close(), []);
 
@@ -21,8 +18,6 @@ export const LootBagPanel = (): ReactNode => {
   }, []);
 
   if (!snap.lootBagId || snap.slots.length === 0) return null;
-
-  const clickToTake = t("loot.take");
 
   return (
     <HudPanel
@@ -34,36 +29,16 @@ export const LootBagPanel = (): ReactNode => {
       className="w-[220px]"
     >
       <div className="grid grid-cols-4 gap-1.5">
-        {snap.slots.map((slot, i) => {
-          const def = slot ? itemDefs.get(slot.itemId) : undefined;
-
-          return (
-            <ActionSlot
-              key={i}
-              variant="empty"
-              size="sm"
-              active={!!slot}
-              icon={
-                def ? (
-                  <ItemIcon iconId={def.icon} />
-                ) : slot ? (
-                  <span className="text-[14px]">?</span>
-                ) : (
-                  <></>
-                )
-              }
-              onClick={slot ? () => handleTake(i) : undefined}
-              quantity={slot?.quantity}
-              quantityMin={2}
-              quantityPosition="bottom-right"
-              tooltipName={def?.name}
-              tooltipDesc={def?.description}
-              tooltipDescParams={def?.effectParams}
-              tooltipHint={slot ? clickToTake : undefined}
-              rarity={def?.rarity}
-            />
-          );
-        })}
+        {snap.slots.map((slot, i) => (
+          <ItemActionSlot
+            key={i}
+            itemId={slot?.itemId}
+            instanceId={slot?.instanceId}
+            quantity={slot?.quantity}
+            hint={slot ? t("loot.take") : undefined}
+            onClick={slot ? () => handleTake(i) : undefined}
+          />
+        ))}
       </div>
     </HudPanel>
   );

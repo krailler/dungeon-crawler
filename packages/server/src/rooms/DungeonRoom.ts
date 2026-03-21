@@ -106,6 +106,8 @@ import {
   computeDamage,
   MAX_CONSUMABLE_BAR_SLOTS,
   MAX_PARTY_SIZE,
+  INVENTORY_MAX_SLOTS,
+  EQUIPMENT_SLOTS,
 } from "@dungeon/shared";
 import type {
   MoveMessage,
@@ -134,7 +136,13 @@ import type {
   ConsumableBarAssignMessage,
   ConsumableBarUnassignMessage,
   ConsumableBarSwapMessage,
+  EquipItemMessage,
+  UnequipItemMessage,
+  InstanceDefsRequestMessage,
 } from "@dungeon/shared";
+import type { EquipmentSlotValue } from "@dungeon/shared";
+import { getInstance as getItemInstance } from "../items/ItemInstanceRegistry";
+import { InventorySlotState } from "../state/InventorySlotState";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
 /** Simulation frequency in Hz (configurable via TICK_RATE env var) */
@@ -796,6 +804,72 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
     );
 
+    // Equipment: equip an item from inventory
+    this.onMessage(MessageType.EQUIP_ITEM, (client: Client, data: EquipItemMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+      if (typeof data.invSlot !== "number" || typeof data.equipSlot !== "string") return;
+
+      // Validate equipment slot
+      const validSlots = new Set<string>(Object.values(EQUIPMENT_SLOTS));
+      if (!validSlots.has(data.equipSlot)) return;
+
+      // Validate inventory slot has an equipment item
+      const invSlot = player.inventory.get(String(data.invSlot));
+      if (!invSlot || !invSlot.instanceId) return;
+
+      const itemDef = getItemDef(invSlot.itemId);
+      if (!itemDef?.equipSlot) return;
+
+      // Validate slot match (accessory_1 and accessory_2 both accept "accessory" items)
+      const slotMatches =
+        itemDef.equipSlot === data.equipSlot ||
+        (itemDef.equipSlot.startsWith("accessory") && data.equipSlot.startsWith("accessory"));
+      if (!slotMatches) return;
+
+      // Level requirement
+      if (player.level < itemDef.levelReq) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "equipment.levelTooLow" });
+        return;
+      }
+
+      if (player.equipItem(data.invSlot, data.equipSlot as EquipmentSlotValue)) {
+        this.effectSystem.recomputeStats(player);
+      }
+    });
+
+    // Equipment: unequip an item back to inventory
+    this.onMessage(MessageType.UNEQUIP_ITEM, (client: Client, data: UnequipItemMessage) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.lifeState !== LifeState.ALIVE) return;
+      if (typeof data.equipSlot !== "string") return;
+
+      if (!player.unequipItem(data.equipSlot as EquipmentSlotValue)) {
+        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "equipment.inventoryFull" });
+        return;
+      }
+      this.effectSystem.recomputeStats(player);
+    });
+
+    // Item instance definitions: client requests rolled stats by instanceId
+    this.onMessage(
+      MessageType.INSTANCE_DEFS_REQUEST,
+      (client: Client, data: InstanceDefsRequestMessage) => {
+        if (!Array.isArray(data.instanceIds) || data.instanceIds.length === 0) return;
+        const ids = data.instanceIds.slice(0, 50);
+        const instances = ids
+          .map((id) => getItemInstance(id))
+          .filter((inst): inst is NonNullable<typeof inst> => inst != null)
+          .map((inst) => ({
+            id: inst.id,
+            itemId: inst.itemId,
+            rolledStats: inst.rolledStats,
+            itemLevel: inst.itemLevel,
+          }));
+        client.send(MessageType.INSTANCE_DEFS_RESPONSE, { instances });
+      },
+    );
+
     // Permanent leave: player explicitly chose "Leave Room" (not tab close)
     this.onMessage(MessageType.LEAVE_ROOM, (client: Client) => {
       this.sessionManager.markPermanentLeave(client.sessionId);
@@ -1030,28 +1104,63 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Try add to inventory
       const def = getItemDef(lootItem.itemId);
       if (!def) return;
-      const added = player.addItem(lootItem.itemId, lootItem.quantity, def.maxStack);
-      if (added <= 0) {
-        client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.inventoryFull" });
-        return;
+
+      let added: number;
+
+      if (lootItem.instanceId) {
+        // Equipment item — find an empty inventory slot and place with instanceId
+        const usedSlots = new Set<number>();
+        player.inventory.forEach((_, key) => usedSlots.add(Number(key)));
+        let emptyIdx = -1;
+        for (let i = 0; i < INVENTORY_MAX_SLOTS; i++) {
+          if (!usedSlots.has(i)) {
+            emptyIdx = i;
+            break;
+          }
+        }
+        if (emptyIdx === -1) {
+          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.inventoryFull" });
+          return;
+        }
+        const invSlot = new InventorySlotState();
+        invSlot.itemId = lootItem.itemId;
+        invSlot.quantity = 1;
+        invSlot.instanceId = lootItem.instanceId;
+        player.inventory.set(String(emptyIdx), invSlot);
+
+        // Cache instanceId → itemId mapping for equipment methods
+        const instance = getItemInstance(lootItem.instanceId);
+        if (instance) {
+          player.instanceItemIds.set(instance.id, instance.itemId);
+        }
+        added = 1;
+      } else {
+        added = player.addItem(lootItem.itemId, lootItem.quantity, def.maxStack);
+        if (added <= 0) {
+          client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "feedback.inventoryFull" });
+          return;
+        }
       }
 
       // Remove item from bag (stable key — no index shifting)
       bag.items.delete(slotKey);
 
-      // Chat notification — to the player who picked up
+      // Chat notification — include instanceId for equipment items
+      const itemLink = lootItem.instanceId
+        ? `[item:${def.id}:${lootItem.instanceId}]`
+        : `[item:${def.id}]`;
+
       this.chatSystem.sendSystemI18nTo(
         client.sessionId,
         "chat.itemPickup",
-        { item: `[item:${def.id}]`, amount: added },
+        { item: itemLink, amount: added },
         `+${added} ${def.id}`,
       );
 
-      // Notify other players
       this.chatSystem.broadcastSystemI18nExcept(
         client.sessionId,
         "chat.otherItemPickup",
-        { player: player.characterName, item: `[item:${def.id}]`, amount: added },
+        { player: player.characterName, item: itemLink, amount: added },
         `${player.characterName} picked up ${added} ${def.id}`,
       );
 

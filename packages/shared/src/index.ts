@@ -52,6 +52,10 @@ export type {
   ConsumableBarAssignMessage,
   ConsumableBarUnassignMessage,
   ConsumableBarSwapMessage,
+  EquipItemMessage,
+  UnequipItemMessage,
+  InstanceDefsRequestMessage,
+  InstanceDefsResponseMessage,
 } from "./protocol.js";
 
 export {
@@ -108,7 +112,19 @@ export { toClassDefClient } from "./Classes.js";
 export type { ClassDef, ClassDefClient, ClassSkillEntry } from "./Classes.js";
 
 export { ItemEffectType, ItemRarity, toItemDefClient } from "./Items.js";
-export type { ItemEffectTypeValue, ItemRarityValue, ItemDef, ItemDefClient } from "./Items.js";
+export type {
+  ItemEffectTypeValue,
+  ItemRarityValue,
+  ItemDef,
+  ItemDefClient,
+  BonusPoolEntry,
+  StatRange,
+  ItemInstance,
+  ItemInstanceClient,
+} from "./Items.js";
+
+// EQUIPMENT_SLOTS, BONUS_AFFIXES_BY_RARITY, INTEGER_STATS, EquipmentSlotValue
+// already re-exported via export * from "./constants/index.js"
 
 export { TalentEffectType, toTalentDefClient, computeTalentSkillMods } from "./Talents.js";
 export type {

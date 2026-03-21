@@ -5,6 +5,7 @@ import { chatStore, type ChatMessage } from "../stores/chatStore";
 import { authStore } from "../stores/authStore";
 import { hudStore } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
+import { itemInstanceStore } from "../stores/itemInstanceStore";
 import { ItemIcon } from "../components/ItemIcon";
 import { CHAT_FADE_MS } from "@dungeon/shared";
 import type { CommandInfo } from "@dungeon/shared";
@@ -18,6 +19,7 @@ import {
   clearInsertItemLinkFn,
 } from "./itemLinkUtils";
 import { getRarityStyle } from "../utils/rarityColors";
+import { STAT_I18N, formatStatValue, formatStatRange } from "../utils/statLabels";
 
 // ── Autocomplete mode detection ─────────────────────────────────────────────
 
@@ -70,10 +72,10 @@ function getAutocompleteMode(
   return null;
 }
 
-/** Parse text and replace [item:id] with ReactNode item links */
+/** Parse text and replace [item:id] / [item:id:instanceId] with ReactNode item links */
 function parseItemLinks(
   text: string,
-  onClickLink: (itemId: string, rect: DOMRect) => void,
+  onClickLink: (itemId: string, instanceId: string | undefined, rect: DOMRect) => void,
 ): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
@@ -81,13 +83,18 @@ function parseItemLinks(
   ITEM_LINK_RE.lastIndex = 0;
 
   while ((match = ITEM_LINK_RE.exec(text)) !== null) {
-    // Text before the link
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
     const itemId = match[1];
+    const instanceId = match[2] || undefined;
     parts.push(
-      <ItemLinkSpan key={`${itemId}_${match.index}`} itemId={itemId} onClick={onClickLink} />,
+      <ItemLinkSpan
+        key={`${itemId}_${match.index}`}
+        itemId={itemId}
+        instanceId={instanceId}
+        onClick={onClickLink}
+      />,
     );
     lastIndex = match.index + match[0].length;
   }
@@ -103,16 +110,17 @@ function parseItemLinks(
 /** Inline item link rendered in chat messages */
 const ItemLinkSpan = ({
   itemId,
+  instanceId,
   onClick,
 }: {
   itemId: string;
-  onClick: (itemId: string, rect: DOMRect) => void;
+  instanceId?: string;
+  onClick: (itemId: string, instanceId: string | undefined, rect: DOMRect) => void;
 }): ReactNode => {
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
   const def = itemDefs.get(itemId);
   const spanRef = useRef<HTMLSpanElement>(null);
 
-  // Ensure item def is loaded
   useEffect(() => {
     itemDefStore.ensureLoaded([itemId]);
   }, [itemId]);
@@ -129,7 +137,7 @@ const ItemLinkSpan = ({
         e.stopPropagation();
         playUiSfx("ui_click");
         const rect = spanRef.current?.getBoundingClientRect();
-        if (rect) onClick(itemId, rect);
+        if (rect) onClick(itemId, instanceId, rect);
       }}
     >
       [{displayName}]
@@ -141,20 +149,30 @@ const ItemLinkSpan = ({
 
 const ItemLinkTooltip = ({
   itemId,
+  instanceId,
   anchorRect,
   onClose,
 }: {
   itemId: string;
+  instanceId?: string;
   anchorRect: DOMRect;
   onClose: () => void;
 }): ReactNode => {
   const { t } = useTranslation();
   const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
+  const instances = useSyncExternalStore(
+    itemInstanceStore.subscribe,
+    itemInstanceStore.getSnapshot,
+  );
   const def = itemDefs.get(itemId);
+  const instance = instanceId ? instances.get(instanceId) : undefined;
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside or Escape (use "click" not "mousedown" to avoid
-  // racing with the ItemLinkSpan onClick that toggles the tooltip)
+  // Lazy-load instance data
+  useEffect(() => {
+    if (instanceId) itemInstanceStore.ensureLoaded([instanceId]);
+  }, [instanceId]);
+
   useEffect(() => {
     const handleClick = (e: MouseEvent): void => {
       if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
@@ -164,7 +182,6 @@ const ItemLinkTooltip = ({
     const handleKey = (e: KeyboardEvent): void => {
       if (e.key === "Escape") onClose();
     };
-    // Defer listener registration so the opening click doesn't immediately close
     const timer = setTimeout(() => {
       document.addEventListener("click", handleClick);
     }, 0);
@@ -179,12 +196,18 @@ const ItemLinkTooltip = ({
   if (!def) return null;
 
   const rarityColor = getRarityStyle(def.rarity).text;
-
-  // Position above the anchor
   const style: React.CSSProperties = {
     left: anchorRect.left,
     bottom: window.innerHeight - anchorRect.top + 4,
   };
+
+  const isEquipment = !!def.equipSlot;
+  const slotLabelKey = def.equipSlot ? `equipment.${def.equipSlot.replace(/_\d+$/, "")}` : "";
+
+  // Use instance rolled stats if available, otherwise show template ranges
+  const hasInstance = isEquipment && instance;
+  const rolledStats = hasInstance ? Object.entries(instance.rolledStats) : [];
+  const rangeStats = isEquipment && !hasInstance ? Object.entries(def.statRanges ?? {}) : [];
 
   return (
     <div
@@ -202,15 +225,42 @@ const ItemLinkTooltip = ({
           <div className={`text-sm font-bold ${rarityColor}`}>
             {t(def.name, { defaultValue: def.name })}
           </div>
-          {def.rarity && def.rarity !== "common" && (
-            <div className="text-[10px] capitalize text-slate-500">{def.rarity}</div>
+          {isEquipment ? (
+            <div className="text-[10px] text-slate-500">
+              {t(slotLabelKey)}
+              {hasInstance && ` · ${t("equipment.itemLevel", { level: instance.itemLevel })}`}
+              {def.levelReq > 1 && ` · ${t("equipment.levelReq", { level: def.levelReq })}`}
+            </div>
+          ) : (
+            def.rarity &&
+            def.rarity !== "common" && (
+              <div className="text-[10px] capitalize text-slate-500">{def.rarity}</div>
+            )
           )}
         </div>
       </div>
-      {def.description && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
-          {t(def.description, { ...def.effectParams, defaultValue: def.description })}
-        </p>
+      {rolledStats.length > 0 ? (
+        <div className="mt-1.5 flex flex-col gap-0.5">
+          {rolledStats.map(([stat, value]) => (
+            <div key={stat} className="text-[11px] text-emerald-400">
+              {formatStatValue(stat, value)} {t(STAT_I18N[stat] ?? stat)}
+            </div>
+          ))}
+        </div>
+      ) : rangeStats.length > 0 ? (
+        <div className="mt-1.5 flex flex-col gap-0.5">
+          {rangeStats.map(([stat, range]) => (
+            <div key={stat} className="text-[11px] text-emerald-400">
+              {formatStatRange(stat, range.min, range.max)} {t(STAT_I18N[stat] ?? stat)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        def.description && (
+          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+            {t(def.description, { ...def.effectParams, defaultValue: def.description })}
+          </p>
+        )
       )}
     </div>
   );
@@ -253,7 +303,7 @@ const MessageRow = ({
 }: {
   msg: ChatMessage;
   faded: boolean;
-  onClickLink: (itemId: string, rect: DOMRect) => void;
+  onClickLink: (itemId: string, instanceId: string | undefined, rect: DOMRect) => void;
 }): ReactNode => {
   const { t } = useTranslation();
   const baseStyle = categoryStyles[msg.category] || categoryStyles.player;
@@ -443,10 +493,21 @@ export const ChatPanel = (): ReactNode => {
   const playerNames = useMemo(() => hudSnapshot.members.map((m) => m.name), [hudSnapshot.members]);
 
   // Item link tooltip state
-  const [linkTooltip, setLinkTooltip] = useState<{ itemId: string; rect: DOMRect } | null>(null);
-  const handleClickLink = useCallback((itemId: string, rect: DOMRect) => {
-    setLinkTooltip((prev) => (prev?.itemId === itemId ? null : { itemId, rect }));
-  }, []);
+  const [linkTooltip, setLinkTooltip] = useState<{
+    itemId: string;
+    instanceId?: string;
+    rect: DOMRect;
+  } | null>(null);
+  const handleClickLink = useCallback(
+    (itemId: string, instanceId: string | undefined, rect: DOMRect) => {
+      setLinkTooltip((prev) =>
+        prev?.itemId === itemId && prev?.instanceId === instanceId
+          ? null
+          : { itemId, instanceId, rect },
+      );
+    },
+    [],
+  );
   const closeLinkTooltip = useCallback(() => setLinkTooltip(null), []);
 
   // Item link display→raw mapping (display name in input → [item:id] for sending)
@@ -531,12 +592,13 @@ export const ChatPanel = (): ReactNode => {
 
   // Register item link insertion callback
   useEffect(() => {
-    setInsertItemLinkFn((itemId: string) => {
+    setInsertItemLinkFn((itemId: string, instanceId?: string) => {
       const def = itemDefStore.getSnapshot().get(itemId);
       const displayName = def ? tFn(def.name, { defaultValue: def.name }) : itemId;
       const displayText = `[${displayName}]`;
-      // Store mapping so we can convert back to [item:id] on send
-      itemLinkMapRef.current.set(displayText, `[item:${itemId}]`);
+      // Store mapping so we can convert back to [item:id] or [item:id:instanceId] on send
+      const rawLink = instanceId ? `[item:${itemId}:${instanceId}]` : `[item:${itemId}]`;
+      itemLinkMapRef.current.set(displayText, rawLink);
 
       // Compute new value and cursor position
       const el = inputRef.current;
@@ -732,6 +794,7 @@ export const ChatPanel = (): ReactNode => {
       {linkTooltip && (
         <ItemLinkTooltip
           itemId={linkTooltip.itemId}
+          instanceId={linkTooltip.instanceId}
           anchorRect={linkTooltip.rect}
           onClose={closeLinkTooltip}
         />

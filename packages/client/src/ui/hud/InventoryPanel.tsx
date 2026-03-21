@@ -13,30 +13,29 @@ import { INVENTORY_MAX_SLOTS } from "@dungeon/shared";
 import { hudStore } from "../stores/hudStore";
 import type { SkillCooldownState } from "../stores/hudStore";
 import { itemDefStore } from "../stores/itemDefStore";
-import { ActionSlot } from "../components/ActionSlot";
+import { ItemActionSlot } from "../components/ItemActionSlot";
 import { HudPanel } from "../components/HudPanel";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { feedbackStore } from "../stores/feedbackStore";
 import { playUiSfx } from "../../audio/uiSfx";
 import { ItemIcon } from "../components/ItemIcon";
 import { EMPTY_DRAG_IMG } from "../utils/dragGhost";
-import { insertItemLink } from "./itemLinkUtils";
 
 // ── InventorySlot ────────────────────────────────────────────────────────────
 
 type InventorySlotProps = {
   index: number;
-  slot: { itemId: string; quantity: number } | null;
+  slot: { itemId: string; quantity: number; instanceId?: string } | null;
   isDragSource: boolean;
   isDragOver: boolean;
   cooldown: SkillCooldownState | null;
+  compareInstanceId: string | undefined;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDragLeave: () => void;
   onDrop: (index: number, shiftKey: boolean) => void;
   onDragEnd: () => void;
-  onContextMenu: (itemId: string) => void;
-  onShiftClick: (itemId: string) => void;
+  onUseItem: (itemId: string) => void;
 };
 
 const InventorySlot = memo(
@@ -46,18 +45,17 @@ const InventorySlot = memo(
     isDragSource,
     isDragOver,
     cooldown,
+    compareInstanceId,
     onDragStart,
     onDragOver,
     onDragLeave,
     onDrop,
     onDragEnd,
-    onContextMenu,
-    onShiftClick,
+    onUseItem,
   }: InventorySlotProps): ReactNode => {
     const { t } = useTranslation();
     const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
     const def = slot ? itemDefs.get(slot.itemId) : undefined;
-    const isConsumable = def?.consumable;
 
     const handleDragStart = useCallback(
       (e: DragEvent<HTMLDivElement>) => {
@@ -65,12 +63,8 @@ const InventorySlot = memo(
           e.preventDefault();
           return;
         }
-        // Hide default drag ghost
-        if (EMPTY_DRAG_IMG) {
-          e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
-        }
+        if (EMPTY_DRAG_IMG) e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
         e.dataTransfer.effectAllowed = "move";
-        // Allow dropping onto consumable bar if the item is consumable and not transient
         if (def?.consumable && !def.transient) {
           e.dataTransfer.setData("application/x-consumable-item", slot.itemId);
         }
@@ -96,36 +90,31 @@ const InventorySlot = memo(
       [index, onDrop],
     );
 
-    const handleClick = useCallback(
-      (e: React.MouseEvent) => {
-        if (e.shiftKey && slot && def) {
-          e.preventDefault();
-          onShiftClick(slot.itemId);
-        }
-      },
-      [slot, def, onShiftClick],
-    );
+    // Right-click action: use consumable or equip equipment
+    const handleRightClick = useCallback(() => {
+      if (!slot || !def) return;
+      if (def.consumable) {
+        onUseItem(slot.itemId);
+      } else if (def.equipSlot) {
+        hudStore.equipItem(index, def.equipSlot);
+      }
+    }, [slot, def, index, onUseItem]);
 
-    const handleContextMenu = useCallback(
-      (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (slot && isConsumable) {
-          onContextMenu(slot.itemId);
-        }
-      },
-      [slot, isConsumable, onContextMenu],
-    );
+    // Build hint text
+    const hint = def?.consumable
+      ? t("inventory.rightClickToUse")
+      : def?.equipSlot
+        ? t("equipment.rightClickToEquip")
+        : undefined;
 
     return (
       <div
         draggable={!!slot}
-        onClick={handleClick}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragLeave={onDragLeave}
         onDrop={handleDrop}
         onDragEnd={onDragEnd}
-        onContextMenu={handleContextMenu}
         className={[
           "transition-transform",
           isDragSource ? "opacity-40 scale-90" : "",
@@ -135,28 +124,14 @@ const InventorySlot = memo(
           .join(" ")}
         style={{ transition: "transform 100ms ease, opacity 100ms ease" }}
       >
-        <ActionSlot
-          variant="empty"
-          size="sm"
-          active={!!slot}
-          icon={
-            def ? (
-              <ItemIcon iconId={def.icon} />
-            ) : slot ? (
-              <span className="text-[14px]">?</span>
-            ) : (
-              <></>
-            )
-          }
+        <ItemActionSlot
+          itemId={slot?.itemId}
+          instanceId={slot?.instanceId}
           quantity={slot?.quantity}
-          quantityMin={2}
-          quantityPosition="bottom-right"
           cooldown={cooldown}
-          tooltipName={def?.name}
-          tooltipDesc={def?.description}
-          tooltipDescParams={def?.effectParams}
-          tooltipHint={isConsumable ? t("inventory.rightClickToUse") : undefined}
-          rarity={def?.rarity}
+          hint={hint}
+          onRightClick={slot ? handleRightClick : undefined}
+          compareInstanceId={compareInstanceId}
         />
       </div>
     );
@@ -306,19 +281,41 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
 
   // Build slot array: INVENTORY_MAX_SLOTS entries, each slot or null
   const slots = useMemo(() => {
-    const result: ({ itemId: string; quantity: number } | null)[] = Array.from(
+    const result: ({ itemId: string; quantity: number; instanceId?: string } | null)[] = Array.from(
       { length: INVENTORY_MAX_SLOTS },
       () => null,
     );
     if (inventory) {
       for (const entry of inventory) {
         if (entry.slot >= 0 && entry.slot < INVENTORY_MAX_SLOTS) {
-          result[entry.slot] = { itemId: entry.itemId, quantity: entry.quantity };
+          result[entry.slot] = {
+            itemId: entry.itemId,
+            quantity: entry.quantity,
+            instanceId: entry.instanceId,
+          };
         }
       }
     }
     return result;
   }, [inventory]);
+
+  const equipment = local?.equipment ?? {};
+  const itemDefs = useSyncExternalStore(itemDefStore.subscribe, itemDefStore.getSnapshot);
+
+  /** Find the equipped instanceId for the slot that matches this item's equipSlot */
+  const getCompareInstanceId = useCallback(
+    (slot: { itemId: string; instanceId?: string } | null): string | undefined => {
+      if (!slot?.instanceId) return undefined;
+      const def = itemDefs.get(slot.itemId);
+      if (!def?.equipSlot) return undefined;
+      // Check both accessory slots
+      if (def.equipSlot.startsWith("accessory")) {
+        return equipment["accessory_1"]?.instanceId ?? equipment["accessory_2"]?.instanceId;
+      }
+      return equipment[def.equipSlot]?.instanceId;
+    },
+    [itemDefs, equipment],
+  );
 
   // ── Drag state ──────────────────────────────────────────────────────────
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
@@ -453,11 +450,6 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
     hudStore.useItem(itemId);
   }, []);
 
-  const handleShiftClick = useCallback((itemId: string) => {
-    playUiSfx("ui_click");
-    insertItemLink(itemId);
-  }, []);
-
   const dragSlot = dragSourceIndex !== null ? slots[dragSourceIndex] : null;
 
   return (
@@ -478,13 +470,13 @@ export const InventoryPanel = ({ onClose }: { onClose: () => void }): ReactNode 
               isDragSource={dragSourceIndex === i}
               isDragOver={dragOverIndex === i && dragSourceIndex !== i}
               cooldown={slot ? (snapshot.itemCooldowns.get(slot.itemId) ?? null) : null}
+              compareInstanceId={getCompareInstanceId(slot)}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
-              onContextMenu={handleContextMenu}
-              onShiftClick={handleShiftClick}
+              onUseItem={handleContextMenu}
             />
           ))}
         </div>

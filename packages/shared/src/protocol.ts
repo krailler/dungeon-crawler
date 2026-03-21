@@ -1,10 +1,11 @@
 import type { AllocatableStatValue } from "./Stats.js";
 import type { TutorialStepValue } from "./Tutorial.js";
-import type { ItemDefClient } from "./Items.js";
+import type { ItemDefClient, ItemInstanceClient } from "./Items.js";
 import type { SkillDef } from "./Skills.js";
 import type { EffectDefClient } from "./Effects.js";
 import type { ClassDefClient } from "./Classes.js";
 import type { TalentDefClient } from "./Talents.js";
+import type { EquipmentSlotValue } from "./constants/items.js";
 
 /** Message types for client ↔ server communication */
 export const MessageType = {
@@ -59,6 +60,10 @@ export const MessageType = {
   CONSUMABLE_BAR_UNASSIGN: "cbar:unassign",
   CONSUMABLE_BAR_SWAP: "cbar:swap",
   LEAVE_ROOM: "room:leave",
+  EQUIP_ITEM: "equip:item",
+  UNEQUIP_ITEM: "equip:unequip",
+  INSTANCE_DEFS_REQUEST: "instance:req",
+  INSTANCE_DEFS_RESPONSE: "instance:res",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -443,4 +448,30 @@ export interface CommandInfo {
   usage: string;
   description: string;
   adminOnly: boolean;
+}
+
+// ── Equipment ──────────────────────────────────────────────────────────────
+
+/** Client → Server: equip an item from inventory */
+export interface EquipItemMessage {
+  /** Inventory slot index containing the item to equip */
+  invSlot: number;
+  /** Target equipment slot */
+  equipSlot: EquipmentSlotValue;
+}
+
+/** Client → Server: unequip an item back to inventory */
+export interface UnequipItemMessage {
+  /** Equipment slot to unequip */
+  equipSlot: EquipmentSlotValue;
+}
+
+/** Client → Server: request item instance details by id */
+export interface InstanceDefsRequestMessage {
+  instanceIds: string[];
+}
+
+/** Server → Client: item instance details response */
+export interface InstanceDefsResponseMessage {
+  instances: ItemInstanceClient[];
 }

@@ -111,7 +111,7 @@
 - **Consumable use**: client sends `ITEM_USE`, server validates (alive, has item, no cooldown), executes effect, removes 1 qty, starts cooldown
 - **Cooldowns**: `itemCooldowns: Map<string, number>` on PlayerState (server-only), ticked down in GameLoop, client receives `ITEM_COOLDOWN` message
 - **Lazy item defs**: client requests defs on demand via `ITEM_DEFS_REQUEST`/`ITEM_DEFS_RESPONSE` with microtick batching (`queueMicrotask`), in-memory cache, version-based invalidation
-- **Client UI**: `ConsumableBar` (4 slots, hotkeys 1-4, drag-to-assign from inventory, persisted to DB), `InventoryPanel` (B hotkey, grid of 12 slots), both use `ActionSlot` component
+- **Client UI**: `ConsumableBar` (4 slots, hotkeys 1-4, drag-to-assign from inventory, persisted to DB), `InventoryPanel` (B hotkey, grid of 12 slots) uses `ItemActionSlot` component (wraps ActionSlot with item-specific logic: tooltips, shift-compare, equip/use)
 - **Balance**: health potion heals 50 HP, 10s cooldown, max stack 10; regen potion applies Regeneration buff (8 HP/2s for 10s), 30s cooldown, max stack 5, uncommon rarity
 - **Admin**: `/give <player> <itemId> [qty]` command
 
@@ -137,6 +137,23 @@
 - **Pickup**: player takes item → server moves to inventory (stacks or fills empty slot) → notifies other players via chat announcement
 - **Client**: `ClientLootBag` (golden sphere + bobbing + point light), `lootBagStore`, `LootBagPanel` (4-column grid)
 - **Server**: `LootBagState`, `CreatureTypeRegistry` (loot entries), `DungeonRoom` (bag creation + pickup handlers)
+
+### Equipment System
+
+- **Equippable items**: defined in `world.items` with `equip_slot` (weapon, head, chest, boots, accessory_1, accessory_2), `stat_ranges` (JSONB), `bonus_pool` (JSONB), `level_req`
+- **Item instances**: each dropped equipment piece is a unique instance (`characters.item_instances`) with `rolled_stats` (JSONB) and `item_level`
+- **Stat rolling algorithm** (Diablo-inspired):
+  - Guaranteed stats rolled from `stat_ranges` min-max with ilvl scaling
+  - Bonus affixes selected from `bonus_pool` via weighted random (no duplicates)
+  - Affix count by rarity: common=0, uncommon=1, rare=1-2, epic=2-3, legendary=2-3
+  - `ilvlFactor = clamp((ilvl-1)/(MAX_LEVEL-1), 0, 1)` — higher ilvl biases rolls up
+  - `roll = min + random()^0.8 * range * (0.5 + 0.5 * ilvlFactor)` — slight bias toward higher values
+- **Stats pipeline**: (base stats + equipment str/vit/agi) → class scaling → equipment derived mods (flat) → talent mods (flat/percent) → effect mods (flat/percent) — all in `EffectSystem.recomputeStats()`
+- **Server**: `ItemInstanceRegistry` (in-memory cache + DB persistence), `LootRoller` (stat rolling), `EquipmentSlotState` (Colyseus Schema)
+- **Client**: `itemInstanceStore` (lazy-load rolled stats), `EquipmentTab` in CharacterSheet (6-slot grid with tooltips)
+- **Equip/Unequip**: right-click in inventory to equip, click in equipment tab to unequip; server validates slot match, level req, inventory space
+- **Persistence**: `character_equipment` table (character_id + slot → instance_id), loaded on join before `recomputeStats()`
+- **Loot integration**: `GameLoop` checks `equipSlot` on drop — calls `rollEquipmentDrop()` for equipment, creates instance with rolled stats
 
 ### Stamina & Sprint
 
@@ -177,7 +194,7 @@
 - **EffectDef type**: id, name (i18n key), description (i18n key with `{{value}}` interpolation), icon, duration, maxStacks, stackBehavior, isDebuff, statModifiers, tickEffect
 - **Stat modifiers**: `Record<string, StatModifier>` where StatModifier = `{type: "flat"|"percent", value: number}`. Applied as `(base + flatSum) * (1 + percentSum)`
 - **Stack behaviors**: `StackBehavior.REFRESH` resets timer only; `StackBehavior.INTENSITY` adds stacks (up to maxStacks) and multiplies modifier values
-- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, process tick effects for HoT/DoT, remove expired), `recomputeStats()` (**single source of truth** for all derived stats: base × scaling + talent mods + effect mods; integer stats rounded, float stats like speed/attackCooldown keep precision), `clearEffects()`, `removeEffect()`
+- **Server EffectSystem**: `applyEffect()` (apply/refresh/stack), `update(dt)` (tick timers, process tick effects for HoT/DoT, remove expired), `recomputeStats()` (**single source of truth** for all derived stats: (base + equipment str/vit/agi) × class scaling + equipment derived flat mods + talent mods + effect mods; integer stats rounded, float stats like speed/attackCooldown keep precision), `clearEffects()`, `removeEffect()`
 - **Tick effects**: `tickEffect` field (type, value, interval) on EffectDef — EffectSystem accumulates dt per effect via `tickAccum` server-only field, applies heal/damage when interval reached; value scales with `scalingFactor`
 - **State sync**: `ActiveEffectState` Schema class (effectId, remaining, duration, stacks, modValue; server-only: scalingFactor, scalingOverride, tickAccum) stored in `MapSchema<ActiveEffectState>` on both `PlayerState` and `CreatureState` (public, visible to all)
 - **Lifecycle**: effects cleared on downed, respawn, and revive (via `clearEffects()` in GameLoop)
@@ -218,7 +235,7 @@
 - Slash commands registered via CommandRegistry with admin-only flag
 - Admin commands: /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - Client ChatPanel: Enter to open/send, Escape to close, message fade after 10s, hover to reveal
-- Item links: `[item:id]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips; Shift+click item in inventory to insert link; atomic deletion (delete any char → delete entire link)
+- Item links: `[item:id]` or `[item:id:instanceId]` syntax in messages, rendered as colored clickable spans with rarity styling and tooltips (rolled stats shown if instanceId present); Shift+click (left or right) on any ItemActionSlot to insert link; atomic deletion (delete any char → delete entire link)
 - Command help overlay appears when input starts with `/`, Tab to autocomplete
 - Chat input history: arrow up/down navigates sent messages (max 50, draft preserved on ArrowUp, restored past end on ArrowDown)
 - Player name autocomplete for commands that expect `<player>` argument
@@ -262,8 +279,8 @@
 - `CreatureTypes.ts` — Creature type definitions with baseStats + overrides, `computeCreatureDerivedStats()`, `scaleCreatureDerivedStats(derived, level)`
 - `Economy.ts` — `computeGoldDrop(creatureLevel, avgPartyLevel, aliveCount)` with anti-farming modifiers
 - `Leveling.ts` — `xpToNextLevel(level)`, `computeXpDrop(creatureLevel, playerLevel)` with level diff modifier
-- `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight), `ItemEffectType` (none, heal, apply_effect), `ItemRarity`
-- `Skills.ts` — `SkillDef` type (id, name, icon, passive, cooldown, damageMultiplier, animState, hpThreshold, resetOnKill, effectId, aoeRange), `MAX_SKILL_SLOTS`, `DEFAULT_SKILL_IDS`
+- `Items.ts` — `ItemDef` type (id, name, icon, maxStack, consumable, cooldown, effectType, effectParams, dropWeight, equipSlot, levelReq, statRanges, bonusPool), `ItemInstance` (id, itemId, rolledStats, itemLevel), `ItemEffectType` (none, heal, apply_effect), `ItemRarity`, `BonusPoolEntry`, `StatRange`
+- `Skills.ts` — `SkillDef` type (id, name, icon, passive, cooldown, damageMultiplier, animState, animDuration, hpThreshold, resetOnKill, effectId, aoeRange), `MAX_SKILL_SLOTS`, `DEFAULT_SKILL_IDS`
 - `Effects.ts` — `EffectDef`, `EffectDefClient`, `StatModifier`, `StackBehavior`, `StatModType`, `TickEffect`, `EffectScaling`, `CreatureEffectTrigger` types + `lerpEffectValue()`, `computeScalingFactor()`, `toEffectDefClient()` for buff/debuff system
 - `Talents.ts` — `TalentDef`, `TalentDefClient`, `TalentRankEffect`, `TalentStatModifier`, `TalentSkillModifier` types + `toTalentDefClient()`, `computeTalentSkillMods()` (pure function shared by server and client for skill cooldown/damage modifiers)
 - `Roles.ts` — `Role` type ("admin", "user")
@@ -271,7 +288,7 @@
 - `Tutorial.ts` — `TutorialStep` type (start_dungeon, allocate_stats, sprint, you_downed, teammate_downed, first_debuff, allocate_talents, dungeon_key, portal_no_key, welcome)
 - `RoomNames.ts` — `generateRoomName(seed)` — procedural dungeon names (adjective + noun, mulberry32 RNG)
 - `constants/economy.ts` — Economy + XP tuning constants (BASE_GOLD_PER_KILL, BASE_XP_PER_KILL, XP_CURVE_BASE, MAX_LEVEL, CREATURE_STAT_SCALE_PER_LEVEL, save interval)
-- `constants/items.ts` — Item balance constants (INVENTORY_MAX_SLOTS, POTION_DROP_CHANCE)
+- `constants/items.ts` — Item balance constants (INVENTORY_MAX_SLOTS, POTION_DROP_CHANCE, EQUIPMENT_SLOTS, BONUS_AFFIXES_BY_RARITY, INTEGER_STATS)
 - `constants/death.ts` — Life state constants (BLEEDOUT_DURATION=30s, REVIVE_CHANNEL_DURATION=3.5s, REVIVE_RANGE=3, REVIVE_HP_PERCENT=0.3, respawn timers)
 - `constants/stamina.ts` — Sprint constants (STAMINA_MAX=100, SPRINT_SPEED_MULTIPLIER=1.5, drain/regen rates, delay)
 - `constants/version.ts` — Protocol versioning (PROTOCOL_VERSION, MIN_PROTOCOL_VERSION)
@@ -293,13 +310,15 @@
 - `main.ts` — Colyseus Server entry, defines "dungeon" room, loads registries at startup (items → skills → effects → creatures → classes → talents)
 - `logger.ts` — Pino-based structured logging (pretty in dev, JSON in prod), room-scoped child loggers
 - `auth/authConfig.ts` — JWT authentication setup, email/password registration (dev-only), auto-creates character
-- `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save, reconnection with session migration + countdown warnings, gate system, party kick, ITEM_USE/ITEM_DEFS_REQUEST/SKILL_USE handlers, AOI culling
-- `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle (300s window), session migration, `savePlayerProgress()` (stats + inventory upsert), `loadInventory()`, leader reassignment, tutorial hint sending
+- `rooms/DungeonRoom.ts` — Game room: dungeon gen (with dungeonLevel), message handlers, game loop, gold distribution on kill, auto-save, reconnection with session migration + countdown warnings, gate system, party kick, ITEM_USE/ITEM_DEFS_REQUEST/SKILL_USE/EQUIP_ITEM/UNEQUIP_ITEM/INSTANCE_DEFS_REQUEST handlers, AOI culling
+- `rooms/PlayerSessionManager.ts` — Join/leave/reconnect lifecycle (300s window), session migration, `savePlayerProgress()` (stats + inventory + equipment upsert), `loadInventory()`, `loadEquipment()`, leader reassignment, tutorial hint sending
 - `chat/ChatSystem.ts` — Server-side chat: rate limiting, message broadcasting, system events (i18n keys), command dispatch
 - `chat/CommandRegistry.ts` — Slash command registry with admin-only support, argument parsing
 - `chat/commands.ts` — Built-in commands: /help, /players, /kill, /heal, /revive, /tp, /tpxy, /leader, /setlevel, /kick, /give, /gold, /reset-tutorials, /resettalents, /resetstats, /spawn, /god
 - `chat/notifyLevelProgress.ts` — Level-up notification: public announcement + private stat-point message + tutorial hints
-- `items/ItemRegistry.ts` — Loads item definitions from DB at startup, provides `getItemDef()`, `getDroppableItems()`, versioned cache
+- `items/ItemRegistry.ts` — Loads item definitions from DB at startup (incl. equipSlot, levelReq, statRanges, bonusPool), provides `getItemDef()`, `getDroppableItems()`, versioned cache
+- `items/ItemInstanceRegistry.ts` — In-memory cache of unique item instances (rolled stats). `createInstanceInMemory()`, `savePendingInstancesTx()` (per-player batch save), `cacheInstances()` (load from DB)
+- `items/LootRoller.ts` — Diablo-inspired stat rolling: `rollEquipmentDrop(def, creatureLevel, rarity?)` — ilvl scaling, biased random, weighted affix selection
 - `items/EffectHandlers.ts` — Maps effectType strings to functions (heal → restore HP, apply_effect → apply buff/debuff via EffectSystem)
 - `effects/EffectRegistry.ts` — Loads effect definitions from DB using `createRegistry` factory, with stackBehavior validation and comprehensive hash for version detection
 - `skills/SkillRegistry.ts` — Loads skill definitions from DB using `createRegistry` factory, provides `getSkillDef()`, versioned cache
@@ -307,9 +326,10 @@
 - `talents/TalentRegistry.ts` — Loads talent definitions + effects from DB, `collectTalentStatMods()` for stat bonuses, `collectTalentSkillMods()` delegates to shared `computeTalentSkillMods()`
 - `creatures/CreatureTypeRegistry.ts` — Loads creature types + loot tables + effect triggers + skills from DB, level-based filtering, loot/effect/skill entry lookups
 - `state/DungeonState.ts` — Root Schema state (MapSchema players/creatures/gates/lootBags, tileMapData, tickRate, dungeonLevel, dungeonVersion, serverRuntime)
-- `state/PlayerState.ts` — Player Schema (position, health, animation, lifeState, bleed/respawn/revive timers, level, sprint) + server-only (path, combat data, characterId, itemCooldowns, tutorials, godMode, pacifist) + `addXp()`, `setLevel()`, `addItem()`, `removeItem()`, `countItem()`
-- `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: base stats, derived stats (attackDamage, defense, speed, attackCooldown), gold, xp, skills, stamina, inventory (MapSchema\<InventorySlotState\>), role, auto-attack toggle
-- `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16)
+- `state/PlayerState.ts` — Player Schema (position, health, animation, lifeState, bleed/respawn/revive timers, level, sprint) + server-only (path, combat data, characterId, itemCooldowns, tutorials, godMode, pacifist, instanceItemIds) + `addXp()`, `setLevel()`, `addItem()`, `removeItem()`, `countItem()`, `equipItem()`, `unequipItem()`
+- `state/PlayerSecretState.ts` — Private state synced only to owning client via `@view()`: base stats, derived stats (attackDamage, defense, speed, attackCooldown), gold, xp, skills, stamina, inventory (MapSchema\<InventorySlotState\>), equipment (MapSchema\<EquipmentSlotState\>), role, auto-attack toggle
+- `state/InventorySlotState.ts` — Schema class: itemId (string) + quantity (uint16) + instanceId (string, for equipment)
+- `state/EquipmentSlotState.ts` — Schema class: instanceId (string) — references item_instances UUID
 - `state/CreatureState.ts` — Creature Schema (position, health, isDead, creatureType, level, animation, aggro, isMoving, isWalking, MapSchema effects) + server-only (path, baseSpeed, speed, AI/combat data)
 - `state/GateState.ts` — Gate Schema (position, type, N/S vs E/W orientation, open state)
 - `state/LootBagState.ts` — Loot bag Schema (position, MapSchema\<InventorySlotState\>)
@@ -323,7 +343,7 @@
 - `dungeon/DungeonGenerator.ts` — Procedural dungeon (BSP, no Babylon deps)
 - `navigation/Pathfinder.ts` — A\* on TileMap (8-directional, diagonal wall check, line-of-sight via Bresenham, tile blocking for gates)
 - `sessions/activeSessionRegistry.ts` — Global session tracking for duplicate login detection/kick
-- `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory, character_talents, character_skills), `world` schema (items, skills, creatures, creature_skills, creature_loot, effects, creature_effects, classes, class_skills, talents, talent_effects)
+- `db/schema.ts` — Drizzle ORM schema: `characters` schema (accounts, characters, character_inventory, character_equipment, character_talents, character_skills, item_instances), `world` schema (items, skills, creatures, creature_skills, creature_loot, effects, creature_effects, classes, class_skills, talents, talent_effects)
 - `db/database.ts` — PostgreSQL connection pool (max 10) + auto-migration
 - `db/seed.ts` — Seed data: account/character defaults
 
@@ -354,6 +374,7 @@
 - `ui/stores/authStore.ts` — Auth state: login/logout/kick, token, role
 - `ui/stores/hudStore.ts` — HUD pub-sub: party members (stats, level, gold, xp, xpToNext, online, inventory), FPS, ping, connection, item/skill cooldowns
 - `ui/stores/itemDefStore.ts` — Lazy-loading item definition cache with microtick batching, version-based invalidation, async preloading
+- `ui/stores/itemInstanceStore.ts` — Lazy-loading item instance cache (rolled stats, itemLevel) via INSTANCE_DEFS_REQUEST/RESPONSE with microtick batching
 - `ui/stores/effectDefStore.ts` — Lazy-loading effect definition cache (same pattern as itemDefStore via `createDefStore` factory)
 - `ui/stores/chatStore.ts` — Chat pub-sub: message history, input, commands
 - `ui/stores/debugStore.ts` — Debug toggles, persisted localStorage
@@ -373,8 +394,10 @@
 - `ui/hud/HudRoot.tsx` — Party bars (level badges, offline), gold pill with floating "+amount" animation (GoldPill component), FPS/ping, context menu (promote/kick), character/minimap/inventory buttons, SkillBar + ConsumableBar, WelcomeOverlay
 - `ui/hud/XpBar.tsx` — WoW-style XP bar (bottom center, 60% width): purple gradient, level label, XP numbers, floating "+XP" animated text on gain
 - `ui/hud/StaminaBar.tsx` — Sprint stamina indicator above XP bar (visible when not full)
-- `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab, arrow up/down history navigation
-- `ui/hud/CharacterPanel.tsx` — Character sheet: name, level, health bar, gold display, base stats, derived stats (uses HudPanel)
+- `ui/hud/ChatPanel.tsx` — Chat: messages with fade, input with Enter, slash command help with Tab, arrow up/down history navigation, item link tooltips with rolled stats
+- `ui/hud/CharacterSheet.tsx` — Tabbed character sheet: character stats, equipment, talents, skills (uses HudPanel)
+- `ui/hud/EquipmentTab.tsx` — 3x2 grid equipment display (weapon, head, chest, boots, accessory_1, accessory_2), click to unequip, EquipmentTooltip with shift-compare
+- `ui/hud/CharacterPanel.tsx` — Character stats tab: name, level, health bar, gold display, base stats, derived stats
 - `ui/hud/SkillBar.tsx` — Skill slots (1-5 hotkeys) using ActionSlot component
 - `ui/hud/ConsumableBar.tsx` — 4 assignable consumable slots (hotkeys 1-4), drag-to-assign from inventory, drag-to-reorder, server-persisted
 - `ui/hud/InventoryPanel.tsx` — 4x3 inventory grid (B hotkey) with item tooltips, click-to-use (uses HudPanel + ActionSlot)
@@ -392,7 +415,9 @@
 - `ui/hud/PromptOverlay.tsx` — Generic confirmation overlay
 - `ui/hud/AnnouncementOverlay.tsx` — Center-screen announcements with auto-dismiss
 - `ui/hud/WelcomeOverlay.tsx` — First-time player welcome modal with game tips (logo, subtitle, tips with icons, dismiss button)
-- `ui/components/ActionSlot.tsx` — Unified slot component for skills/consumables/inventory (variants: primary/consumable/empty, cooldown overlay, quantity badge, tooltip, keybind)
+- `ui/components/ActionSlot.tsx` — Base slot component for skills/consumables (variants: primary/consumable/empty, cooldown overlay, quantity badge, tooltip, keybind, loading shimmer)
+- `ui/components/ItemActionSlot.tsx` — Wraps ActionSlot with item-specific logic: lazy-loads def + instance, EquipmentTooltip, shift-compare with equipped, Shift+click item link insertion
+- `ui/components/EquipmentTooltip.tsx` — Rich tooltip for equipment items: rarity-colored name, slot/level/ilvl, rolled stats, shift-compare diffs (green=better, red=worse)
 - `ui/components/EffectIcon.tsx` — Reusable effect icon with timer sweep overlay, stacks badge, styled tooltip (name + description with value/interval interpolation + remaining), supports normal (32px) and small (20px) sizes
 - `ui/components/HudButton.tsx` — Reusable HUD button with icon + label + shortcut
 - `ui/components/HudPill.tsx` — Reusable HUD pill (default/amber variants)
@@ -402,7 +427,8 @@
 - `ui/utils/healthColor.ts` — Health bar color utility (green → red gradient)
 - `ui/utils/lifeState.ts` — Life state CSS class mapping (alive/downed/dead)
 - `ui/utils/rarityColors.ts` — Centralized rarity styling (text, border, shadow) with `getRarityStyle()`
-- `ui/utils/itemLinkUtils.ts` — Chat item link utilities: `[item:id]` parsing, insertion, resolution
+- `ui/utils/itemLinkUtils.ts` — Chat item link utilities: `[item:id:instanceId?]` parsing, insertion, resolution
+- `ui/utils/statLabels.ts` — Shared stat i18n key map (`STAT_I18N`), `formatStatValue()`, `formatStatRange()` for equipment tooltips
 - `ui/utils/dragGhost.ts` — Empty drag image for custom drag ghosts
 - `ui/stores/welcomeStore.ts` — Welcome overlay state (show/dismiss/reset)
 - `ui/hooks/useDraggable.ts` — Draggable panel handle logic

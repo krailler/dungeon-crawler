@@ -1,6 +1,6 @@
 import type { Client, Deferred } from "colyseus";
 import type { Logger } from "pino";
-import { eq, and, notInArray, sql } from "drizzle-orm";
+import { eq, and, notInArray, inArray, sql } from "drizzle-orm";
 import { pid } from "../logger";
 import { getDb } from "../db/database";
 import type { DbTransaction } from "../db/database";
@@ -10,8 +10,12 @@ import {
   characterConsumableBar,
   characterSkills,
   characterTalents,
+  characterEquipment,
+  itemInstances,
 } from "../db/schema";
 import { getItemDef } from "../items/ItemRegistry";
+import { cacheInstances, savePendingInstancesTx } from "../items/ItemInstanceRegistry";
+import { EquipmentSlotState } from "../state/EquipmentSlotState";
 import { DungeonState } from "../state/DungeonState";
 import { PlayerState } from "../state/PlayerState";
 import { InventorySlotState } from "../state/InventorySlotState";
@@ -194,9 +198,10 @@ export class PlayerSessionManager {
     // Compute an initial hash so early disconnects don't skip saves
     this.lastSavedHash.set(characterId, this.buildProgressHash(player));
 
-    // Load inventory + consumable bar + skills + talents from DB before computing stats
+    // Load inventory + equipment + consumable bar + skills + talents from DB before computing stats
     await Promise.all([
       this.loadInventory(characterId, player),
+      this.loadEquipment(characterId, player),
       this.loadConsumableBar(characterId, player),
       this.loadCharacterSkills(characterId, player),
       this.loadCharacterTalents(characterId, player),
@@ -650,6 +655,7 @@ export class PlayerSessionManager {
       .where(eq(characters.id, characterId));
 
     await this.saveInventoryTx(tx, characterId, player);
+    await this.saveEquipmentTx(tx, characterId, player);
     await this.saveConsumableBarTx(tx, characterId, player);
     await this.saveSkillsTx(tx, characterId, player);
     await this.saveTalentsTx(tx, characterId, player);
@@ -662,13 +668,24 @@ export class PlayerSessionManager {
     const cbar = this.buildConsumableBarHash(player);
     const sk = this.buildSkillsHash(player);
     const tal = this.buildTalentsHash(player);
-    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${talentPoints}:${tut}:${inv}:${cbar}:${sk}:${tal}`;
+    const eq = this.buildEquipmentHash(player);
+    return `${gold}:${xp}:${level}:${strength}:${vitality}:${agility}:${statPoints}:${talentPoints}:${tut}:${inv}:${cbar}:${sk}:${tal}:${eq}`;
   }
 
   private buildInventoryHash(player: PlayerState): string {
     const parts: string[] = [];
     player.inventory.forEach((slot, key) => {
-      parts.push(`${key}=${slot.itemId}x${slot.quantity}`);
+      parts.push(`${key}=${slot.itemId}x${slot.quantity}:${slot.instanceId}`);
+    });
+    return parts.sort().join("|");
+  }
+
+  private buildEquipmentHash(player: PlayerState): string {
+    const parts: string[] = [];
+    player.equipment.forEach((eqSlot, slotName) => {
+      if (eqSlot.instanceId) {
+        parts.push(`${slotName}=${eqSlot.instanceId}`);
+      }
     });
     return parts.sort().join("|");
   }
@@ -679,6 +696,30 @@ export class PlayerSessionManager {
       .select()
       .from(characterInventory)
       .where(eq(characterInventory.characterId, characterId));
+
+    // Collect instanceIds to load from item_instances table
+    const instanceIds = rows.filter((r) => r.instanceId).map((r) => r.instanceId as string);
+
+    // Load item instances in bulk
+    if (instanceIds.length > 0) {
+      const instRows = await db
+        .select()
+        .from(itemInstances)
+        .where(inArray(itemInstances.id, instanceIds));
+      cacheInstances(
+        instRows.map((r) => ({
+          id: r.id,
+          itemId: r.itemId,
+          rolledStats: r.rolledStats as Record<string, number>,
+          itemLevel: r.itemLevel,
+        })),
+      );
+      // Populate instanceItemIds map
+      for (const r of instRows) {
+        player.instanceItemIds.set(r.id, r.itemId);
+      }
+    }
+
     let loaded = 0;
     for (const row of rows) {
       if (!getItemDef(row.itemId)) {
@@ -691,6 +732,7 @@ export class PlayerSessionManager {
       const slot = new InventorySlotState();
       slot.itemId = row.itemId;
       slot.quantity = row.quantity;
+      slot.instanceId = row.instanceId ?? "";
       player.inventory.set(String(row.slotIndex), slot);
       loaded++;
     }
@@ -705,7 +747,13 @@ export class PlayerSessionManager {
     player: PlayerState,
   ): Promise<void> {
     const activeSlots: number[] = [];
-    const rows: { characterId: string; slotIndex: number; itemId: string; quantity: number }[] = [];
+    const rows: {
+      characterId: string;
+      slotIndex: number;
+      itemId: string;
+      quantity: number;
+      instanceId: string | null;
+    }[] = [];
     player.inventory.forEach((slot, key) => {
       if (slot.quantity > 0) {
         // Skip transient items (e.g. dungeon key) — they don't persist across sessions
@@ -713,7 +761,13 @@ export class PlayerSessionManager {
         if (itemDef?.transient) return;
         const slotIndex = Number(key);
         activeSlots.push(slotIndex);
-        rows.push({ characterId, slotIndex, itemId: slot.itemId, quantity: slot.quantity });
+        rows.push({
+          characterId,
+          slotIndex,
+          itemId: slot.itemId,
+          quantity: slot.quantity,
+          instanceId: slot.instanceId || null,
+        });
       }
     });
 
@@ -727,6 +781,7 @@ export class PlayerSessionManager {
           set: {
             itemId: sql`excluded.item_id`,
             quantity: sql`excluded.quantity`,
+            instanceId: sql`excluded.instance_id`,
           },
         });
     }
@@ -744,6 +799,76 @@ export class PlayerSessionManager {
     } else {
       // Inventory is empty — delete all
       await tx.delete(characterInventory).where(eq(characterInventory.characterId, characterId));
+    }
+  }
+
+  private async loadEquipment(characterId: string, player: PlayerState): Promise<void> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(characterEquipment)
+      .where(eq(characterEquipment.characterId, characterId));
+
+    if (rows.length === 0) return;
+
+    // Load item instances for equipped items
+    const instanceIds = rows.map((r) => r.instanceId);
+    const instRows = await db
+      .select()
+      .from(itemInstances)
+      .where(inArray(itemInstances.id, instanceIds));
+
+    cacheInstances(
+      instRows.map((r) => ({
+        id: r.id,
+        itemId: r.itemId,
+        rolledStats: r.rolledStats as Record<string, number>,
+        itemLevel: r.itemLevel,
+      })),
+    );
+
+    for (const r of instRows) {
+      player.instanceItemIds.set(r.id, r.itemId);
+    }
+
+    for (const row of rows) {
+      const eqSlot = new EquipmentSlotState();
+      eqSlot.instanceId = row.instanceId;
+      player.equipment.set(row.slot, eqSlot);
+    }
+
+    this.log.debug({ characterId, slots: rows.length }, "Equipment loaded");
+  }
+
+  private async saveEquipmentTx(
+    tx: DbTransaction,
+    characterId: string,
+    player: PlayerState,
+  ): Promise<void> {
+    // Collect all instance IDs this player has (inventory + equipment)
+    const playerInstanceIds: string[] = [];
+    player.inventory.forEach((slot) => {
+      if (slot.instanceId) playerInstanceIds.push(slot.instanceId);
+    });
+    player.equipment.forEach((eqSlot) => {
+      if (eqSlot.instanceId) playerInstanceIds.push(eqSlot.instanceId);
+    });
+
+    // Save only this player's pending instances
+    await savePendingInstancesTx(tx, playerInstanceIds);
+
+    // Delete all equipment for this character, then re-insert
+    await tx.delete(characterEquipment).where(eq(characterEquipment.characterId, characterId));
+
+    const rows: { characterId: string; slot: string; instanceId: string }[] = [];
+    player.equipment.forEach((eqSlot, slotName) => {
+      if (eqSlot.instanceId) {
+        rows.push({ characterId, slot: slotName, instanceId: eqSlot.instanceId });
+      }
+    });
+
+    if (rows.length > 0) {
+      await tx.insert(characterEquipment).values(rows);
     }
   }
 

@@ -7,10 +7,16 @@ import {
   PLAYER_SCALING,
   TALENT_UNLOCK_LEVEL,
 } from "@dungeon/shared";
-import type { AllocatableStatValue, RoleValue, StatScaling } from "@dungeon/shared";
+import type {
+  AllocatableStatValue,
+  RoleValue,
+  StatScaling,
+  EquipmentSlotValue,
+} from "@dungeon/shared";
 import { PlayerSecretState } from "./PlayerSecretState";
 import { InventorySlotState } from "./InventorySlotState";
 import { ActiveEffectState } from "./ActiveEffectState";
+import { EquipmentSlotState } from "./EquipmentSlotState";
 
 export class PlayerState extends Schema {
   // ── Public fields (visible to all clients) ─────────────────────────────────
@@ -181,6 +187,10 @@ export class PlayerState extends Schema {
 
   get consumableBar() {
     return this.secret.consumableBar;
+  }
+
+  get equipment() {
+    return this.secret.equipment;
   }
 
   /**
@@ -455,5 +465,86 @@ export class PlayerState extends Schema {
       if (slot.itemId === itemId) total += slot.quantity;
     });
     return total;
+  }
+
+  // ── Equipment helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Equip an item from inventory. Moves it from the inventory slot to the
+   * equipment slot. If the equipment slot is already occupied, swaps them.
+   * Returns true on success.
+   */
+  equipItem(invSlotIndex: number, equipSlot: EquipmentSlotValue): boolean {
+    const invKey = String(invSlotIndex);
+    const invSlot = this.inventory.get(invKey);
+    if (!invSlot || !invSlot.instanceId) return false;
+
+    const existingEquip = this.equipment.get(equipSlot);
+
+    if (existingEquip && existingEquip.instanceId) {
+      // Swap: move currently equipped item back to the same inventory slot
+      const oldInstanceId = existingEquip.instanceId;
+      const oldItemId = this.getItemIdForInstance(oldInstanceId);
+
+      // Put new item into equipment
+      existingEquip.instanceId = invSlot.instanceId;
+
+      // Put old item into the inventory slot
+      invSlot.itemId = oldItemId;
+      invSlot.instanceId = oldInstanceId;
+      invSlot.quantity = 1;
+    } else {
+      // Empty slot: equip and remove from inventory
+      const eqSlot = new EquipmentSlotState();
+      eqSlot.instanceId = invSlot.instanceId;
+      this.equipment.set(equipSlot, eqSlot);
+      this.inventory.delete(invKey);
+    }
+
+    return true;
+  }
+
+  /**
+   * Unequip an item from an equipment slot back to inventory.
+   * Returns true on success, false if no space in inventory.
+   */
+  unequipItem(equipSlot: EquipmentSlotValue): boolean {
+    const eqSlot = this.equipment.get(equipSlot);
+    if (!eqSlot || !eqSlot.instanceId) return false;
+
+    // Find an empty inventory slot
+    const usedSlots = new Set<number>();
+    this.inventory.forEach((_, key) => usedSlots.add(Number(key)));
+
+    let emptyIdx = -1;
+    for (let i = 0; i < INVENTORY_MAX_SLOTS; i++) {
+      if (!usedSlots.has(i)) {
+        emptyIdx = i;
+        break;
+      }
+    }
+    if (emptyIdx === -1) return false; // inventory full
+
+    const itemId = this.getItemIdForInstance(eqSlot.instanceId);
+
+    const invSlot = new InventorySlotState();
+    invSlot.itemId = itemId;
+    invSlot.quantity = 1;
+    invSlot.instanceId = eqSlot.instanceId;
+    this.inventory.set(String(emptyIdx), invSlot);
+
+    this.equipment.delete(equipSlot);
+    return true;
+  }
+
+  /**
+   * Server-only map: instanceId → itemId.
+   * Populated by PlayerSessionManager when loading inventory/equipment.
+   */
+  instanceItemIds: Map<string, string> = new Map();
+
+  /** Look up the item template id for an instance */
+  getItemIdForInstance(instanceId: string): string {
+    return this.instanceItemIds.get(instanceId) ?? "";
   }
 }

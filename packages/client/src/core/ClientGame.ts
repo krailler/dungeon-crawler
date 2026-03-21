@@ -60,6 +60,7 @@ import { announcementStore } from "../ui/stores/announcementStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { welcomeStore } from "../ui/stores/welcomeStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
+import { itemInstanceStore } from "../ui/stores/itemInstanceStore";
 import { feedbackStore } from "../ui/stores/feedbackStore";
 import { settingsStore } from "../ui/stores/settingsStore";
 import type { GraphicsSettings } from "../ui/stores/settingsStore";
@@ -372,8 +373,9 @@ export class ClientGame {
         tutorialStore.dismiss(msg.step, false);
       });
 
-      // Connect item def store to room for lazy loading
+      // Connect item def store + item instance store to room for lazy loading
       itemDefStore.connect(room);
+      itemInstanceStore.connect(room);
 
       // Item use confirmation from server (cooldown + sound)
       room.onMessage(MessageType.ITEM_COOLDOWN, (data: ItemCooldownMessage) => {
@@ -540,6 +542,7 @@ export class ClientGame {
     announcementStore.reset();
     tutorialStore.reset();
     welcomeStore.reset();
+    itemInstanceStore.reset();
     // Only clear reconnection token if NOT in reconnectable state
     if (!authStore.getSnapshot().canReconnect) {
       localStorage.removeItem("reconnectionToken");

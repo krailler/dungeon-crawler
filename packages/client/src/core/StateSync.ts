@@ -57,6 +57,7 @@ import type { SoundManager } from "../audio/SoundManager";
 import { hudStore } from "../ui/stores/hudStore";
 import { levelUpStore } from "../ui/stores/levelUpStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
+import { itemInstanceStore } from "../ui/stores/itemInstanceStore";
 import { skillDefStore } from "../ui/stores/skillDefStore";
 import { effectDefStore } from "../ui/stores/effectDefStore";
 import { classDefStore } from "../ui/stores/classDefStore";
@@ -551,6 +552,14 @@ export class StateSync {
           });
           $(secret).inventory.onRemove(rebuildInv);
 
+          // Sync equipment MapSchema
+          const rebuildEquip = this.rebuildEquipment.bind(this, sessionId, secret);
+          $(secret).equipment.onAdd((eqSlot: any, _key: string) => {
+            $(eqSlot).onChange(rebuildEquip);
+            rebuildEquip();
+          });
+          $(secret).equipment.onRemove(rebuildEquip);
+
           // Track gold changes for pickup sound
           let prevGold = secret.gold as number;
 
@@ -999,19 +1008,46 @@ export class StateSync {
 
   /** Sync inventory from secret state to hudStore + lazy-fetch unknown item defs. */
   private rebuildInventory(sessionId: string, secret: any): void {
-    const inv: { slot: number; itemId: string; quantity: number }[] = [];
+    const inv: { slot: number; itemId: string; quantity: number; instanceId?: string }[] = [];
     secret.inventory.forEach((slot: any, key: string) => {
       if (slot.quantity > 0) {
-        inv.push({ slot: Number(key), itemId: slot.itemId, quantity: slot.quantity });
+        inv.push({
+          slot: Number(key),
+          itemId: slot.itemId,
+          quantity: slot.quantity,
+          instanceId: slot.instanceId || undefined,
+        });
       }
     });
     hudStore.updateMember(sessionId, { inventory: inv });
     if (inv.length > 0) {
       itemDefStore.ensureLoaded(inv.map((s) => s.itemId));
+      // Lazy-load instance data for equipment items
+      const instanceIds = inv.map((s) => s.instanceId).filter(Boolean) as string[];
+      if (instanceIds.length > 0) {
+        itemInstanceStore.ensureLoaded(instanceIds);
+      }
     }
   }
 
   /** Extract item ids from local player's inventory (for preloading defs). */
+  /** Sync equipment from secret state to hudStore + lazy-fetch instance data. */
+  private rebuildEquipment(sessionId: string, secret: any): void {
+    const equipment: Record<string, { instanceId: string }> = {};
+    secret.equipment.forEach((eqSlot: any, slotName: string) => {
+      if (eqSlot.instanceId) {
+        equipment[slotName] = { instanceId: eqSlot.instanceId };
+      }
+    });
+    hudStore.updateMember(sessionId, { equipment });
+
+    // Lazy-load instance data for equipped items
+    const instanceIds = Object.values(equipment).map((e) => e.instanceId);
+    if (instanceIds.length > 0) {
+      itemInstanceStore.ensureLoaded(instanceIds);
+    }
+  }
+
   private getLocalInventoryItemIds(room: Room): string[] {
     const player = room.state.players.get(room.sessionId) as any;
     if (!player?.secret?.inventory) return [];

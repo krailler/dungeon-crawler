@@ -2,6 +2,7 @@ import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 import { Role } from "@dungeon/shared";
 import type { RoleValue } from "@dungeon/shared";
 import { InventorySlotState } from "./InventorySlotState";
+import { EquipmentSlotState } from "./EquipmentSlotState";
 
 /**
  * Private player data — only visible to the owning client via @view().
@@ -42,6 +43,9 @@ export class PlayerSecretState extends Schema {
 
   // Consumable bar (itemId per slot, empty string = unassigned)
   @type(["string"]) consumableBar = new ArraySchema<string>();
+
+  // Equipment (slot name → equipped instance)
+  @type({ map: EquipmentSlotState }) equipment = new MapSchema<EquipmentSlotState>();
 
   // Role (admin/user)
   @type("string") role: RoleValue = Role.USER;

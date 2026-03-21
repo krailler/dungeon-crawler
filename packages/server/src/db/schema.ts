@@ -71,6 +71,13 @@ export const characters = charactersSchema.table(
   (table) => [uniqueIndex("idx_characters_account_name").on(table.accountId, table.name)],
 );
 
+export const itemInstances = charactersSchema.table("item_instances", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: text("item_id").notNull(),
+  rolledStats: jsonb("rolled_stats").notNull().default({}),
+  itemLevel: integer("item_level").notNull().default(1),
+});
+
 export const characterInventory = charactersSchema.table(
   "character_inventory",
   {
@@ -81,10 +88,28 @@ export const characterInventory = charactersSchema.table(
     slotIndex: integer("slot_index").notNull(),
     itemId: text("item_id").notNull(),
     quantity: integer("quantity").notNull().default(1),
+    instanceId: uuid("instance_id").references(() => itemInstances.id, { onDelete: "set null" }),
   },
   (table) => [
     uniqueIndex("idx_char_inventory_slot").on(table.characterId, table.slotIndex),
     index("idx_char_inventory_char").on(table.characterId),
+  ],
+);
+
+export const characterEquipment = charactersSchema.table(
+  "character_equipment",
+  {
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    slot: text("slot").notNull(),
+    instanceId: uuid("instance_id")
+      .notNull()
+      .references(() => itemInstances.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("idx_char_equipment_slot").on(table.characterId, table.slot),
+    index("idx_char_equipment_char").on(table.characterId),
   ],
 );
 
@@ -150,6 +175,14 @@ export const items = worldSchema.table("items", {
   useSound: text("use_sound").notNull().default(""),
   transient: boolean("transient").notNull().default(false),
   rarity: text("rarity").notNull().default("common"),
+  /** Equipment slot this item can be equipped in (null = not equippable) */
+  equipSlot: text("equip_slot"),
+  /** Minimum character level to equip */
+  levelReq: integer("level_req").notNull().default(1),
+  /** Guaranteed stat ranges for equipment rolling: { "attackDamage": { min, max } } */
+  statRanges: jsonb("stat_ranges").notNull().default({}),
+  /** Pool of bonus affixes: [{ stat, min, max, weight }] */
+  bonusPool: jsonb("bonus_pool").notNull().default([]),
 });
 
 export const skills = worldSchema.table("skills", {

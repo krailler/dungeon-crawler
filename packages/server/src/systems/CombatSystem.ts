@@ -8,7 +8,7 @@
  *   │ 1. Tick down skill cooldowns                        │
  *   │ 2. Tick anim timer → clear animState when done      │
  *   │ 3. Tick damage timer → apply damage at animation    │
- *   │    peak (DAMAGE_DELAY) and fire onHit callback      │
+ *   │    peak (animDuration/2) and fire onHit callback    │
  *   │ 4. If attack cooldown ready + auto-attack enabled:  │
  *   │    └─ findTarget() → scheduleHit()                  │
  *   └──────────────────────────────────────────────────────┘

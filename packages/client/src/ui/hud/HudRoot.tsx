@@ -261,13 +261,28 @@ export const HudRoot = (): ReactNode => {
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      document.documentElement.requestFullscreen();
+  const lockKeyboard = useCallback(() => {
+    navigator.keyboard?.lock?.(["Escape"]).catch(() => {});
+  }, []);
+  const unlockKeyboard = useCallback(() => {
+    if (
+      "keyboard" in navigator &&
+      "unlock" in (navigator as Navigator & { keyboard: { unlock: () => void } }).keyboard
+    ) {
+      (navigator.keyboard as { unlock: () => void }).unlock();
     }
   }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      unlockKeyboard();
+      document.exitFullscreen();
+    } else {
+      document.documentElement
+        .requestFullscreen()
+        .then(() => lockKeyboard())
+        .catch(() => {});
+    }
+  }, [lockKeyboard, unlockKeyboard]);
 
   // Context menu for party members
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
