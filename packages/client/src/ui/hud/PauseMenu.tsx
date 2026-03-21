@@ -80,16 +80,6 @@ export const PauseMenu = (): ReactNode => {
               <MenuButton variant="danger" onClick={() => setConfirmLeave(true)} className="w-full">
                 {t("pause.leaveRoom")}
               </MenuButton>
-              <MenuButton
-                variant="danger"
-                onClick={() => {
-                  authStore.logout();
-                  window.location.reload();
-                }}
-                className="w-full"
-              >
-                {t("pause.logout")}
-              </MenuButton>
             </div>
           </>
         )}
