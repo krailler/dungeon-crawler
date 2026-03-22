@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore, type FormEvent } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { authStore } from "../stores/authStore";
-import { PROTOCOL_VERSION } from "@dungeon/shared";
+import { BuildVersion } from "../components/BuildVersion";
 import { ParticleBackground } from "../components/ParticleBackground";
 import { GoldButton } from "../components/GoldButton";
 import { GameLogo } from "../components/GameLogo";
@@ -117,9 +117,7 @@ export const LoginScreen = (): ReactNode => {
       )}
 
       {/* Version */}
-      <span className="absolute bottom-3 left-4 text-[10px] text-slate-600">
-        Build Version: {PROTOCOL_VERSION}
-      </span>
+      <BuildVersion className="absolute bottom-3 left-4" />
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { playUiSfx } from "../../audio/uiSfx";
-import { PROTOCOL_VERSION } from "@dungeon/shared";
+import { BuildVersion } from "../components/BuildVersion";
 import { lobbyStore } from "../stores/lobbyStore";
 import { matchmakingStore } from "../stores/matchmakingStore";
 import { authStore } from "../stores/authStore";
@@ -159,7 +159,7 @@ export const LobbyScreen = (): ReactNode => {
         >
           {t("lobby.logout")}
         </button>
-        <span className="pl-0.5 text-[10px] text-slate-700">Build Version: {PROTOCOL_VERSION}</span>
+        <BuildVersion className="pl-0.5" />
         {!preload.done && preload.total > 0 && (
           <div className="flex items-center gap-2 pl-0.5">
             <div className="h-1 w-24 overflow-hidden rounded-full bg-slate-800">
