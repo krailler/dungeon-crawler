@@ -13,6 +13,7 @@ const UI_SOUNDS = {
   ui_tutorial: "/audio/ui/tutorial_hint.ogg",
   ui_queue_start: "/audio/ui/queue_start.ogg",
   ui_equip: "/audio/ui/equip.ogg",
+  ui_dungeon_complete: "/audio/ui/dungeon_complete.ogg",
   level_up: "/audio/sfx/level_up.ogg",
 } as const;
 
@@ -58,9 +59,10 @@ export async function preloadUiSounds(): Promise<void> {
 /** Play a UI sound effect by name. Supports unlimited overlaps with zero allocation overhead. */
 export function playUiSfx(name: UiSoundName): void {
   const buffer = buffers.get(name);
-  if (!buffer || !ctx || !gainNode) return;
+  if (!buffer) return;
 
-  const source = ctx.createBufferSource();
+  const audioCtx = getContext();
+  const source = audioCtx.createBufferSource();
   source.buffer = buffer;
   source.connect(gainNode);
   source.start();
@@ -145,11 +147,10 @@ export function stopLobbyMusic(): void {
   }
 }
 
-/** Release the AudioContext and buffers */
+/** Release the AudioContext (buffers are kept for reuse across sessions) */
 export function disposeUiSounds(): void {
   stopLobbyMusic();
   lobbyBuffer = null;
-  buffers.clear();
   if (ctx) {
     ctx.close().catch(() => {});
     ctx = null;

@@ -14,6 +14,7 @@ import { matchmakingStore } from "./ui/stores/matchmakingStore";
 import { ClientGame } from "./core/ClientGame";
 import { preloadUiSounds, startLobbyMusic, stopLobbyMusic } from "./audio/uiSfx";
 import { assetPreloadStore } from "./ui/stores/assetPreloadStore";
+import { dungeonSummaryStore } from "./ui/stores/dungeonSummaryStore";
 import { GlobalOverlay } from "./ui/components/GlobalOverlay";
 
 // Preload UI sounds early so they work in login/lobby screens
@@ -90,6 +91,8 @@ lobbyStore.setOnReturnToLobby(() => {
   showScreen("lobby");
   lobbyStore.connect(authStore.getClient());
   authStore.refreshUserData();
+  // Show dungeon summary overlay if one was stored during the run
+  dungeonSummaryStore.show();
 });
 
 // Watch auth state — manage transitions between login, lobby, and game

@@ -44,6 +44,7 @@ import type {
   DamageDealtMessage,
   ItemCooldownMessage,
   ActionFeedbackMessage,
+  DungeonSummaryMessage,
 } from "@dungeon/shared";
 import { minimapStore } from "../ui/stores/minimapStore";
 import {
@@ -57,6 +58,7 @@ import { chatStore } from "../ui/stores/chatStore";
 import { gateStore } from "../ui/stores/gateStore";
 import { promptStore } from "../ui/stores/promptStore";
 import { announcementStore } from "../ui/stores/announcementStore";
+import { dungeonSummaryStore } from "../ui/stores/dungeonSummaryStore";
 import { tutorialStore } from "../ui/stores/tutorialStore";
 import { welcomeStore } from "../ui/stores/welcomeStore";
 import { itemDefStore } from "../ui/stores/itemDefStore";
@@ -379,6 +381,11 @@ export class ClientGame {
       itemDefStore.connect(room);
       itemInstanceStore.connect(room);
 
+      // Dungeon completion summary — store data but don't show yet (shown on lobby return)
+      room.onMessage(MessageType.DUNGEON_SUMMARY, (data: DungeonSummaryMessage) => {
+        dungeonSummaryStore.store(data);
+      });
+
       // Item use confirmation from server (cooldown + sound)
       room.onMessage(MessageType.ITEM_COOLDOWN, (data: ItemCooldownMessage) => {
         if (data.duration > 0) {
@@ -565,6 +572,8 @@ export class ClientGame {
     tutorialStore.reset();
     welcomeStore.reset();
     itemInstanceStore.reset();
+    // Don't reset dungeonSummaryStore here — it's shown AFTER dispose on lobby return.
+    // It resets itself on dismiss() or when a new dungeon stores fresh data.
     if (lobbyStore.isLeavingIntentionally()) {
       localStorage.removeItem("reconnectionToken");
       localStorage.removeItem("reconnectionRoomId");

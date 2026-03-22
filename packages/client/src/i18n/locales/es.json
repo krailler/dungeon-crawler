@@ -192,6 +192,18 @@
     "bossTimerStarted": "Combate contra el jefe! {{seconds}}s para derrotarlo!",
     "bonusReward": "Bonus de misión: +{{gold}} oro, +{{xp}} XP!"
   },
+  "summary": {
+    "title": "Mazmorra Completada",
+    "dungeonLevel": "Nivel {{level}}",
+    "duration": "Tiempo",
+    "deaths": "Muertes",
+    "boss": "Jefe",
+    "party": "Grupo",
+    "questsTitle": "Objetivos",
+    "loot": "Botín Notable",
+    "bonusRewards": "Recompensas Bonus",
+    "continue": "Continuar"
+  },
   "hud": {
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",

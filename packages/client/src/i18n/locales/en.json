@@ -192,6 +192,18 @@
     "bossTimerStarted": "Boss fight! {{seconds}}s to defeat it!",
     "bonusReward": "Quest bonus: +{{gold}} gold, +{{xp}} XP!"
   },
+  "summary": {
+    "title": "Dungeon Completed",
+    "dungeonLevel": "Level {{level}}",
+    "duration": "Time",
+    "deaths": "Deaths",
+    "boss": "Boss",
+    "party": "Party",
+    "questsTitle": "Objectives",
+    "loot": "Notable Loot",
+    "bonusRewards": "Bonus Rewards",
+    "continue": "Continue"
+  },
   "hud": {
     "ping": "{{value}} ms",
     "pingEmpty": "-- ms",

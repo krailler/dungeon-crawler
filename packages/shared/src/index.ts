@@ -56,6 +56,10 @@ export type {
   UnequipItemMessage,
   InstanceDefsRequestMessage,
   InstanceDefsResponseMessage,
+  DungeonSummaryMessage,
+  DungeonSummaryQuest,
+  DungeonSummaryItem,
+  DungeonSummaryPlayer,
 } from "./protocol.js";
 
 export {

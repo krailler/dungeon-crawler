@@ -13,6 +13,7 @@ import { GameLogo } from "../components/GameLogo";
 import { GoldPanel } from "../components/GoldPanel";
 import { SettingsPanel } from "../hud/SettingsPanel";
 import { Tooltip } from "../components/Tooltip";
+import { DungeonSummaryOverlay } from "../hud/DungeonSummaryOverlay";
 import { assetPreloadStore } from "../stores/assetPreloadStore";
 
 const SwordDivider = (): ReactNode => (
@@ -322,6 +323,7 @@ export const LobbyScreen = (): ReactNode => {
           </GoldPanel>
         </div>
       )}
+      <DungeonSummaryOverlay />
     </div>
   );
 };

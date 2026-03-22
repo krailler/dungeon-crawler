@@ -180,6 +180,12 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private creatureSpawnSeed: number = 0;
   /** Whether the exit countdown is already running */
   private exitCountdownActive: boolean = false;
+  /** Timestamp when the dungeon room was created (for run duration) */
+  private createdAt: number = Date.now();
+  /** Total player deaths (transitions to DOWNED) during this run */
+  private totalDeaths: number = 0;
+  /** Notable items dropped during this run (rarity >= rare) */
+  private notableItemDrops: { itemId: string; rarity: string }[] = [];
 
   // ── Area of Interest (AOI) ──────────────────────────────────────────────────
   /** All creatures (authoritative) — includes those outside sync range */
@@ -360,6 +366,14 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       },
       getSpawnPoint: () => self.sessionManager.findSpawnPosition(),
       hasPlayerTarget: (sessionId: string) => self.playerTargets.has(sessionId),
+      onPlayerDowned: () => {
+        self.totalDeaths++;
+      },
+      onItemDropped: (itemId: string, rarity: string) => {
+        if (rarity !== "common" && rarity !== "uncommon") {
+          self.notableItemDrops.push({ itemId, rarity });
+        }
+      },
       get questSystem() {
         return self.questSystem;
       },
@@ -501,6 +515,54 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
           `Quest bonus: +${bonusGold} gold, +${bonusXp} XP!`,
         );
       }
+
+      // Build and send dungeon summary to all clients before countdown
+      const summaryQuests: {
+        questType: string;
+        i18nKey: string;
+        status: string;
+        target: number;
+        progress: number;
+      }[] = [];
+      let bossKilled = false;
+      let bossNameKey: string | null = null;
+      this.state.quests.forEach((q) => {
+        summaryQuests.push({
+          questType: q.questType,
+          i18nKey: q.i18nKey,
+          status: q.status,
+          target: q.target,
+          progress: q.progress,
+        });
+      });
+
+      // Check if boss was killed (any dead boss creature)
+      this.allCreatures.forEach((c) => {
+        const typeDef = getCreatureTypeDef(c.creatureType);
+        if (typeDef?.isBoss) {
+          bossNameKey = typeDef.name;
+          if (c.isDead) bossKilled = true;
+        }
+      });
+
+      // Gather player info
+      const summaryPlayers: { name: string; classId: string; level: number }[] = [];
+      this.state.players.forEach((p: PlayerState) => {
+        summaryPlayers.push({ name: p.characterName, classId: p.classId, level: p.level });
+      });
+
+      this.broadcast(MessageType.DUNGEON_SUMMARY, {
+        dungeonLevel: this.state.dungeonLevel,
+        bonusGold,
+        bonusXp,
+        quests: summaryQuests,
+        durationSec: Math.floor((Date.now() - this.createdAt) / 1000),
+        totalDeaths: this.totalDeaths,
+        bossKilled,
+        bossNameKey,
+        players: summaryPlayers,
+        items: this.notableItemDrops,
+      });
 
       this.chatSystem.broadcastAnnouncement(
         "announce.dungeonCompleted",
@@ -1401,6 +1463,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
     this.state.creatures.clear();
     this.state.lootBags.clear();
     this.gameLoop.resetDungeonState();
+    this.exitCountdownActive = false;
+    this.createdAt = Date.now();
+    this.totalDeaths = 0;
+    this.notableItemDrops = [];
 
     // Regenerate dungeon
     this.generateDungeon(seed);

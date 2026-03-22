@@ -110,6 +110,10 @@ export interface GameLoopBridge {
   getSpawnPoint(): { x: number; z: number } | null;
   /** Check if a player has a player-type target (e.g. revive target). */
   hasPlayerTarget(sessionId: string): boolean;
+  /** Called when a player transitions to DOWNED (for stats tracking). */
+  onPlayerDowned?: () => void;
+  /** Called when a notable item drops (for summary tracking). */
+  onItemDropped?: (itemId: string, rarity: string) => void;
   /** Quest system for tracking dungeon objectives. */
   readonly questSystem?: QuestSystem;
 }
@@ -625,6 +629,7 @@ export class GameLoop {
               const instance = rollEquipmentDrop(itemDef, killedCreature.level);
               slot.instanceId = instance.id;
               slot.quantity = 1;
+              this.bridge.onItemDropped?.(entry.itemId, itemDef.rarity);
             } else {
               const qty =
                 entry.minQuantity +
@@ -951,6 +956,7 @@ export class GameLoop {
   /** Transition a player from ALIVE to DOWNED. */
   private transitionToDowned(player: PlayerState, sessionId: string): void {
     this.bridge.questSystem?.onPlayerDied();
+    this.bridge.onPlayerDowned?.();
     player.lifeState = LifeState.DOWNED;
     player.bleedTimer = BLEEDOUT_DURATION;
     player.isMoving = false;

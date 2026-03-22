@@ -64,6 +64,7 @@ export const MessageType = {
   UNEQUIP_ITEM: "equip:unequip",
   INSTANCE_DEFS_REQUEST: "instance:req",
   INSTANCE_DEFS_RESPONSE: "instance:res",
+  DUNGEON_SUMMARY: "dungeon:summary",
 } as const;
 
 /** Custom WebSocket close codes (4xxx range) */
@@ -466,4 +467,48 @@ export interface InstanceDefsRequestMessage {
 /** Server → Client: item instance details response */
 export interface InstanceDefsResponseMessage {
   instances: ItemInstanceClient[];
+}
+
+// ── Dungeon Summary ───────────────────────────────────────────────────────
+
+/** A single quest result in the dungeon summary */
+export interface DungeonSummaryQuest {
+  questType: string;
+  i18nKey: string;
+  status: string;
+  target: number;
+  progress: number;
+}
+
+/** A notable item drop in the dungeon summary */
+export interface DungeonSummaryItem {
+  itemId: string;
+  rarity: string;
+}
+
+/** A player who participated in the dungeon */
+export interface DungeonSummaryPlayer {
+  name: string;
+  classId: string;
+  level: number;
+}
+
+/** Server → Client: dungeon completion summary (sent before countdown) */
+export interface DungeonSummaryMessage {
+  dungeonLevel: number;
+  bonusGold: number;
+  bonusXp: number;
+  quests: DungeonSummaryQuest[];
+  /** Run duration in seconds */
+  durationSec: number;
+  /** Total player deaths (downed) during the run */
+  totalDeaths: number;
+  /** Whether the boss was killed */
+  bossKilled: boolean;
+  /** Boss creature type name key (for i18n) */
+  bossNameKey: string | null;
+  /** Players who participated */
+  players: DungeonSummaryPlayer[];
+  /** Notable item drops (rare+) */
+  items: DungeonSummaryItem[];
 }
