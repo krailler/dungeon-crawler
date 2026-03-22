@@ -32,7 +32,13 @@
     "queueStatus": "{{count}} jugador(es) en cola",
     "cancelQueue": "Cancelar",
     "customGame": "Partida Personalizada",
-    "preloading": "Cargando recursos..."
+    "preloading": "Cargando recursos...",
+    "tabHome": "Inicio",
+    "tabInventory": "Inventario",
+    "tabMarket": "Mercado",
+    "marketSoon": "Próximamente",
+    "inventoryError": "Error al cargar el inventario",
+    "inventoryWhileInRoom": "No puedes modificar el inventario estando en una mazmorra"
   },
   "loading": {
     "title": "Dungeon Crawler",
@@ -374,6 +380,8 @@
     "levelReq": "Requiere nivel {{level}}",
     "clickToUnequip": "Clic para desequipar",
     "rightClickToEquip": "Clic derecho para equipar",
+    "clickToEquip": "Clic para equipar",
+    "equip": "Equipar",
     "levelTooLow": "Nivel demasiado bajo para equipar este objeto",
     "inventoryFull": "Inventario lleno — no se puede desequipar",
     "statMaxHealth": "Vida Máxima",
@@ -388,13 +396,16 @@
     "title": "Inventario",
     "clickToUse": "Clic para usar",
     "rightClickToUse": "Clic derecho para usar",
+    "destroy": "Destruir",
+    "rightClickMenu": "Clic derecho para opciones",
     "destroyTitle": "Destruir objeto",
     "destroyMessage": "¿Seguro que quieres destruir este objeto? No se puede deshacer.",
     "destroyConfirm": "Destruir",
     "destroyCancel": "Cancelar",
     "cannotDestroy": "Este objeto no se puede destruir",
     "splitTitle": "Dividir pila",
-    "splitConfirm": "Dividir"
+    "splitConfirm": "Dividir",
+    "rightClickDestroy": "Clic derecho para destruir"
   },
   "consumableBar": {
     "dragToAssign": "Arrastra un consumible aquí"

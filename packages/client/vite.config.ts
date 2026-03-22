@@ -28,6 +28,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: "0.0.0.0",
     proxy: {
       "/auth": "http://localhost:3000",
       "/matchmake": "http://localhost:3000",

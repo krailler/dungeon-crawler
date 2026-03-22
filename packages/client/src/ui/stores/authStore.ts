@@ -19,6 +19,7 @@ export type AuthSnapshot = {
   loading: boolean;
   error: string | null;
   email: string | null;
+  characterId: string | null;
   characterName: string | null;
   characterClass: string | null;
   characterLevel: number | null;
@@ -31,6 +32,7 @@ export type AuthSnapshot = {
 type UserData = {
   email?: string;
   role?: string;
+  characterId?: string;
   characterName?: string;
   characterClass?: string;
   characterLevel?: number;
@@ -43,6 +45,7 @@ let snapshot: AuthSnapshot = {
   loading: false,
   error: null,
   email: null,
+  characterId: null,
   characterName: null,
   characterClass: null,
   characterLevel: null,
@@ -94,6 +97,7 @@ export const authStore = {
           loading: false,
           email: u.email ?? null,
           role: u.role ?? null,
+          characterId: u.characterId ?? null,
           characterName: u.characterName ?? null,
           characterClass: u.characterClass ?? null,
           characterLevel: u.characterLevel ?? null,
@@ -173,6 +177,7 @@ export const authStore = {
     update({
       isAuthenticated: false,
       email: null,
+      characterId: null,
       characterName: null,
       characterClass: null,
       characterLevel: null,
@@ -190,6 +195,7 @@ export const authStore = {
     update({
       isAuthenticated: false,
       email: null,
+      characterId: null,
       characterName: null,
       characterClass: null,
       characterLevel: null,
@@ -230,6 +236,7 @@ export const authStore = {
       if (user) {
         const u = user as UserData;
         update({
+          characterId: u.characterId ?? null,
           characterName: u.characterName ?? null,
           characterClass: u.characterClass ?? null,
           characterLevel: u.characterLevel ?? null,

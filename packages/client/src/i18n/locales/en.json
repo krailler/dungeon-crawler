@@ -32,7 +32,13 @@
     "queueStatus": "{{count}} player(s) in queue",
     "cancelQueue": "Cancel",
     "customGame": "Custom Game",
-    "preloading": "Loading assets..."
+    "preloading": "Loading assets...",
+    "tabHome": "Home",
+    "tabInventory": "Inventory",
+    "tabMarket": "Market",
+    "marketSoon": "Coming soon",
+    "inventoryError": "Failed to load inventory",
+    "inventoryWhileInRoom": "Cannot modify inventory while in a dungeon"
   },
   "loading": {
     "title": "Dungeon Crawler",
@@ -374,6 +380,8 @@
     "levelReq": "Requires level {{level}}",
     "clickToUnequip": "Click to unequip",
     "rightClickToEquip": "Right-click to equip",
+    "clickToEquip": "Click to equip",
+    "equip": "Equip",
     "levelTooLow": "Level too low to equip this item",
     "inventoryFull": "Inventory full — cannot unequip",
     "statMaxHealth": "Max Health",
@@ -388,13 +396,16 @@
     "title": "Inventory",
     "clickToUse": "Click to use",
     "rightClickToUse": "Right-click to use",
+    "destroy": "Destroy",
+    "rightClickMenu": "Right-click for options",
     "destroyTitle": "Destroy Item",
     "destroyMessage": "Are you sure you want to destroy this item? This cannot be undone.",
     "destroyConfirm": "Destroy",
     "destroyCancel": "Cancel",
     "cannotDestroy": "This item cannot be destroyed",
     "splitTitle": "Split Stack",
-    "splitConfirm": "Split"
+    "splitConfirm": "Split",
+    "rightClickDestroy": "Right-click to destroy"
   },
   "consumableBar": {
     "dragToAssign": "Drag a consumable here"

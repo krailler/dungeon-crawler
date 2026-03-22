@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { authStore } from "../stores/authStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { targetStore } from "../stores/targetStore";
 import { lobbyStore } from "../stores/lobbyStore";

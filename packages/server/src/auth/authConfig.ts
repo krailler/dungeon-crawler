@@ -47,6 +47,7 @@ auth.settings.onParseToken = async (token) => {
       id: accounts.id,
       email: accounts.email,
       role: accounts.role,
+      characterId: characters.id,
       characterName: characters.name,
       characterClass: characters.classId,
       characterLevel: characters.level,

@@ -162,7 +162,7 @@ export const DungeonSummaryOverlay = (): ReactNode => {
                       key={`${item.itemId}-${i}`}
                       className={`flex items-center gap-1.5 rounded-lg bg-slate-800/50 px-2.5 py-1.5 border ${rarityStyle.border}`}
                     >
-                      <ItemIcon iconId={def?.iconId ?? item.itemId} className="h-4 w-4" />
+                      <ItemIcon iconId={def?.icon ?? item.itemId} className="h-4 w-4" />
                       <span className={`text-[11px] font-medium ${rarityStyle.text}`}>
                         {def ? t(def.name) : item.itemId}
                       </span>

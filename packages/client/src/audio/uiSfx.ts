@@ -64,7 +64,7 @@ export function playUiSfx(name: UiSoundName): void {
   const audioCtx = getContext();
   const source = audioCtx.createBufferSource();
   source.buffer = buffer;
-  source.connect(gainNode);
+  source.connect(gainNode!);
   source.start();
   // AudioBufferSourceNode auto-disposes after playback — no cleanup needed
 }
