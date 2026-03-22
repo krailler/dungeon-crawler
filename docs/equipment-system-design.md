@@ -156,7 +156,7 @@ Equipment base stat bonuses (str/vit/agi) are applied **before** class scaling s
 
 ### Save (on disconnect/auto-save)
 
-1. Save new item instances created this session
+1. Save new item instances created this session (must run first — FK dependency)
 2. Save equipment slots (delete + re-insert)
 3. Save inventory (with instanceIds)
 
@@ -186,9 +186,11 @@ When a player picks up equipment from a loot bag, the instanceId is preserved an
 ## Client Architecture
 
 - **itemInstanceStore**: Lazy-loads instance data (rolledStats, itemLevel) from server via `INSTANCE_DEFS_REQUEST/RESPONSE`
-- **EquipmentTab**: New tab in CharacterSheet — 3x2 grid of equipment slots with ActionSlot components
-- **Tooltips**: Show item name (colored by rarity), equipment slot, item level, level requirement, and rolled stats (green text)
-- **InventoryPanel**: Right-click equipment → auto-equip to matching slot
+- **EquipmentTab**: Paperdoll 3x3 grid in CharacterSheet (head top-center, weapon left, chest center, boots bottom-center, accessories right column) with drag-to-equip from inventory
+- **Tooltips**: Show item name (colored by rarity), equipment slot, item level, level requirement, and rolled stats (green text). Shift-held comparison arrows vs equipped item.
+- **InventoryPanel**: Right-click → auto-equip to matching slot (accessories pick first empty slot). Drag-and-drop to equipment slots.
+- **ItemSlotView**: Reusable pure-visual item slot component (used in lobby inventory)
+- **Lobby Inventory**: REST API-based inventory management outside dungeon rooms (`/api/inventory/:characterId`). Full equip/unequip/swap/destroy with drag-and-drop and context menus.
 - **State sync**: `PlayerSecretState.equipment` (MapSchema<EquipmentSlotState>) synced via Colyseus @view
 
 ---
