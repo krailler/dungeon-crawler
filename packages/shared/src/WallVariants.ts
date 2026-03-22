@@ -77,7 +77,7 @@ export function generateWallVariants(
   roomOwnership: number[][],
   roomSets: RoomSetAssignment[],
 ): number[] {
-  // XOR offset for independence from floor variant sequence
+  // XOR with ASCII "WALL" for seed independence from floor variant sequence
   const rand = mulberry32(seed ^ 0x57414c4c);
   const result: number[] = new Array(tileMap.width * tileMap.height);
 

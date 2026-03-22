@@ -9,7 +9,7 @@ import {
 /**
  * Level-difference modifier for reward scaling (gold, XP).
  *
- * - Creatures >5 levels below: minimum modifier (anti-farming)
+ * - Creatures 6+ levels below: minimum modifier (anti-farming)
  * - Creatures below: -10% per level below
  * - Creatures above: +5% per level above (risk/reward)
  */

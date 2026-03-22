@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartyMember } from "../stores/hudStore";
@@ -55,142 +63,144 @@ const formatHealth = (member: PartyMember): string => {
   return `${current}/${max}`;
 };
 
-const PartyRow = ({
-  member,
-  isTargeted,
-  onClick,
-  onContextMenu,
-}: {
-  member: PartyMember;
-  isTargeted: boolean;
-  onClick: (member: PartyMember) => void;
-  onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
-}): ReactNode => {
-  const { t } = useTranslation();
-  const classDefs = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
-  const classDef = member.classId ? classDefs.get(member.classId) : undefined;
-  const safeMax = Math.max(1, member.maxHealth);
-  const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
-  const isDowned = member.lifeState === LifeState.DOWNED;
-  const isFullDead = member.lifeState === LifeState.DEAD;
-  const isDead = isEntityDead(member.lifeState, member.health);
-  const isLowHp = !isDead && pct <= 30;
-  const barClass = isDead ? "from-red-900/60 via-red-900/40 to-red-950/50" : healthColor(pct);
+const PartyRow = memo(
+  ({
+    member,
+    isTargeted,
+    onClick,
+    onContextMenu,
+  }: {
+    member: PartyMember;
+    isTargeted: boolean;
+    onClick: (member: PartyMember) => void;
+    onContextMenu: (e: React.MouseEvent, member: PartyMember) => void;
+  }): ReactNode => {
+    const { t } = useTranslation();
+    const classDefs = useSyncExternalStore(classDefStore.subscribe, classDefStore.getSnapshot);
+    const classDef = member.classId ? classDefs.get(member.classId) : undefined;
+    const safeMax = Math.max(1, member.maxHealth);
+    const pct = Math.max(0, Math.min(100, (member.health / safeMax) * 100));
+    const isDowned = member.lifeState === LifeState.DOWNED;
+    const isFullDead = member.lifeState === LifeState.DEAD;
+    const isDead = isEntityDead(member.lifeState, member.health);
+    const isLowHp = !isDead && pct <= 30;
+    const barClass = isDead ? "from-red-900/60 via-red-900/40 to-red-950/50" : healthColor(pct);
 
-  // Floating health change numbers
-  const [hpFloats, setHpFloats] = useState<FloatEntry[]>([]);
-  const prevHpRef = useRef<number | null>(null);
+    // Floating health change numbers
+    const [hpFloats, setHpFloats] = useState<FloatEntry[]>([]);
+    const prevHpRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    const prev = prevHpRef.current;
-    prevHpRef.current = member.health;
-    if (prev === null) return;
-    const delta = Math.round(member.health - prev);
-    if (delta === 0) return;
+    useEffect(() => {
+      const prev = prevHpRef.current;
+      prevHpRef.current = member.health;
+      if (prev === null) return;
+      const delta = Math.round(member.health - prev);
+      if (delta === 0) return;
 
-    const id = ++floatIdCounter;
-    setHpFloats((f) => [...f, { id, amount: delta }]);
-    const timer = setTimeout(() => {
-      setHpFloats((f) => f.filter((e) => e.id !== id));
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [member.health]);
+      const id = ++floatIdCounter;
+      setHpFloats((f) => [...f, { id, amount: delta }]);
+      const timer = setTimeout(() => {
+        setHpFloats((f) => f.filter((e) => e.id !== id));
+      }, 1200);
+      return () => clearTimeout(timer);
+    }, [member.health]);
 
-  return (
-    <div
-      onClick={() => onClick(member)}
-      onContextMenu={(e) => onContextMenu(e, member)}
-      className="animate-rise-in cursor-pointer"
-    >
+    return (
       <div
-        className={[
-          "rounded-2xl border px-3 py-2 shadow-lg shadow-black/30",
-          "backdrop-blur-md transition-[border-color,box-shadow] duration-500",
-          "bg-[color:var(--ui-panel)]",
-          isTargeted
-            ? "border-amber-400/50 ring-1 ring-amber-400/40"
-            : isLowHp
-              ? "animate-low-hp border-red-500/40"
-              : "border-[color:var(--ui-panel-border)]",
-          !isTargeted && (member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10"),
-          !member.online && "opacity-40",
-          isDead && "saturate-[0.3]",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+        onClick={() => onClick(member)}
+        onContextMenu={(e) => onContextMenu(e, member)}
+        className="animate-rise-in cursor-pointer"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-sm font-semibold ${isDead ? "text-slate-400 line-through" : "text-slate-100"}`}
-              >
-                {member.name}
+        <div
+          className={[
+            "rounded-2xl border px-3 py-2 shadow-lg shadow-black/30",
+            "backdrop-blur-md transition-[border-color,box-shadow] duration-500",
+            "bg-[color:var(--ui-panel)]",
+            isTargeted
+              ? "border-amber-400/50 ring-1 ring-amber-400/40"
+              : isLowHp
+                ? "animate-low-hp border-red-500/40"
+                : "border-[color:var(--ui-panel-border)]",
+            !isTargeted && (member.isLocal ? "ring-1 ring-sky-400/60" : "ring-1 ring-white/10"),
+            !member.online && "opacity-40",
+            isDead && "saturate-[0.3]",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-sm font-semibold ${isDead ? "text-slate-400 line-through" : "text-slate-100"}`}
+                >
+                  {member.name}
+                </span>
+                <Badge>{t("character.level", { level: member.level })}</Badge>
+                {isDowned && (
+                  <Badge variant="status" color="amber">
+                    {t("party.downed")}
+                  </Badge>
+                )}
+                {isFullDead && (
+                  <Badge variant="status" color="red">
+                    {t("party.dead")}
+                  </Badge>
+                )}
+                {!member.online && (
+                  <Badge variant="status" color="slate">
+                    {t("party.offline")}
+                  </Badge>
+                )}
+              </div>
+              <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                {[
+                  classDef ? t(classDef.name) : undefined,
+                  member.isLeader ? t("party.roleLeader") : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(" — ") || t("party.roleMember")}
               </span>
-              <Badge>{t("character.level", { level: member.level })}</Badge>
-              {isDowned && (
-                <Badge variant="status" color="amber">
-                  {t("party.downed")}
-                </Badge>
-              )}
-              {isFullDead && (
-                <Badge variant="status" color="red">
-                  {t("party.dead")}
-                </Badge>
-              )}
-              {!member.online && (
-                <Badge variant="status" color="slate">
-                  {t("party.offline")}
-                </Badge>
-              )}
             </div>
-            <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-              {[
-                classDef ? t(classDef.name) : undefined,
-                member.isLeader ? t("party.roleLeader") : undefined,
-              ]
-                .filter(Boolean)
-                .join(" — ") || t("party.roleMember")}
-            </span>
-          </div>
-          <div className="relative">
-            {hpFloats.map((f) => (
+            <div className="relative">
+              {hpFloats.map((f) => (
+                <span
+                  key={f.id}
+                  className={`animate-xp-float absolute -top-1 right-0 whitespace-nowrap font-mono text-xs font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${
+                    f.amount < 0 ? "text-red-400" : "text-emerald-400"
+                  }`}
+                >
+                  {f.amount < 0 ? f.amount : `+${f.amount}`}
+                </span>
+              ))}
               <span
-                key={f.id}
-                className={`animate-xp-float absolute -top-1 right-0 whitespace-nowrap font-mono text-xs font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${
-                  f.amount < 0 ? "text-red-400" : "text-emerald-400"
-                }`}
+                className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : isLowHp ? "text-red-400 animate-pulse" : "text-slate-300"}`}
               >
-                {f.amount < 0 ? f.amount : `+${f.amount}`}
+                {isDowned
+                  ? `${Math.max(0, member.bleedTimer ?? 0).toFixed(1)}s`
+                  : isFullDead
+                    ? `${Math.max(0, member.respawnTimer ?? 0).toFixed(1)}s`
+                    : formatHealth(member)}
               </span>
-            ))}
-            <span
-              className={`font-mono text-[11px] ${isDead ? "text-red-400/70" : isLowHp ? "text-red-400 animate-pulse" : "text-slate-300"}`}
-            >
-              {isDowned
-                ? `${Math.max(0, member.bleedTimer ?? 0).toFixed(1)}s`
-                : isFullDead
-                  ? `${Math.max(0, member.respawnTimer ?? 0).toFixed(1)}s`
-                  : formatHealth(member)}
-            </span>
+            </div>
           </div>
-        </div>
-        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">
-          <div
-            className={`h-full rounded-full bg-gradient-to-r ${barClass} transition-[width] duration-300`}
-            style={{
-              width: isDowned
-                ? `${Math.max(0, Math.min(100, ((member.bleedTimer ?? 0) / BLEEDOUT_DURATION) * 100))}%`
-                : isDead
-                  ? "100%"
-                  : `${pct}%`,
-            }}
-          />
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-900/80">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${barClass} transition-[width] duration-300`}
+              style={{
+                width: isDowned
+                  ? `${Math.max(0, Math.min(100, ((member.bleedTimer ?? 0) / BLEEDOUT_DURATION) * 100))}%`
+                  : isDead
+                    ? "100%"
+                    : `${pct}%`,
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  },
+);
 
 /** Context menu state */
 type ContextMenuState = {

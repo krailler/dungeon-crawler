@@ -1139,6 +1139,14 @@ export class PlayerSessionManager {
     return this.accountToSession.get(accountId);
   }
 
+  /** Clear reconnect timers for all sessions (used on room dispose). */
+  clearAllReconnectTimers(): void {
+    for (const timers of this.reconnectTimers.values()) {
+      for (const t of timers) clearTimeout(t);
+    }
+    this.reconnectTimers.clear();
+  }
+
   private clearReconnectTimers(sessionId: string): void {
     const timers = this.reconnectTimers.get(sessionId);
     if (timers) {

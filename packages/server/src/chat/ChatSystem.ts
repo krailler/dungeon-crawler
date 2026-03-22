@@ -150,12 +150,7 @@ export class ChatSystem {
       i18nKey,
       i18nParams,
     };
-    for (const client of this.bridge.getClients()) {
-      if (client.sessionId === sessionId) {
-        client.send(MessageType.CHAT_ENTRY, entry);
-        break;
-      }
-    }
+    this.bridge.sendToClient(sessionId, MessageType.CHAT_ENTRY, entry);
   }
 
   /** Broadcast a center-screen announcement with i18n key. */

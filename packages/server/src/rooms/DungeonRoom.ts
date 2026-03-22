@@ -142,8 +142,9 @@ import type {
   InstanceDefsRequestMessage,
 } from "@dungeon/shared";
 import type { EquipmentSlotValue } from "@dungeon/shared";
-import { getInstance as getItemInstance } from "../items/ItemInstanceRegistry";
+import { getInstance as getItemInstance, evictInstances } from "../items/ItemInstanceRegistry";
 import { InventorySlotState } from "../state/InventorySlotState";
+import { RateLimiter } from "./RateLimiter";
 import { mulberry32, generateRoomName } from "@dungeon/shared";
 
 /** Simulation frequency in Hz (configurable via TICK_RATE env var) */
@@ -167,6 +168,8 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   private gameLoop!: GameLoop;
   private questSystem!: QuestSystem;
   private sessionManager!: PlayerSessionManager;
+  /** Rate limiter for item operations (use, swap, equip, loot, etc.) */
+  private itemRateLimiter: RateLimiter = new RateLimiter(2000, 15);
   /** Tracks which player session each player is targeting (for commands fallback). */
   private playerTargets: Map<string, string> = new Map();
   private tileMap!: TileMap;
@@ -325,7 +328,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         },
         sendToClient: this.sendToClient,
         allowReconnection: (client, seconds) => self.allowReconnection(client, seconds),
-        onSessionCleanup: (sessionId) => self.gameLoop?.removeDebugClient(sessionId),
+        onSessionCleanup: (sessionId) => {
+          self.gameLoop?.removeDebugClient(sessionId);
+          self.itemRateLimiter.remove(sessionId);
+        },
         onPlayerRemoved: () => self.checkRoomEmpty(),
         recomputeStats: (player: PlayerState) => self.effectSystem.recomputeStats(player),
       },
@@ -759,6 +765,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Item use: consume an item from inventory
     this.onMessage(MessageType.ITEM_USE, (client: Client, data: ItemUseMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       if (player.lifeState !== LifeState.ALIVE) {
@@ -809,6 +816,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Item swap: move / swap inventory slots
     this.onMessage(MessageType.ITEM_SWAP, (client: Client, data: ItemSwapMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       if (typeof data.from !== "number" || typeof data.to !== "number") return;
@@ -820,6 +828,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Item destroy: remove an inventory slot entirely
     this.onMessage(MessageType.ITEM_DESTROY, (client: Client, data: ItemDestroyMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       if (typeof data.slot !== "number") return;
@@ -901,6 +910,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Equipment: equip an item from inventory
     this.onMessage(MessageType.EQUIP_ITEM, (client: Client, data: EquipItemMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player || player.lifeState !== LifeState.ALIVE) return;
       if (typeof data.invSlot !== "number" || typeof data.equipSlot !== "string") return;
@@ -940,6 +950,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Equipment: unequip an item back to inventory
     this.onMessage(MessageType.UNEQUIP_ITEM, (client: Client, data: UnequipItemMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player || player.lifeState !== LifeState.ALIVE) return;
       if (typeof data.equipSlot !== "string") return;
@@ -1197,6 +1208,7 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
     // Loot: take an item from a loot bag on the ground
     this.onMessage(MessageType.LOOT_TAKE, (client: Client, data: LootTakeMessage) => {
+      if (!this.itemRateLimiter.check(client.sessionId)) return;
       const player = this.state.players.get(client.sessionId);
       if (!player || player.lifeState !== LifeState.ALIVE) return;
 
@@ -1893,6 +1905,39 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
   }
 
   /** Send a message only to clients with admin role */
+  async onDispose(): Promise<void> {
+    this.log.info("Room disposing — cleaning up resources");
+
+    // Clear all reconnect timers
+    this.sessionManager.clearAllReconnectTimers();
+
+    // Evict item instances cached for this room's players from global registry
+    const instanceIds: string[] = [];
+    this.state.players.forEach((player) => {
+      player.inventory.forEach((slot) => {
+        if (slot.instanceId) instanceIds.push(slot.instanceId);
+      });
+      player.equipment.forEach((eqSlot) => {
+        if (eqSlot.instanceId) instanceIds.push(eqSlot.instanceId);
+      });
+    });
+    // Also evict instances from loot bags still on the ground
+    this.state.lootBags.forEach((bag) => {
+      bag.items.forEach((slot) => {
+        if (slot.instanceId) instanceIds.push(slot.instanceId);
+      });
+    });
+    if (instanceIds.length > 0) {
+      evictInstances(instanceIds);
+      this.log.debug({ count: instanceIds.length }, "Evicted item instances from cache");
+    }
+
+    // Clear creature references
+    this.allCreatures.clear();
+
+    this.log.info("Room disposed");
+  }
+
   private broadcastToAdmins(type: string, message: unknown): void {
     for (const client of this.clients) {
       const auth = client.auth as { role?: string } | undefined;

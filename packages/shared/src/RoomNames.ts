@@ -103,7 +103,7 @@ const NOUNS = [
 
 /** Generate a deterministic dungeon name from a seed. */
 export function generateRoomName(seed: number): string {
-  const rng = mulberry32(seed ^ 0x524f4f4d); // mix with "ROOM" constant
+  const rng = mulberry32(seed ^ 0x524f4f4d); // XOR with ASCII "ROOM" for seed independence
   const adj = ADJECTIVES[Math.floor(rng() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(rng() * NOUNS.length)];
   return `${adj} ${noun}`;

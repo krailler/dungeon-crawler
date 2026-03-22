@@ -120,6 +120,69 @@ export class StateSync {
   }
 
   /**
+   * Wire up effect sync listeners for a schema entity (player or creature).
+   * Extracts effect data from the schema, calls `onSync` with the effect array,
+   * and ensures effect defs are pre-fetched for UI.
+   */
+  private setupEffectSync(
+    $: any,
+    track: <T>(unsub: T) => T,
+    schema: any,
+    onSync: (
+      effects: {
+        effectId: string;
+        remaining: number;
+        duration: number;
+        stacks: number;
+        modValue: number;
+      }[],
+    ) => void,
+  ): void {
+    const syncEffects = (): void => {
+      const effects: {
+        effectId: string;
+        remaining: number;
+        duration: number;
+        stacks: number;
+        modValue: number;
+      }[] = [];
+      schema.effects?.forEach((effect: any, effectId: string) => {
+        effects.push({
+          effectId,
+          remaining: effect.remaining,
+          duration: effect.duration,
+          stacks: effect.stacks,
+          modValue: effect.modValue ?? 0,
+        });
+      });
+      onSync(effects);
+      if (effects.length > 0) {
+        effectDefStore.ensureLoaded(effects.map((e) => e.effectId));
+      }
+    };
+    if (schema.effects) {
+      let lastSync = 0;
+      const throttled = (): void => {
+        const now = performance.now();
+        if (now - lastSync < 100) return;
+        lastSync = now;
+        syncEffects();
+      };
+      track(
+        $(schema).effects.onAdd((effect: any) => {
+          track($(effect).onChange(() => throttled()));
+          syncEffects();
+        }),
+      );
+      track(
+        $(schema).effects.onRemove(() => {
+          syncEffects();
+        }),
+      );
+    }
+  }
+
+  /**
    * Register message-based stores early (before asset loading) so server
    * messages sent during handleJoin (e.g. TALENT_STATE) are not missed.
    */
@@ -298,8 +361,13 @@ export class StateSync {
           const wallSetNames = Array.from(usedWallSets);
           console.log("[Client] Loading floor tile sets:", floorSetNames);
           console.log("[Client] Loading wall tile sets:", wallSetNames);
-          this.deps.dungeonRenderer
-            .loadAssets(floorSetNames, wallSetNames)
+          const ASSET_LOAD_TIMEOUT = 30_000;
+          Promise.race([
+            this.deps.dungeonRenderer.loadAssets(floorSetNames, wallSetNames),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error("Asset loading timed out")), ASSET_LOAD_TIMEOUT),
+            ),
+          ])
             .then(async () => {
               loadingStore.setPhase(LoadingPhase.DUNGEON_RENDER);
               console.log("[Client] Assets loaded, rendering dungeon");
@@ -616,50 +684,9 @@ export class StateSync {
         }
 
         // Sync active effects (buffs/debuffs) — visible to all players
-        const syncEffects = (): void => {
-          const effects: {
-            effectId: string;
-            remaining: number;
-            duration: number;
-            stacks: number;
-            modValue: number;
-          }[] = [];
-          player.effects?.forEach((effect: any, effectId: string) => {
-            effects.push({
-              effectId,
-              remaining: effect.remaining,
-              duration: effect.duration,
-              stacks: effect.stacks,
-              modValue: effect.modValue ?? 0,
-            });
-          });
+        this.setupEffectSync($, track, player, (effects) => {
           hudStore.updateMember(sessionId, { effects });
-          // Prefetch effect definitions for UI
-          if (effects.length > 0) {
-            effectDefStore.ensureLoaded(effects.map((e) => e.effectId));
-          }
-        };
-        if (player.effects) {
-          // Throttle onChange syncs to avoid 32Hz re-renders from remaining ticking
-          let lastEffectChangeSync = 0;
-          const throttledSyncEffects = (): void => {
-            const now = performance.now();
-            if (now - lastEffectChangeSync < 100) return; // max 10Hz
-            lastEffectChangeSync = now;
-            syncEffects();
-          };
-
-          $(player).effects.onAdd((effect: any, _effectId: string) => {
-            // Listen for changes within each ActiveEffectState (e.g. remaining ticking down)
-            $(effect).onChange(() => {
-              throttledSyncEffects();
-            });
-            syncEffects(); // immediate on add
-          });
-          $(player).effects.onRemove(() => {
-            syncEffects(); // immediate on remove
-          });
-        }
+        });
 
         // Track health to detect healing (for particle effect)
         let prevHealth = player.health as number;
@@ -819,45 +846,9 @@ export class StateSync {
         }
 
         // Sync creature effects (buffs/debuffs) — visible to all players
-        const syncCreatureEffects = (): void => {
-          const effects: {
-            effectId: string;
-            remaining: number;
-            duration: number;
-            stacks: number;
-            modValue: number;
-          }[] = [];
-          creature.effects?.forEach((effect: any, effectId: string) => {
-            effects.push({
-              effectId,
-              remaining: effect.remaining,
-              duration: effect.duration,
-              stacks: effect.stacks,
-              modValue: effect.modValue ?? 0,
-            });
-          });
+        this.setupEffectSync($, track, creature, (effects) => {
           creatureStore.update(id, { effects });
-          if (effects.length > 0) {
-            effectDefStore.ensureLoaded(effects.map((e) => e.effectId));
-          }
-        };
-        if (creature.effects) {
-          let lastCreatureEffectSync = 0;
-          const throttledSyncCreatureEffects = (): void => {
-            const now = performance.now();
-            if (now - lastCreatureEffectSync < 100) return;
-            lastCreatureEffectSync = now;
-            syncCreatureEffects();
-          };
-
-          $(creature).effects.onAdd((effect: any) => {
-            $(effect).onChange(() => throttledSyncCreatureEffects());
-            syncCreatureEffects();
-          });
-          $(creature).effects.onRemove(() => {
-            syncCreatureEffects();
-          });
-        }
+        });
 
         // Populate creature store for UI (TargetFrame reads from here)
         creatureStore.set(id, {

@@ -3,6 +3,7 @@ import { Effect } from "@babylonjs/core/Materials/effect";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
+import type { DepthRenderer } from "@babylonjs/core/Rendering/depthRenderer";
 import {
   FOG_INNER_RADIUS,
   FOG_OUTER_RADIUS,
@@ -86,13 +87,14 @@ export class FogOfWarSystem {
   // Pre-allocated temporaries to avoid per-frame allocations
   private tempMatrix: Matrix = Matrix.Identity();
   private tempPlayerPos: Vector3 = Vector3.Zero();
+  private depthRenderer: DepthRenderer;
 
   constructor(scene: Scene, camera: Camera) {
     this.scene = scene;
     this.camera = camera;
 
-    // Enable depth texture
-    const depthRenderer = scene.enableDepthRenderer(camera, false);
+    // Enable depth texture (stored for cleanup in dispose())
+    this.depthRenderer = scene.enableDepthRenderer(camera, false);
 
     this.postProcess = new PostProcess(
       SHADER_NAME,
@@ -113,7 +115,7 @@ export class FogOfWarSystem {
       effect.setFloat("innerRadius", this.currentInner);
       effect.setFloat("outerRadius", this.currentOuter);
 
-      effect.setTexture("depthSampler", depthRenderer.getDepthMap());
+      effect.setTexture("depthSampler", this.depthRenderer.getDepthMap());
     };
   }
 
@@ -148,6 +150,7 @@ export class FogOfWarSystem {
   }
 
   dispose(): void {
+    this.depthRenderer.dispose();
     this.postProcess.dispose();
   }
 }

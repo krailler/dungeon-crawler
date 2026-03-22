@@ -81,4 +81,13 @@ export async function deleteInstanceFromDb(id: string): Promise<void> {
   const db = getDb();
   await db.delete(itemInstances).where(eq(itemInstances.id, id));
   cache.delete(id);
+  pendingInserts.delete(id);
+}
+
+/** Evict instances from in-memory cache (call after save or on room dispose). */
+export function evictInstances(ids: string[]): void {
+  for (const id of ids) {
+    cache.delete(id);
+    pendingInserts.delete(id);
+  }
 }

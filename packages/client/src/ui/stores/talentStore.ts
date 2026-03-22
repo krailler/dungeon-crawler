@@ -13,7 +13,7 @@ let state: TalentStoreSnapshot = {
   allocations: new Map(),
   classTalentIds: [],
 };
-let listeners = new Set<() => void>();
+const listeners = new Set<() => void>();
 let room: Room | null = null;
 
 function emit(): void {
@@ -70,7 +70,7 @@ export const talentStore = {
 
   reset(): void {
     state = { allocations: new Map(), classTalentIds: [] };
-    listeners = new Set();
     room = null;
+    emit();
   },
 };
