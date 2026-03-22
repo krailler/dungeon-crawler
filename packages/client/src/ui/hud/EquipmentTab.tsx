@@ -12,15 +12,17 @@ const EQUIP_MIME = "application/x-equip-slot";
 type SlotConfig = {
   key: EquipmentSlotValue;
   labelKey: string;
+  row: number;
+  col: number;
 };
 
-const SLOT_LAYOUT: SlotConfig[] = [
-  { key: EQUIPMENT_SLOTS.WEAPON, labelKey: "equipment.weapon" },
-  { key: EQUIPMENT_SLOTS.HEAD, labelKey: "equipment.head" },
-  { key: EQUIPMENT_SLOTS.CHEST, labelKey: "equipment.chest" },
-  { key: EQUIPMENT_SLOTS.BOOTS, labelKey: "equipment.boots" },
-  { key: EQUIPMENT_SLOTS.ACCESSORY_1, labelKey: "equipment.accessory1" },
-  { key: EQUIPMENT_SLOTS.ACCESSORY_2, labelKey: "equipment.accessory2" },
+const EQUIP_GRID: SlotConfig[] = [
+  { key: EQUIPMENT_SLOTS.HEAD, labelKey: "equipment.head", row: 0, col: 1 },
+  { key: EQUIPMENT_SLOTS.WEAPON, labelKey: "equipment.weapon", row: 1, col: 0 },
+  { key: EQUIPMENT_SLOTS.CHEST, labelKey: "equipment.chest", row: 1, col: 1 },
+  { key: EQUIPMENT_SLOTS.BOOTS, labelKey: "equipment.boots", row: 2, col: 1 },
+  { key: EQUIPMENT_SLOTS.ACCESSORY_1, labelKey: "equipment.accessory1", row: 1, col: 2 },
+  { key: EQUIPMENT_SLOTS.ACCESSORY_2, labelKey: "equipment.accessory2", row: 2, col: 2 },
 ];
 
 function EquipmentSlotItem({
@@ -69,29 +71,36 @@ function EquipmentSlotItem({
       <ItemActionSlot
         itemId={instance?.itemId}
         instanceId={instanceId}
-        hint={t("equipment.clickToUnequip")}
+        hint={instanceId ? t("equipment.clickToUnequip") : t(slotConfig.labelKey)}
         onClick={instanceId ? () => hudStore.unequipItem(slotConfig.key) : undefined}
       />
-      <span className="text-[9px] text-slate-500">{t(slotConfig.labelKey)}</span>
+      {!instanceId && <span className="text-[8px] text-slate-600">{t(slotConfig.labelKey)}</span>}
     </div>
   );
 }
 
-export const EquipmentTab = ({ compact }: { compact?: boolean } = {}): ReactNode => {
+export const EquipmentTab = (): ReactNode => {
   const snapshot = useSyncExternalStore(hudStore.subscribe, hudStore.getSnapshot);
   const local = useMemo(() => snapshot.members.find((m) => m.isLocal), [snapshot.members]);
   const equipment = local?.equipment ?? {};
 
   return (
     <div className="flex flex-col gap-3">
-      <div className={`grid ${compact ? "grid-cols-2" : "grid-cols-3"} gap-2 place-items-center`}>
-        {SLOT_LAYOUT.map((slotConfig) => (
-          <EquipmentSlotItem
-            key={slotConfig.key}
-            slotConfig={slotConfig}
-            instanceId={equipment[slotConfig.key]?.instanceId}
-          />
-        ))}
+      <div className="grid grid-cols-3 gap-2 place-items-center">
+        {Array.from({ length: 9 }, (_, i) => {
+          const row = Math.floor(i / 3);
+          const col = i % 3;
+          const slotConfig = EQUIP_GRID.find((s) => s.row === row && s.col === col);
+          if (!slotConfig) return <div key={i} />;
+
+          return (
+            <EquipmentSlotItem
+              key={slotConfig.key}
+              slotConfig={slotConfig}
+              instanceId={equipment[slotConfig.key]?.instanceId}
+            />
+          );
+        })}
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { authStore } from "./ui/stores/authStore";
 import { lobbyStore } from "./ui/stores/lobbyStore";
 import { matchmakingStore } from "./ui/stores/matchmakingStore";
 import { ClientGame } from "./core/ClientGame";
+import { lobbyInventoryStore } from "./ui/stores/lobbyInventoryStore";
 import { preloadUiSounds, startLobbyMusic, stopLobbyMusic } from "./audio/uiSfx";
 import { assetPreloadStore } from "./ui/stores/assetPreloadStore";
 import { dungeonSummaryStore } from "./ui/stores/dungeonSummaryStore";
@@ -91,6 +92,8 @@ lobbyStore.setOnReturnToLobby(() => {
   showScreen("lobby");
   lobbyStore.connect(authStore.getClient());
   authStore.refreshUserData();
+  // Invalidate lobby inventory so it reloads with latest data from dungeon
+  lobbyInventoryStore.reset();
   // Show dungeon summary overlay if one was stored during the run
   dungeonSummaryStore.show();
 });

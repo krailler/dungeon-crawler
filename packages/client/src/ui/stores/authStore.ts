@@ -1,4 +1,5 @@
 import { Client } from "@colyseus/sdk";
+import { lobbyInventoryStore } from "./lobbyInventoryStore";
 
 const AUTH_TOKEN_KEY = "authToken";
 
@@ -145,6 +146,7 @@ export const authStore = {
           loading: false,
           email,
           role: u.role ?? null,
+          characterId: u.characterId ?? null,
           characterName: u.characterName ?? null,
           characterClass: u.characterClass ?? null,
           characterLevel: u.characterLevel ?? null,
@@ -172,6 +174,7 @@ export const authStore = {
   /** Logout — clear tokens and reset state */
   logout(): void {
     localStorage.removeItem(AUTH_TOKEN_KEY);
+    lobbyInventoryStore.reset();
     const c = this.getClient();
     c.auth.signOut().catch(() => {});
     update({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ItemIcon } from "./ItemIcon";
@@ -166,7 +166,7 @@ export const ItemSlotView = ({
     >
       {/* Icon */}
       {def ? (
-        <ItemIcon iconId={def.icon} className="h-7 w-7" />
+        <ItemIcon iconId={def.icon} fill />
       ) : emptyLabel ? (
         <span className="text-[9px] text-slate-600">{emptyLabel}</span>
       ) : null}

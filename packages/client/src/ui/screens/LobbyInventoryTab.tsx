@@ -38,6 +38,7 @@ export const LobbyInventoryTab = (): ReactNode => {
 
   const characterId = auth.characterId;
 
+  // Reload inventory on mount (tab switch, return from dungeon, login)
   useEffect(() => {
     if (characterId) lobbyInventoryStore.load(characterId);
   }, [characterId]);

@@ -15,24 +15,24 @@ export const ItemIcon = ({
   fill?: boolean;
 }): ReactNode => {
   const [loaded, setLoaded] = useState(false);
-  const cls = fill ? "h-full w-full rounded-lg" : (className ?? "h-7 w-7");
+  const sizeCls = fill ? "h-full w-full" : (className ?? "h-7 w-7");
 
   return (
-    <div className={`relative ${cls}`}>
+    <>
       {!loaded && (
-        <div className={`absolute inset-0 overflow-hidden rounded ${cls}`}>
+        <div className="absolute inset-0 overflow-hidden rounded-lg">
           <div className="absolute inset-0 bg-slate-700/50 animate-shimmer" />
         </div>
       )}
       <img
         src={`${ICON_PATH}${iconId}.png`}
         alt=""
-        className={`${cls} ${loaded ? "opacity-100" : "opacity-0"} transition-opacity duration-150`}
+        className={`${sizeCls} ${fill ? "object-contain p-2" : ""} ${loaded ? "opacity-100" : "opacity-0"} transition-opacity duration-150`}
         draggable={false}
         style={{ imageRendering: "auto" }}
         onLoad={() => setLoaded(true)}
         onError={() => setLoaded(true)}
       />
-    </div>
+    </>
   );
 };
