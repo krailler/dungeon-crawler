@@ -596,6 +596,10 @@ export class GameLoop {
         const levelUps = p.addXp(xpGain);
 
         if (levelUps.length > 0) {
+          logger.info(
+            { sessionId, player: p.characterName, levels: levelUps, newLevel: p.level, xpGain },
+            "Player leveled up",
+          );
           // Recompute stats with talent modifiers + full heal on level-up
           this.bridge.effectSystem.recomputeStats(p);
           p.health = p.maxHealth;
@@ -968,6 +972,7 @@ export class GameLoop {
     this.bridge.effectSystem.clearEffects(player);
 
     const name = player.characterName || sessionId.slice(0, 6);
+    logger.info({ sessionId, player: name }, "Player downed");
     this.bridge.chatSystem.broadcastSystemI18n("chat.downed", { name }, `${name} has been downed!`);
 
     // Tutorial: tell the downed player what happened
@@ -1008,6 +1013,10 @@ export class GameLoop {
     });
 
     const name = player.characterName || sessionId.slice(0, 6);
+    logger.info(
+      { sessionId, player: name, deathCount: player.deathCount, respawnTimer: player.respawnTimer },
+      "Player died",
+    );
     this.bridge.chatSystem.broadcastSystemI18n("chat.died", { name }, `${name} has died!`);
   }
 
@@ -1032,6 +1041,7 @@ export class GameLoop {
     }
 
     const name = player.characterName || "???";
+    logger.info({ sessionId, player: name }, "Player respawned");
     this.bridge.chatSystem.broadcastSystemI18n(
       "chat.respawned",
       { name },

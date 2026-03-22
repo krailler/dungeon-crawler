@@ -173,10 +173,11 @@ router.post("/:characterId/swap", async (req: any, res: any) => {
       }
     });
 
+    logger.debug({ characterId: auth.characterId, from, to }, "Inventory slots swapped");
     const data = await buildInventoryResponse(auth.characterId);
     res.json(data);
   } catch (err) {
-    logger.error({ err }, "Failed to swap inventory slots");
+    logger.error({ err, characterId: auth.characterId }, "Failed to swap inventory slots");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -305,10 +306,14 @@ router.post("/:characterId/equip", async (req: any, res: any) => {
       }
     });
 
+    logger.info(
+      { characterId: auth.characterId, equipSlot, invSlot: slotIndex },
+      "Item equipped via REST",
+    );
     const data = await buildInventoryResponse(auth.characterId);
     res.json(data);
   } catch (err) {
-    logger.error({ err }, "Failed to equip item");
+    logger.error({ err, characterId: auth.characterId }, "Failed to equip item");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -395,10 +400,11 @@ router.post("/:characterId/unequip", async (req: any, res: any) => {
       });
     });
 
+    logger.info({ characterId: auth.characterId, equipSlot }, "Item unequipped via REST");
     const data = await buildInventoryResponse(auth.characterId);
     res.json(data);
   } catch (err) {
-    logger.error({ err }, "Failed to unequip item");
+    logger.error({ err, characterId: auth.characterId }, "Failed to unequip item");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -445,10 +451,19 @@ router.delete("/:characterId/destroy", async (req: any, res: any) => {
       }
     });
 
+    logger.info(
+      {
+        characterId: auth.characterId,
+        slotIndex,
+        itemId: invSlot.itemId,
+        instanceId: invSlot.instanceId,
+      },
+      "Item destroyed via REST",
+    );
     const data = await buildInventoryResponse(auth.characterId);
     res.json(data);
   } catch (err) {
-    logger.error({ err }, "Failed to destroy item");
+    logger.error({ err, characterId: auth.characterId }, "Failed to destroy item");
     res.status(500).json({ error: "Internal server error" });
   }
 });

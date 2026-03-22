@@ -1,5 +1,6 @@
 import type { Client } from "colyseus";
 import type { PlayerState } from "../state/PlayerState";
+import { logger } from "../logger";
 import {
   ChatCategory,
   ChatVariant,
@@ -357,6 +358,12 @@ export class ChatSystem {
       },
     };
 
+    if (cmd.adminOnly) {
+      logger.info(
+        { sessionId: client.sessionId, player: player.characterName, command: cmdName, args },
+        "Admin command executed",
+      );
+    }
     cmd.handler(ctx);
   }
 

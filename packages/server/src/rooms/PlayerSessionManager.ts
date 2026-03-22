@@ -1128,7 +1128,10 @@ export class PlayerSessionManager {
         this.log.debug({ count: dirtyPlayers.length }, "Batch progress saved");
       })
       .catch((err) => {
-        this.log.error({ err }, "Failed to batch save progress");
+        this.log.error(
+          { err, players: dirtyPlayers.map((p) => p.characterName) },
+          "Failed to batch save progress",
+        );
       });
   }
 

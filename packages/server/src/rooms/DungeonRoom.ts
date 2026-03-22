@@ -495,6 +495,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
 
       this.exitCountdownActive = true;
       const EXIT_COUNTDOWN = 10;
+      this.log.info(
+        { dungeonLevel: this.state.dungeonLevel, players: this.state.players.size },
+        "Dungeon completed — exit countdown started",
+      );
 
       // Distribute quest completion rewards
       const { bonusGold, bonusXp } = this.questSystem.getCompletionRewards(this.state.dungeonLevel);
@@ -727,6 +731,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       if (!ALLOCATABLE_STATS.includes(data.stat as AllocatableStatValue)) return;
       const oldMaxHealth = player.maxHealth;
       if (player.allocateStat(data.stat)) {
+        this.log.debug(
+          { sessionId: client.sessionId, player: player.characterName, stat: data.stat },
+          "Stat allocated",
+        );
         this.effectSystem.recomputeStats(player);
         // Grant the extra HP so current health increases proportionally
         if (player.maxHealth > oldMaxHealth) {
@@ -922,6 +930,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       }
 
       if (player.equipItem(data.invSlot, data.equipSlot as EquipmentSlotValue)) {
+        this.log.info(
+          { sessionId: client.sessionId, player: player.characterName, slot: data.equipSlot },
+          "Item equipped",
+        );
         this.effectSystem.recomputeStats(player);
       }
     });
@@ -936,6 +948,10 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
         client.send(MessageType.ACTION_FEEDBACK, { i18nKey: "equipment.inventoryFull" });
         return;
       }
+      this.log.info(
+        { sessionId: client.sessionId, player: player.characterName, slot: data.equipSlot },
+        "Item unequipped",
+      );
       this.effectSystem.recomputeStats(player);
     });
 
@@ -1081,6 +1097,15 @@ export class DungeonRoom extends Room<{ state: DungeonState }> {
       // Apply
       player.talentAllocations.set(talentId, currentRank + 1);
       player.talentPoints--;
+      this.log.info(
+        {
+          sessionId: client.sessionId,
+          player: player.characterName,
+          talentId,
+          rank: currentRank + 1,
+        },
+        "Talent allocated",
+      );
 
       // Handle unlock_skill effect
       const newRankEffect = def.effects.find((e) => e.rank === currentRank + 1);
