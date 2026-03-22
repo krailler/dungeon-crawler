@@ -381,6 +381,10 @@ export const hudStore = {
     const msg: UnequipItemMessage = { equipSlot };
     room.send(MessageType.UNEQUIP_ITEM, msg);
   },
+  /** Notify server that the player is permanently leaving (before dispose). */
+  sendLeaveRoom(): void {
+    room?.send(MessageType.LEAVE_ROOM);
+  },
 };
 
 /* ------------------------------------------------------------------ */

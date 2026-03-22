@@ -5,6 +5,7 @@ import { authStore } from "../stores/authStore";
 import { tutorialStore } from "../stores/tutorialStore";
 import { targetStore } from "../stores/targetStore";
 import { lobbyStore } from "../stores/lobbyStore";
+import { hudStore } from "../stores/hudStore";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { MenuButton } from "../components/MenuButton";
 import { SettingsPanel } from "./SettingsPanel";
@@ -109,6 +110,7 @@ export const PauseMenu = (): ReactNode => {
           cancelLabel={t("pause.leaveRoomCancel")}
           onConfirm={() => {
             setConfirmLeave(false);
+            hudStore.sendLeaveRoom();
             lobbyStore.returnToLobby();
           }}
           onCancel={() => setConfirmLeave(false)}

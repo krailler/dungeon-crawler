@@ -102,9 +102,11 @@ authStore.subscribe(() => {
     // Try reconnection first (page reload with saved token)
     lobbyStore.tryReconnect(client).then((reconnected) => {
       if (!reconnected) {
-        // No reconnection — show lobby
+        // No reconnection — show lobby (connect will redirect to login if server is down)
         showScreen("lobby");
-        lobbyStore.connect(client);
+        lobbyStore.connect(client).catch(() => {
+          authStore.reconnectFailed("login.connectionError");
+        });
       }
       // If reconnected, startGame() is called via the onRoomJoined callback
     });

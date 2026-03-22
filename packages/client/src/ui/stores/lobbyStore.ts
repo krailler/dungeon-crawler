@@ -1,7 +1,7 @@
 import { Client, Room } from "@colyseus/sdk";
 import type { RoomAvailable } from "@colyseus/sdk";
 import { PROTOCOL_VERSION } from "@dungeon/shared";
-import { SERVER_URL } from "./authStore";
+import { SERVER_URL, authStore } from "./authStore";
 import { t } from "../../i18n/i18n";
 
 /** Ask the server which room this account is currently in (if any). */
@@ -40,8 +40,10 @@ let snapshot: LobbySnapshot = {
 let onRoomJoined: ((room: Room) => void) | null = null;
 // Callback invoked when the player wants to leave the current room and return to lobby
 let onReturnToLobby: (() => void) | null = null;
-// Flag set when intentionally leaving a room (prevents disconnect screen)
+// Flag set when intentionally leaving a dungeon room (prevents disconnect screen)
 let leavingIntentionally = false;
+// Flag set when intentionally leaving the lobby (join room, logout — not server crash)
+let lobbyLeaveIntentional = false;
 
 function emit(): void {
   for (const fn of listeners) fn();
@@ -93,10 +95,15 @@ export const lobbyStore = {
   /** Connect to the built-in LobbyRoom for real-time room listing */
   async connect(client: Client): Promise<void> {
     if (lobby) return;
+    lobbyLeaveIntentional = false;
     try {
       lobby = await client.joinOrCreate("lobby", {
         filter: { name: "dungeon" },
       });
+
+      // Disable automatic reconnection for lobby — if server goes down,
+      // we want onLeave to fire immediately so we can redirect to login
+      lobby.reconnection.enabled = false;
 
       // Full room list on initial connect
       lobby.onMessage("rooms", (rooms: RoomAvailable[]) => {
@@ -130,11 +137,19 @@ export const lobbyStore = {
         update({ rooms: snapshot.rooms.filter((r) => r.roomId !== roomId) });
       });
 
-      lobby.onLeave(() => {
+      const handleDisconnect = (): void => {
+        if (!lobby) return; // already handled
         lobby = null;
-      });
+        if (!lobbyLeaveIntentional) {
+          authStore.reconnectFailed("login.connectionError");
+        }
+      };
+
+      lobby.onLeave(handleDisconnect);
+      lobby.onError(handleDisconnect);
     } catch (err) {
       console.error("[Lobby] Failed to connect:", err);
+      throw err;
     }
   },
 
@@ -144,6 +159,7 @@ export const lobbyStore = {
     try {
       const room = await client.create("dungeon", { protocolVersion: PROTOCOL_VERSION });
       update({ joining: false });
+      lobbyLeaveIntentional = true;
       lobby?.leave();
       lobby = null;
       onRoomJoined?.(room);
@@ -159,6 +175,7 @@ export const lobbyStore = {
     try {
       const room = await client.joinById(roomId, { protocolVersion: PROTOCOL_VERSION });
       update({ joining: false });
+      lobbyLeaveIntentional = true;
       lobby?.leave();
       lobby = null;
       onRoomJoined?.(room);
@@ -229,6 +246,7 @@ export const lobbyStore = {
 
   /** Disconnect from lobby and reset state */
   disconnect(): void {
+    lobbyLeaveIntentional = true;
     lobby?.leave();
     lobby = null;
     update({ rooms: [], joining: false, error: null });

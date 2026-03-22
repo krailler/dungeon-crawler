@@ -565,15 +565,11 @@ export class ClientGame {
     tutorialStore.reset();
     welcomeStore.reset();
     itemInstanceStore.reset();
-    // Only clear reconnection token if NOT in reconnectable state
-    if (!authStore.getSnapshot().canReconnect) {
+    if (lobbyStore.isLeavingIntentionally()) {
       localStorage.removeItem("reconnectionToken");
       localStorage.removeItem("reconnectionRoomId");
     }
-    // Notify server of permanent leave so it removes the player immediately
-    if (lobbyStore.isLeavingIntentionally()) {
-      this.room?.send(MessageType.LEAVE_ROOM);
-    }
+    // Page reload / tab close: keep tokens so tryReconnect works on next load
     this.room?.leave();
     window.clearInterval(this.pingInterval);
     window.removeEventListener("resize", this.onResize);
