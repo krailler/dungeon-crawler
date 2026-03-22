@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Room } from "@colyseus/sdk";
 import { MessageType } from "@dungeon/shared";
+import { playUiSfx } from "../../audio/uiSfx";
 import type {
   PromoteLeaderMessage,
   PartyKickMessage,
@@ -373,6 +374,7 @@ export const hudStore = {
     if (!room) return;
     const msg: EquipItemMessage = { invSlot, equipSlot };
     room.send(MessageType.EQUIP_ITEM, msg);
+    playUiSfx("ui_equip");
   },
   unequipItem(equipSlot: EquipmentSlotValue): void {
     if (!room) return;

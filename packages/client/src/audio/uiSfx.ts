@@ -12,6 +12,7 @@ const UI_SOUNDS = {
   ui_announcement: "/audio/ui/announcement.ogg",
   ui_tutorial: "/audio/ui/tutorial_hint.ogg",
   ui_queue_start: "/audio/ui/queue_start.ogg",
+  ui_equip: "/audio/ui/equip.ogg",
   level_up: "/audio/sfx/level_up.ogg",
 } as const;
 
