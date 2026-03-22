@@ -9,7 +9,7 @@ import { createInstanceInMemory } from "./ItemInstanceRegistry.js";
  * - random()^0.8 gives a slight bias toward higher values (D2-inspired)
  * - ilvlFactor (0 at level 1, 1 at MAX_LEVEL) scales the effective range
  */
-function rollStatValue(min: number, max: number, ilvlFactor: number): number {
+export function rollStatValue(min: number, max: number, ilvlFactor: number): number {
   const range = max - min;
   // Scale effective range: at ilvl 1 you can roll 50-100% of range, at max 100%
   const effectiveRange = range * (0.5 + 0.5 * ilvlFactor);
@@ -20,7 +20,7 @@ function rollStatValue(min: number, max: number, ilvlFactor: number): number {
  * Select N unique entries from a weighted pool (no duplicates).
  * Uses D2-style weighted random: chance = entry.weight / totalWeight.
  */
-function selectFromPool(pool: readonly BonusPoolEntry[], count: number): BonusPoolEntry[] {
+export function selectFromPool(pool: readonly BonusPoolEntry[], count: number): BonusPoolEntry[] {
   if (count <= 0 || pool.length === 0) return [];
 
   const available = [...pool];

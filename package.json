@@ -16,12 +16,17 @@
     "db:migrate": "npm run db:migrate --workspace=@dungeon/server",
     "db:seed": "npm run seed --workspace=@dungeon/server",
     "db:studio": "npm run db:studio --workspace=@dungeon/server",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "NODE_ENV=test bun test --recursive",
+    "test:coverage": "NODE_ENV=test bun test --recursive --coverage",
+    "test:shared": "NODE_ENV=test bun test packages/shared",
+    "test:server": "NODE_ENV=test bun test packages/server"
   },
   "lint-staged": {
     "*.{ts,tsx,js,json,md,html,css}": "prettier --write"
   },
   "devDependencies": {
+    "@colyseus/testing": "^0.17.11",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.3",
     "prettier": "^3.8.1",

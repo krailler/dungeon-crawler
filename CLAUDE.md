@@ -26,7 +26,21 @@ npm run build        # Client production build
 npm run server       # Start game server
 npm run server:dev   # Start game server with watch (auto-restart)
 ./scripts/reset-db.sh  # Drop DB + re-run migrations + seed
+npm test             # Run all tests (bun test)
+npm run test:coverage # Run tests with coverage report
+npm run test:shared  # Run shared package tests only
+npm run test:server  # Run server package tests only
 ```
+
+## Pre-commit Checklist
+
+Before committing ANY code change, you MUST:
+
+1. **Run tests**: `NODE_ENV=test bun test --recursive` — all tests must pass
+2. **Type-check server**: `npx tsc --noEmit -p packages/server/tsconfig.json` — no new errors
+3. **Type-check client**: `npx tsc --noEmit -p packages/client/tsconfig.json` — no new errors (ignore pre-existing express/LobbyInventoryTab errors)
+4. **If you modified game logic**: add or update tests covering the change
+5. **If you added a new system/module**: add a test file in the corresponding `tests/` directory
 
 ## Project Structure (monorepo with npm workspaces)
 
